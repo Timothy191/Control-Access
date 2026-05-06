@@ -58,6 +58,68 @@
     background: rgba(244, 67, 54, 0.2);
     color: #f44336;
 }
+.qr-decoded-info {
+    margin-top: 12px;
+    padding: 10px 12px;
+    background: rgba(0, 188, 212, 0.08);
+    border-left: 3px solid #00bcd4;
+    border-radius: 0 6px 6px 0;
+}
+.qr-decoded-info .qr-field {
+    display: flex;
+    justify-content: space-between;
+    padding: 4px 0;
+    font-size: 13px;
+}
+.qr-decoded-info .qr-field label {
+    color: #80cbc4;
+    font-weight: 500;
+    min-width: 80px;
+}
+.qr-decoded-info .qr-field span {
+    color: var(--text-primary);
+    font-family: 'JetBrains Mono', monospace;
+    text-align: right;
+}
+.qr-format-badge {
+    display: inline-block;
+    padding: 1px 6px;
+    border-radius: 3px;
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    background: rgba(255,255,255,0.1);
+    color: var(--gray);
+    margin-left: 6px;
+}
+.qr-raw-toggle {
+    display: block;
+    margin-top: 8px;
+    font-size: 11px;
+    color: var(--gray);
+    cursor: pointer;
+    border: none;
+    background: none;
+    padding: 0;
+    text-decoration: underline;
+}
+.qr-raw-toggle:hover { color: var(--text-primary); }
+.qr-raw-data {
+    display: none;
+    margin-top: 6px;
+    padding: 8px;
+    background: rgba(0,0,0,0.3);
+    border-radius: 4px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: #aaa;
+    word-break: break-all;
+    white-space: pre-wrap;
+    max-height: 120px;
+    overflow-y: auto;
+}
+.qr-raw-data.visible { display: block; }
 .target-selection {
     display: flex;
     gap: 15px;
@@ -157,6 +219,49 @@
                             <p class="approval-details-text">{{ approval.details }}</p>
                         </div>
                     </div>
+                    {% set qr = decoded_map.get(approval.id, {}) %}
+                    {% if qr.get('format', 'none') != 'none' %}
+                    <div class="qr-decoded-info">
+                        <div class="qr-field">
+                            <label><i class="fas fa-qrcode"></i> Scanned Info</label>
+                            <span class="qr-format-badge">{{ qr.get('format', 'unknown') }}</span>
+                        </div>
+                        {% if qr.get('employee_id') %}
+                        <div class="qr-field">
+                            <label>ID:</label>
+                            <span>{{ qr.employee_id }}</span>
+                        </div>
+                        {% endif %}
+                        {% if qr.get('name') %}
+                        <div class="qr-field">
+                            <label>Name:</label>
+                            <span>{{ qr.name }}</span>
+                        </div>
+                        {% endif %}
+                        {% if qr.get('position') %}
+                        <div class="qr-field">
+                            <label>Position:</label>
+                            <span>{{ qr.position }}</span>
+                        </div>
+                        {% endif %}
+                        {% if qr.get('department') %}
+                        <div class="qr-field">
+                            <label>Dept:</label>
+                            <span>{{ qr.department }}</span>
+                        </div>
+                        {% endif %}
+                        {% if qr.get('area') %}
+                        <div class="qr-field">
+                            <label>Area:</label>
+                            <span>{{ qr.area }}</span>
+                        </div>
+                        {% endif %}
+                        {% if qr.get('raw_data') %}
+                        <button class="qr-raw-toggle" onclick="this.nextElementSibling.classList.toggle('visible'); this.textContent = this.nextElementSibling.classList.contains('visible') ? '▲ Hide Raw QR' : '▼ Show Raw QR'">▼ Show Raw QR</button>
+                        <div class="qr-raw-data">{{ qr.raw_data }}</div>
+                        {% endif %}
+                    </div>
+                    {% endif %}
                 </div>
                 <div class="approval-footer">
                     {% if session.role in ['admin', 'manager'] %}

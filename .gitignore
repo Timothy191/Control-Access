@@ -26,6 +26,9 @@ env/
 
 # Database
 *.db
+*.db-shm
+*.db-wal
+*.db-journal
 *.sqlite
 *.sqlite3
 
@@ -48,6 +51,12 @@ MineGateScannerNative/
 .opencode/
 .windsurf/
 
+# Test/coverage artifacts
+.pytest_cache/
+htmlcov/
+.coverage
+coverage.xml
+
 # Backup/temp scripts
 *.backup
 *.backup2
@@ -57,3 +66,6 @@ MineGateScannerNative/
 cookies.txt
 ba.txt
 OpenMythos/
+
+# Node (if any JS tooling added)
+node_modules/

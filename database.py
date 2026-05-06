@@ -1,4 +1,4 @@
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, event
 from sqlalchemy.orm import scoped_session, sessionmaker
 from sqlalchemy.ext.declarative import declarative_base
 import os
@@ -9,7 +9,22 @@ database_path = os.path.join(base_dir, "mine_management.db")
 DATABASE_URL = f"sqlite:///{database_path}"
 
 # Create engine - removed convert_unicode parameter, added connect_args for SQLite
-engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
+engine = create_engine(
+    DATABASE_URL,
+    connect_args={"check_same_thread": False},
+    pool_pre_ping=True,
+)
+
+
+@event.listens_for(engine, "connect")
+def _set_sqlite_pragmas(dbapi_conn, connection_record):
+    cursor = dbapi_conn.cursor()
+    cursor.execute("PRAGMA journal_mode=WAL")
+    cursor.execute("PRAGMA synchronous=NORMAL")
+    cursor.execute("PRAGMA cache_size=-64000")      # 64 MB page cache
+    cursor.execute("PRAGMA mmap_size=268435456")     # 256 MB memory-mapped I/O
+    cursor.execute("PRAGMA temp_store=MEMORY")
+    cursor.close()
 
 # Create session
 db_session = scoped_session(

@@ -111,6 +111,40 @@ fi
 echo -e "  ${GREEN}✓ Imports OK${NC}"
 
 # ─────────────────────────────────────────────────────────────
+step "Checking Ollama AI service"
+# ─────────────────────────────────────────────────────────────
+if command -v ollama >/dev/null 2>&1; then
+    if curl -sf http://localhost:11434/api/tags >/dev/null 2>&1; then
+        OLLAMA_MODELS=$(curl -sf http://localhost:11434/api/tags | python3 -c "import sys,json; print(', '.join(m['name'] for m in json.load(sys.stdin).get('models',[])))" 2>/dev/null)
+        echo -e "  ${GREEN}✓ Ollama running — models: ${OLLAMA_MODELS}${NC}"
+    else
+        echo -e "  ${YELLOW}⚠ Ollama installed but not running — starting...${NC}"
+        nohup ollama serve >/dev/null 2>&1 &
+        sleep 3
+        if curl -sf http://localhost:11434/api/tags >/dev/null 2>&1; then
+            echo -e "  ${GREEN}✓ Ollama started successfully${NC}"
+        else
+            echo -e "  ${RED}✗ Could not start Ollama — AI chat will be disabled${NC}"
+        fi
+    fi
+    # Ensure base model is pulled
+    if ! ollama list 2>/dev/null | grep -q "llama3.2"; then
+        echo -e "  ${YELLOW}⚠ Pulling llama3.2 base model (2GB, one-time download)...${NC}"
+        ollama pull llama3.2
+    fi
+    # Build CPU-optimized mine-assistant model from Modelfile
+    if ! ollama list 2>/dev/null | grep -q "mine-assistant"; then
+        echo -e "  ${YELLOW}⚠ Building mine-assistant model (CPU-optimized for this system)...${NC}"
+        ollama create mine-assistant -f "$PROJECT_DIR/Modelfile.mine"
+        echo -e "  ${GREEN}✓ mine-assistant model built${NC}"
+    else
+        echo -e "  ${GREEN}✓ mine-assistant model ready${NC}"
+    fi
+else
+    echo -e "  ${DIM}⚠ Ollama not installed — AI chat disabled. Install: curl -fsSL https://ollama.com/install.sh | sh${NC}"
+fi
+
+# ─────────────────────────────────────────────────────────────
 step "Launching services in tmux"
 # ─────────────────────────────────────────────────────────────
 #

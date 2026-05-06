@@ -1024,3 +1024,20 @@ select.form-control {
     font-size: 0.9rem;
     width: 120px;
 }
+
+/* WebGL Dashboard Components */
+.gate-chart { grid-column: 1 / -1; }
+.gate-chart .card-body { border-radius: 0 0 8px 8px; overflow: hidden; }
+.gate-chart canvas { display: block; }
+.badge-gpu {
+    background: linear-gradient(135deg, #6366f1, #8b5cf6);
+    color: #fff;
+    padding: 3px 8px;
+    border-radius: 12px;
+    font-size: 0.7rem;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+}
+.on-site-gauge .card-body { min-height: 140px; }
+.status-badge.success { color: #4caf50; }
+.status-badge.danger { color: #f44336; }

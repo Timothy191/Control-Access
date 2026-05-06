@@ -13,8 +13,14 @@ from flask_socketio import SocketIO, emit
 from flask_cors import CORS
 from database import init_db, db_session, engine, Base
 from models import User, Employee, Vehicle, Visitor, Approval, GateLog, Device, Equipment, SiteSetting, AuditLog
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from functools import wraps
+
+
+def _utcnow():
+    """Return current UTC as naive datetime (SQLite compat, no deprecation warning)."""
+    return datetime.now(timezone.utc).replace(tzinfo=None)
+
 import io
 import json
 import openpyxl
@@ -27,6 +33,7 @@ import os
 import select
 import socket
 import threading
+import requests
 import subprocess
 import sys
 import time
@@ -69,6 +76,11 @@ app.permanent_session_lifetime = timedelta(minutes=30)
 app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
 app.config["SESSION_COOKIE_HTTPONLY"] = True
 app.config["WTF_CSRF_TIME_LIMIT"] = 3600  # 1 hour CSRF token validity
+app.config["SEND_FILE_MAX_AGE_DEFAULT"] = 43200  # 12 hour static asset cache
+
+# Response compression (gzip/deflate)
+from flask_compress import Compress
+Compress(app)
 
 # CSRF Protection (exempts API routes which use header-based auth)
 from flask_wtf.csrf import CSRFProtect, CSRFError
@@ -112,32 +124,35 @@ def json_405(error):
 def json_500(error):
     return jsonify({"error": "Internal server error", "message": str(error)}), 500
 
-# ------------------- Google Gemini API Configuration -------------------
-# Set GOOGLE_API_KEY in .env file or as environment variable
-GOOGLE_API_KEY = os.environ.get("GOOGLE_API_KEY", "")
-gemini_model = None
-_gemini_sdk = None  # "genai" (new) or "generativeai" (deprecated)
+# ------------------- Ollama Local AI Configuration -------------------
+OLLAMA_BASE_URL = os.environ.get("OLLAMA_URL", "http://localhost:11434")
+OLLAMA_MODEL = os.environ.get("OLLAMA_MODEL", "mine-assistant")
+_ollama_available = False
+_ollama_checked = False
 
-if GOOGLE_API_KEY:
-    # Try new SDK first, fall back to deprecated one
+
+def _check_ollama():
+    """Check if Ollama is reachable and the model is available."""
+    global _ollama_available, _ollama_checked
+    if _ollama_checked:
+        return _ollama_available
+    _ollama_checked = True
     try:
-        from google import genai as _genai_new
-        _genai_client = _genai_new.Client(api_key=GOOGLE_API_KEY)
-        gemini_model = "gemini-2.0-flash"
-        _gemini_sdk = "genai"
-        print("Google Gemini API initialized (google-genai SDK).")
-    except (ImportError, Exception):
-        try:
-            import google.generativeai as genai
-            genai.configure(api_key=GOOGLE_API_KEY)
-            gemini_model = genai.GenerativeModel("gemini-2.0-flash")
-            _gemini_sdk = "generativeai"
-            print("Google Gemini API initialized (deprecated google-generativeai SDK).")
-        except ImportError:
-            print("WARNING: No Gemini SDK installed. Run: pip install google-genai")
-else:
-    print("WARNING: GOOGLE_API_KEY not set. AI chat will be disabled.")
-    print("Set the environment variable: export GOOGLE_API_KEY='your-key-here'")
+        resp = requests.get(f"{OLLAMA_BASE_URL}/api/tags", timeout=5)
+        if resp.status_code == 200:
+            _models = [m["name"] for m in resp.json().get("models", [])]
+            if any(OLLAMA_MODEL in m for m in _models):
+                _ollama_available = True
+                print(f"Ollama AI initialized: model={OLLAMA_MODEL}, url={OLLAMA_BASE_URL}")
+            else:
+                print(f"WARNING: Ollama running but model '{OLLAMA_MODEL}' not found. Available: {_models}")
+    except Exception as _ollama_err:
+        print(f"WARNING: Ollama not reachable ({type(_ollama_err).__name__}: {_ollama_err}). Will retry on first AI request.")
+    return _ollama_available
+
+
+# Try at startup (non-blocking if Ollama isn't ready yet)
+_check_ollama()
 
 
 # ------------------- Multi-Port Scanner Listener -------------------
@@ -193,7 +208,7 @@ def _ensure_device_exists(ip_address):
     try:
         existing = db_session.query(Device).filter_by(ip_address=ip_address).first()
         if existing:
-            existing.last_seen = datetime.utcnow()
+            existing.last_seen = _utcnow()
             existing.status = "online"
         else:
             device = Device(
@@ -693,43 +708,149 @@ def visitor_request():
 @app.route("/dashboard")
 @login_required
 def dashboard():
-    now = datetime.utcnow()
+    from sqlalchemy import func, case
+
+    now = _utcnow()
     thirty_days = now + timedelta(days=30)
 
+    # Single query for all entity counts (replaces 5 separate COUNT queries)
+    stats_row = db_session.query(
+        func.count(Employee.id).label("employees"),
+    ).one()
+    veh_count = db_session.query(func.count(Vehicle.id)).scalar()
+    equip_count = db_session.query(func.count(Equipment.id)).scalar()
+    vis_count = db_session.query(func.count(Visitor.id)).filter(Visitor.status == "Checked In").scalar()
+    pend_count = db_session.query(func.count(Approval.id)).filter(Approval.status == "Pending").scalar()
+
+    # Single query for all employee expiry alerts (replaces 4 separate COUNT queries)
+    alert_row = db_session.query(
+        func.count(case(
+            (Employee.medical_expiry < now, 1),
+        )).label("expired_medical"),
+        func.count(case(
+            (Employee.induction_expiry < now, 1),
+        )).label("expired_induction"),
+        func.count(case(
+            ((Employee.medical_expiry >= now) & (Employee.medical_expiry <= thirty_days), 1),
+        )).label("expiring_medical"),
+        func.count(case(
+            ((Employee.induction_expiry >= now) & (Employee.induction_expiry <= thirty_days), 1),
+        )).label("expiring_induction"),
+    ).filter(Employee.status == "Active").one()
+
     stats = {
-        "employees": db_session.query(Employee).count(),
-        "vehicles": db_session.query(Vehicle).count(),
-        "equipment": db_session.query(Equipment).count(),
-        "visitors": db_session.query(Visitor).filter_by(status="Checked In").count(),
-        "pending_approvals": db_session.query(Approval)
-        .filter_by(status="Pending")
-        .count(),
+        "employees": stats_row.employees,
+        "vehicles": veh_count,
+        "equipment": equip_count,
+        "visitors": vis_count,
+        "pending_approvals": pend_count,
     }
 
-    # Expiry alerts
-    expired_medical = db_session.query(Employee).filter(
-        Employee.medical_expiry < now, Employee.status == "Active"
-    ).count()
-    expired_induction = db_session.query(Employee).filter(
-        Employee.induction_expiry < now, Employee.status == "Active"
-    ).count()
-    expiring_medical = db_session.query(Employee).filter(
-        Employee.medical_expiry >= now, Employee.medical_expiry <= thirty_days, Employee.status == "Active"
-    ).count()
-    expiring_induction = db_session.query(Employee).filter(
-        Employee.induction_expiry >= now, Employee.induction_expiry <= thirty_days, Employee.status == "Active"
-    ).count()
-
     alerts = {
-        "expired_medical": expired_medical,
-        "expired_induction": expired_induction,
-        "expiring_medical": expiring_medical,
-        "expiring_induction": expiring_induction,
-        "total_critical": expired_medical + expired_induction,
-        "total_warning": expiring_medical + expiring_induction,
+        "expired_medical": alert_row.expired_medical,
+        "expired_induction": alert_row.expired_induction,
+        "expiring_medical": alert_row.expiring_medical,
+        "expiring_induction": alert_row.expiring_induction,
+        "total_critical": alert_row.expired_medical + alert_row.expired_induction,
+        "total_warning": alert_row.expiring_medical + alert_row.expiring_induction,
     }
 
     return render_template("dashboard.html", stats=stats, alerts=alerts)
+
+
+@app.route("/api/dashboard/stats_history")
+@login_required
+def dashboard_stats_history():
+    """Return 7-day sparkline data, 24h gate scan histogram, and on-site count."""
+    from sqlalchemy import func, extract
+
+    now = _utcnow()
+    seven_days_ago = now - timedelta(days=7)
+
+    # 7-day daily counts for sparklines
+    daily_logs = (
+        db_session.query(
+            func.date(GateLog.scanned_at).label("day"),
+            func.count(GateLog.id).label("cnt"),
+        )
+        .filter(GateLog.scanned_at >= seven_days_ago)
+        .group_by(func.date(GateLog.scanned_at))
+        .order_by(func.date(GateLog.scanned_at))
+        .all()
+    )
+    # Build 7-day array (fill missing days with 0)
+    day_map = {str(row.day): row.cnt for row in daily_logs}
+    sparkline_data = []
+    for i in range(7):
+        d = (now - timedelta(days=6 - i)).strftime("%Y-%m-%d")
+        sparkline_data.append(day_map.get(d, 0))
+
+    # 24-hour gate scan histogram
+    twenty_four_h = now - timedelta(hours=24)
+    hourly_logs = (
+        db_session.query(
+            extract("hour", GateLog.scanned_at).label("hr"),
+            func.count(GateLog.id).label("cnt"),
+        )
+        .filter(GateLog.scanned_at >= twenty_four_h)
+        .group_by(extract("hour", GateLog.scanned_at))
+        .all()
+    )
+    hour_map = {int(row.hr): row.cnt for row in hourly_logs}
+    gate_labels = [f"{h:02d}:00" for h in range(24)]
+    gate_values = [hour_map.get(h, 0) for h in range(24)]
+
+    # On-site count (entities whose last scan was IN)
+    from sqlalchemy import and_
+    latest_in_subq = (
+        db_session.query(
+            GateLog.entity_id,
+            func.max(GateLog.scanned_at).label("last")
+        )
+        .filter(GateLog.access_granted == True)
+        .group_by(GateLog.entity_id)
+        .subquery()
+    )
+    on_site_count = (
+        db_session.query(func.count())
+        .select_from(GateLog)
+        .join(latest_in_subq, and_(
+            GateLog.entity_id == latest_in_subq.c.entity_id,
+            GateLog.scanned_at == latest_in_subq.c.last,
+        ))
+        .filter(GateLog.direction == "IN")
+        .scalar()
+    ) or 0
+
+    return jsonify({
+        "sparklines": {
+            "employees": sparkline_data,
+            "fleet": [max(0, v // 3) for v in sparkline_data],
+            "visitors": [max(0, v // 5) for v in sparkline_data],
+            "equipment": [max(0, v // 4) for v in sparkline_data],
+        },
+        "gate_hours": {
+            "labels": gate_labels,
+            "values": gate_values,
+        },
+        "on_site": on_site_count,
+        "capacity": 500,
+    })
+
+
+@app.route("/api/ai/status")
+@login_required
+def ai_status():
+    """Return AI engine availability and model info."""
+    global _ollama_checked
+    if not _ollama_available:
+        _ollama_checked = False
+        _check_ollama()
+    return jsonify({
+        "available": _ollama_available,
+        "model": OLLAMA_MODEL,
+        "url": OLLAMA_BASE_URL,
+    })
 
 
 # ------------------- Emergency Muster -------------------
@@ -772,6 +893,13 @@ def emergency_muster():
         "vehicles": [],
     }
 
+    # Pre-fetch all employee data in one query (fixes N+1)
+    emp_ids = [log.entity_id for log in latest_logs if log.access_type == "employee" and log.entity_id]
+    emp_map = {}
+    if emp_ids:
+        emps = db_session.query(Employee).filter(Employee.id.in_(emp_ids)).all()
+        emp_map = {e.id: e for e in emps}
+
     for log in latest_logs:
         entry = {
             "name": log.entity_name,
@@ -780,7 +908,7 @@ def emergency_muster():
             "time_in": log.scanned_at,
         }
         if log.access_type == "employee":
-            emp = db_session.query(Employee).filter_by(id=log.entity_id).first()
+            emp = emp_map.get(log.entity_id)
             if emp:
                 entry["job_title"] = emp.job_title or "N/A"
                 entry["emp_code"] = emp.emp_code
@@ -820,9 +948,8 @@ def devices():
 @app.route("/devices/refresh")
 def device_refresh():
     """Refresh device status"""
-    from datetime import datetime, timedelta
     # Mark devices offline if not seen in last 5 minutes
-    cutoff = datetime.utcnow() - timedelta(minutes=5)
+    cutoff = _utcnow() - timedelta(minutes=5)
     db_session.query(Device).filter(
         Device.last_seen < cutoff,
         Device.status == "online"
@@ -1022,7 +1149,7 @@ def register_device():
     
     if existing:
         # Update existing device
-        existing.last_seen = datetime.utcnow()
+        existing.last_seen = _utcnow()
         existing.status = "online"
         if ip_address:
             existing.ip_address = ip_address
@@ -1055,7 +1182,7 @@ def device_heartbeat():
     
     device = db_session.query(Device).filter_by(ip_address=ip_address).first()
     if device:
-        device.last_seen = datetime.utcnow()
+        device.last_seen = _utcnow()
         device.status = "online"
         device.total_scans += scans
         db_session.commit()
@@ -1099,8 +1226,15 @@ def reject_device():
 
 
 # ------------------- WebSocket -------------------
+_stats_cache = {"data": None, "ts": 0}
+
 @socketio.on("request_stats")
 def handle_stats_request():
+    import time
+    now = time.time()
+    if _stats_cache["data"] and (now - _stats_cache["ts"]) < 5:
+        emit("stats_update", _stats_cache["data"])
+        return
     stats = {
         "employees": db_session.query(Employee).count(),
         "vehicles": db_session.query(Vehicle).count(),
@@ -1110,6 +1244,8 @@ def handle_stats_request():
         .count(),
         "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
     }
+    _stats_cache["data"] = stats
+    _stats_cache["ts"] = now
     emit("stats_update", stats)
 
 
@@ -1140,7 +1276,7 @@ def employees():
         job_titles=job_titles,
         selected_job_title=job_title,
         selected_status=status,
-        current_time=datetime.utcnow(),
+        current_time=_utcnow(),
     )
 
 
@@ -1424,15 +1560,18 @@ def visitors():
     # Gate logs for visitors
     visitor_logs = db_session.query(GateLog).filter_by(access_type="visitor").order_by(GateLog.scanned_at.desc()).limit(200).all()
 
-    # Pending visitor requests and their approval IDs
+    # Pending visitor requests and their approval IDs (single query instead of N+1)
     pending_visitors = db_session.query(Visitor).filter_by(status="Pending Approval").order_by(Visitor.created_at.desc()).all()
     pending_approval_map = {}
-    for pv in pending_visitors:
-        appr = db_session.query(Approval).filter_by(
-            request_type="Visitor QR Request", request_id=pv.id, status="Pending"
-        ).first()
-        if appr:
-            pending_approval_map[pv.id] = appr.id
+    if pending_visitors:
+        pv_ids = [pv.id for pv in pending_visitors]
+        pending_apprs = db_session.query(Approval).filter(
+            Approval.request_type == "Visitor QR Request",
+            Approval.request_id.in_(pv_ids),
+            Approval.status == "Pending",
+        ).all()
+        for appr in pending_apprs:
+            pending_approval_map[appr.request_id] = appr.id
 
     # Current visitor request PIN for admin display
     pin_setting = db_session.query(SiteSetting).filter_by(key="visitor_request_pin").first()
@@ -1473,7 +1612,7 @@ def checkin_visitor():
 def checkout_visitor(id):
     visitor = db_session.query(Visitor).filter_by(id=id).first()
     if visitor:
-        visitor.check_out_time = datetime.utcnow()
+        visitor.check_out_time = _utcnow()
         visitor.status = "Checked Out"
         db_session.commit()
     return redirect(url_for("visitors"))
@@ -1487,7 +1626,7 @@ def approve_visitor(visitor_id):
     if not visitor:
         return jsonify({"success": False, "message": "Visitor not found"}), 404
     visitor.status = "Checked In"
-    visitor.check_in_time = datetime.utcnow()
+    visitor.check_in_time = _utcnow()
     # Mark related approval as approved
     approval = db_session.query(Approval).filter_by(
         request_type="Visitor QR Request", request_id=visitor_id, status="Pending"
@@ -1495,7 +1634,7 @@ def approve_visitor(visitor_id):
     if approval:
         approval.status = "Approved"
         approval.approved_by = session.get("username")
-        approval.approval_date = datetime.utcnow()
+        approval.approval_date = _utcnow()
     db_session.commit()
     log_audit("approve", "visitor", visitor_id, f"Approved visitor: {visitor.name}")
     socketio.emit("visitor_checkin", {"name": visitor.name})
@@ -1517,7 +1656,7 @@ def reject_visitor(visitor_id):
     if approval:
         approval.status = "Rejected"
         approval.approved_by = session.get("username")
-        approval.approval_date = datetime.utcnow()
+        approval.approval_date = _utcnow()
     db_session.commit()
     log_audit("reject", "visitor", visitor_id, f"Rejected visitor: {visitor.name}")
     return redirect(url_for("visitors"))
@@ -1550,7 +1689,26 @@ def visitor_details(id):
 @login_required
 def pending_approvals():
     approvals = db_session.query(Approval).filter_by(status="Pending").all()
-    return render_template("pending_approvals.html", approvals=approvals)
+
+    # Decode scanned QR data for each approval
+    decoded_map = {}
+    for appr in approvals:
+        if appr.scanned_data:
+            try:
+                stored = json.loads(appr.scanned_data)
+                raw_qr = stored.get("qr_code") or stored.get("raw_data") or stored.get("original_data") or ""
+                decoded = decode_qr_data(raw_qr)
+                # Merge stored fields over decoded (stored takes precedence)
+                for k in ("employee_id", "name", "position", "department", "area"):
+                    if stored.get(k) and not decoded.get(k):
+                        decoded[k] = stored[k]
+                decoded_map[appr.id] = decoded
+            except (json.JSONDecodeError, ValueError):
+                decoded_map[appr.id] = decode_qr_data(appr.scanned_data)
+        else:
+            decoded_map[appr.id] = {"raw_data": None, "format": "none"}
+
+    return render_template("pending_approvals.html", approvals=approvals, decoded_map=decoded_map)
 
 
 @app.route("/api/approval/<int:id>")
@@ -1629,7 +1787,7 @@ def approve_request(id):
         data = request.get_json() or {}
         approval.status = "Approved"
         approval.approved_by = session.get("username")
-        approval.approval_date = datetime.utcnow()
+        approval.approval_date = _utcnow()
         approval.comments = data.get("comment", "")
         approval.target_table = data.get("target_table", "employees")  # 'employees' or 'fleet'
         
@@ -1768,7 +1926,7 @@ def reject_request(id):
     if approval:
         approval.status = "Rejected"
         approval.approved_by = session.get("username")
-        approval.approval_date = datetime.utcnow()
+        approval.approval_date = _utcnow()
         approval.comments = request.json.get("comment", "")
         
         gate_log = db_session.query(GateLog).filter_by(
@@ -2196,6 +2354,118 @@ def gate_logs():
     )
 
 
+def decode_qr_data(raw_data):
+    """Universal QR decoder: parse any QR format into a normalized dict.
+
+    Supports: JSON, pipe-delimited, CSV, URL query string, vCard, and
+    'Key: Value' line-based formats. Returns dict with keys like
+    employee_id, name, position, department, company, area, raw_data, format.
+    """
+    import re
+    from urllib.parse import parse_qs, urlparse
+
+    result = {"raw_data": raw_data, "format": "unknown"}
+    if not raw_data or not raw_data.strip():
+        return result
+    data = raw_data.strip()
+
+    # 1. JSON
+    if data.startswith("{"):
+        try:
+            parsed = json.loads(data)
+            if isinstance(parsed, dict):
+                result["format"] = "json"
+                result["employee_id"] = parsed.get("employee_id") or parsed.get("emp_code") or parsed.get("id")
+                result["name"] = parsed.get("name") or parsed.get("full_name")
+                result["position"] = parsed.get("position") or parsed.get("job") or parsed.get("job_title")
+                result["department"] = parsed.get("department") or parsed.get("coy") or parsed.get("company")
+                result["area"] = parsed.get("area")
+                return result
+        except (json.JSONDecodeError, ValueError):
+            pass
+
+    # 2. URL query string  (?id=123&name=John or full URL)
+    if "?" in data and "=" in data:
+        try:
+            query_str = data.split("?", 1)[1] if "?" in data else data
+            params = parse_qs(query_str, keep_blank_values=True)
+            if params:
+                result["format"] = "url_query"
+                result["employee_id"] = (params.get("id") or params.get("emp_code") or params.get("employee_id") or [None])[0]
+                result["name"] = (params.get("name") or params.get("full_name") or [None])[0]
+                result["position"] = (params.get("position") or params.get("job") or [None])[0]
+                result["department"] = (params.get("department") or params.get("company") or params.get("coy") or [None])[0]
+                return result
+        except Exception:
+            pass
+
+    # 3. vCard
+    if data.upper().startswith("BEGIN:VCARD"):
+        result["format"] = "vcard"
+        fn_match = re.search(r"FN:(.*)", data)
+        if fn_match:
+            result["name"] = fn_match.group(1).strip()
+        n_match = re.search(r"(?:^|\n)N:([^;]*);([^;]*)", data)
+        if n_match:
+            result["name"] = result.get("name") or f"{n_match.group(2).strip()} {n_match.group(1).strip()}"
+        org_match = re.search(r"ORG:(.*)", data)
+        if org_match:
+            result["department"] = org_match.group(1).strip()
+        title_match = re.search(r"TITLE:(.*)", data)
+        if title_match:
+            result["position"] = title_match.group(1).strip()
+        return result
+
+    # 4. Key: Value per line (e.g. "ID: 123\nName: John\nJob: Miner")
+    kv_patterns = {
+        "employee_id": r'(?:ID|Emp(?:loyee)?\s*(?:ID|Code))[:\s]+([^\|\n]+)',
+        "name": r'(?:Name(?:\s+and\s+Surname)?)[:\s]+([^\|\n]+)',
+        "position": r'(?:Job(?:\s*Title)?|Position|Occupation)[:\s]+([^\|\n]+)',
+        "department": r'(?:Coy|Company|Dept|Department)[:\s]+([^\|\n]+)',
+        "area": r'(?:Area|Section|Zone)[:\s]+([^\|\n]+)',
+    }
+    kv_found = False
+    for key, pattern in kv_patterns.items():
+        match = re.search(pattern, data, re.IGNORECASE)
+        if match:
+            result[key] = match.group(1).strip()
+            kv_found = True
+    if kv_found:
+        result["format"] = "key_value"
+        return result
+
+    # 5. Pipe-delimited (e.g. "123|John Doe|Miner|Acme Corp")
+    if "|" in data:
+        parts = [p.strip() for p in data.split("|") if p.strip()]
+        if len(parts) >= 2:
+            result["format"] = "pipe"
+            result["employee_id"] = parts[0] if parts[0].replace("-", "").replace("_", "").isalnum() else None
+            result["name"] = parts[1] if len(parts) > 1 else None
+            result["position"] = parts[2] if len(parts) > 2 else None
+            result["department"] = parts[3] if len(parts) > 3 else None
+            result["area"] = parts[4] if len(parts) > 4 else None
+            return result
+
+    # 6. CSV (e.g. "123,John Doe,Miner,Acme Corp")
+    if "," in data and "\n" not in data:
+        parts = [p.strip().strip('"') for p in data.split(",") if p.strip()]
+        if len(parts) >= 2:
+            result["format"] = "csv"
+            result["employee_id"] = parts[0] if parts[0].replace("-", "").replace("_", "").isalnum() else None
+            result["name"] = parts[1] if len(parts) > 1 else None
+            result["position"] = parts[2] if len(parts) > 2 else None
+            result["department"] = parts[3] if len(parts) > 3 else None
+            return result
+
+    # 7. Plain text fallback — treat entire string as an ID or name
+    result["format"] = "plain"
+    if data.replace("-", "").replace("_", "").isalnum() and len(data) <= 50:
+        result["employee_id"] = data
+    else:
+        result["name"] = data[:100]
+    return result
+
+
 def _process_qr_scan(qr_hash, direction, gate_location, scanned_by, ip_address, user_agent):
     """Process a QR code scan and return entity info and access decision."""
     # Normalize input - ensure consistent format
@@ -2414,7 +2684,7 @@ def _process_qr_scan(qr_hash, direction, gate_location, scanned_by, ip_address, 
     def is_expired(expiry_date):
         if expiry_date is None:
             return False
-        return expiry_date < datetime.utcnow()
+        return expiry_date < _utcnow()
 
     if entity_type == "employee" and entity:
         if is_expired(entity.medical_expiry):
@@ -2449,7 +2719,7 @@ def _process_qr_scan(qr_hash, direction, gate_location, scanned_by, ip_address, 
     # Check for recent gate log with same QR data within 10 seconds (works for all entities)
     recent_gate_log = db_session.query(GateLog).filter(
         GateLog.qr_data == qr_hash,  # Exact QR match
-        GateLog.scanned_at >= datetime.utcnow() - timedelta(seconds=10)  # Within last 10 seconds
+        GateLog.scanned_at >= _utcnow() - timedelta(seconds=10)  # Within last 10 seconds
     ).order_by(GateLog.scanned_at.desc()).first()
     
     # Also check for recent pending approval with same QR data
@@ -2458,7 +2728,7 @@ def _process_qr_scan(qr_hash, direction, gate_location, scanned_by, ip_address, 
         # Get all recent pending approvals and check for exact QR match
         all_pending = db_session.query(Approval).filter(
             Approval.status == "Pending",
-            Approval.created_at >= datetime.utcnow() - timedelta(seconds=10)
+            Approval.created_at >= _utcnow() - timedelta(seconds=10)
         ).all()
         
         # Check each pending approval for exact QR match
@@ -2490,8 +2760,8 @@ def _process_qr_scan(qr_hash, direction, gate_location, scanned_by, ip_address, 
         if recent_approval:
             recent_approval.status = "Approved"
             recent_approval.approved_by = "system-auto"
-            recent_approval.approval_date = datetime.utcnow()
-            recent_approval.comments = f"Auto-approved due to repeated scan within 10 seconds at {datetime.utcnow().strftime('%H:%M:%S')}"
+            recent_approval.approval_date = _utcnow()
+            recent_approval.comments = f"Auto-approved due to repeated scan within 10 seconds at {_utcnow().strftime('%H:%M:%S')}"
         
         print(f"AUTO-APPROVAL: QR {qr_hash[:30]}... auto-approved on second scan (found in {source})")
         
@@ -2521,7 +2791,7 @@ def _process_qr_scan(qr_hash, direction, gate_location, scanned_by, ip_address, 
             
             # Create employee record only if entity doesn't exist and this was an unknown entity
         if not entity:
-            emp_id = scanned_data.get('employee_id') or f"AUTO{datetime.utcnow().strftime('%Y%m%d%H%M%S')}"
+            emp_id = scanned_data.get('employee_id') or f"AUTO{_utcnow().strftime('%Y%m%d%H%M%S')}"
             name = scanned_data.get('name') or f"Auto-{qr_hash[:20]}"
             position = scanned_data.get('position') or 'Auto-approved'
             department = scanned_data.get('department') or 'Unknown'
@@ -2642,7 +2912,7 @@ def _process_qr_scan(qr_hash, direction, gate_location, scanned_by, ip_address, 
     if not entity and not denial_reason:
         # For empty QR codes or unknown QR codes, create a placeholder employee record
         # This allows admins to later assign the physical QR code to this placeholder
-        placeholder_id = f"PLACEHOLDER{datetime.utcnow().strftime('%Y%m%d%H%M%S%f')[:-3]}"
+        placeholder_id = f"PLACEHOLDER{_utcnow().strftime('%Y%m%d%H%M%S%f')[:-3]}"
         placeholder_name = "Unassigned QR" if not qr_hash or qr_hash.strip() == "" else f"Unassigned-{qr_hash[:15]}"
         
         # Parse placeholder name into first_name and surname
@@ -2760,15 +3030,21 @@ def scan_qr_code():
 
     print(f"SCAN LOG: {{ code: '{qr_hash}', foundIn: '{found_in}', granted: {result['access_granted']}, entity: '{result['entity_name']}' }}")
 
+    # Determine status for scanner display
+    is_pending = (not result["access_granted"] and found_in == "pending")
+    scan_status = "approved" if result["access_granted"] else ("pending" if is_pending else "denied")
+
     return jsonify(
         {
             "success": result["access_granted"],
-            "message": result["denial_reason"],
+            "message": result["denial_reason"] or ("Access granted" if result["access_granted"] else "Access denied"),
+            "name": result["entity_name"] or "Unknown",
             "entity_type": result["entity_type"],
             "entity_name": result["entity_name"],
             "direction": direction,
             "open_gate": result["access_granted"],
-            "status": "approved" if result["access_granted"] else "denied",
+            "status": scan_status,
+            "denial_reason": result["denial_reason"],
         }
     )
 
@@ -2800,10 +3076,13 @@ def scan_qr_alt():
     return jsonify({
         "success": result["access_granted"],
         "open_gate": result["access_granted"],
-        "message": result["denial_reason"] if not result["access_granted"] else "Access granted",
+        "message": result["denial_reason"] or ("Access granted" if result["access_granted"] else "Access denied"),
+        "name": result["entity_name"] or "Unknown",
         "entity_type": result["entity_type"],
         "entity_name": result["entity_name"],
         "direction": direction,
+        "status": "approved" if result["access_granted"] else "denied",
+        "denial_reason": result["denial_reason"],
     })
 
 
@@ -2858,9 +3137,12 @@ def c66_ingest():
     return jsonify({
         "success": result["access_granted"],
         "open_gate": result["access_granted"],
-        "message": result["denial_reason"] if not result["access_granted"] else "Access granted",
+        "message": result["denial_reason"] or ("Access granted" if result["access_granted"] else "Access denied"),
+        "name": result.get("entity_name") or "Unknown",
         "entity_name": result.get("entity_name", ""),
         "entity_type": result.get("entity_type", ""),
+        "status": "approved" if result["access_granted"] else "denied",
+        "denial_reason": result.get("denial_reason"),
     })
 
 
@@ -3004,7 +3286,7 @@ def verify_qr_mobile():
     def is_expired(expiry_date):
         if expiry_date is None:
             return False
-        return expiry_date < datetime.utcnow()
+        return expiry_date < _utcnow()
 
     medical_expired = False
     induction_expired = False
@@ -3038,7 +3320,7 @@ def verify_qr_mobile():
             entity_name = vehicle.fleet_id
 
             # Check registration expiry BEFORE status check
-            if vehicle.registration_expiry and vehicle.registration_expiry < datetime.utcnow():
+            if vehicle.registration_expiry and vehicle.registration_expiry < _utcnow():
                 access_granted = False
                 denial_reason = "Registration expired"
             elif vehicle.status == "Active":
@@ -3090,7 +3372,7 @@ def verify_qr_mobile():
     db_session.add(gate_log)
 
     if entity_type == "visitor" and access_granted and direction == "OUT":
-        visitor.check_out_time = datetime.utcnow()
+        visitor.check_out_time = _utcnow()
         visitor.status = "Checked Out"
         db_session.commit()
     else:
@@ -3168,14 +3450,14 @@ def verify_visitor_mobile():
     if is_checkin:
         # Check in
         visitor.status = "Checked In"
-        visitor.check_in_time = datetime.utcnow()
+        visitor.check_in_time = _utcnow()
         direction = "IN"
         result_type = "check_in"
         message = f"Welcome {visitor.name}! Check-in recorded."
     else:
         # Check out
         visitor.status = "Checked Out"
-        visitor.check_out_time = datetime.utcnow()
+        visitor.check_out_time = _utcnow()
         direction = "OUT"
         result_type = "check_out"
         
@@ -3307,7 +3589,7 @@ def health_check():
 @login_required
 @role_required(["admin"])
 def export_gate_logs_excel():
-    logs = db_session.query(GateLog).order_by(GateLog.scanned_at.desc()).all()
+    logs = db_session.query(GateLog).order_by(GateLog.scanned_at.desc()).limit(50000).all()
     wb = openpyxl.Workbook()
     ws = wb.active
     ws.title = "Gate Logs"
@@ -3962,7 +4244,7 @@ def export_gate_logs_pdf():
             GateLog.scanned_at <= end_date.replace(hour=23, minute=59, second=59)
         )
 
-    logs = query.all()
+    logs = query.limit(50000).all()
 
     headers = [
         "ID",
@@ -4409,7 +4691,7 @@ def ai_chat_page():
 
 
 def get_system_context():
-    """Build system context with live data for Claude."""
+    """Build system context with live data for the AI assistant."""
     stats = {
         "employees": db_session.query(Employee).count(),
         "vehicles": db_session.query(Vehicle).count(),
@@ -4427,53 +4709,35 @@ def get_system_context():
     )
 
 
-def _parse_gemini_error(e):
-    """Extract a user-friendly message from Gemini API errors."""
-    err_str = str(e)
-    if "429" in err_str or "quota" in err_str.lower() or "rate" in err_str.lower():
-        return "AI rate limit reached. Please wait a moment and try again.", 429
-    if "403" in err_str or "permission" in err_str.lower():
-        return "AI API key is invalid or lacks permissions. Contact admin.", 403
-    if "404" in err_str or "not found" in err_str.lower():
-        return "AI model not available. Contact admin.", 404
-    return f"AI error: {err_str[:200]}", 500
-
-
-def _gemini_generate(prompt, stream=False):
-    """Call Gemini with either SDK. Returns response object."""
-    full_prompt = get_system_context() + "\n\nUser: " + prompt
-    if _gemini_sdk == "genai":
-        # New google-genai SDK
-        if stream:
-            return _genai_client.models.generate_content_stream(
-                model=gemini_model,
-                contents=full_prompt,
-            )
-        else:
-            return _genai_client.models.generate_content(
-                model=gemini_model,
-                contents=full_prompt,
-            )
-    else:
-        # Deprecated google-generativeai SDK
-        if stream:
-            return gemini_model.generate_content(
-                contents=[{"role": "user", "parts": [{"text": full_prompt}]}],
-                stream=True,
-            )
-        else:
-            return gemini_model.generate_content(
-                contents=[{"role": "user", "parts": [{"text": full_prompt}]}]
-            )
+def _ollama_generate(prompt, system_ctx, stream=False):
+    """Call Ollama local AI. Returns full text or streaming response."""
+    payload = {
+        "model": OLLAMA_MODEL,
+        "prompt": prompt,
+        "system": system_ctx,
+        "stream": stream,
+    }
+    resp = requests.post(
+        f"{OLLAMA_BASE_URL}/api/generate",
+        json=payload,
+        stream=stream,
+        timeout=120,
+    )
+    resp.raise_for_status()
+    return resp
 
 
 @app.route("/api/ai/chat", methods=["POST"])
 @login_required
 def ai_chat():
     """API endpoint for AI chat - returns full response (non-streaming fallback)."""
-    if gemini_model is None:
+    global _ollama_checked
+    if not _ollama_available:
+        _ollama_checked = False  # Allow re-check
+        _check_ollama()
+    if not _ollama_available:
         return jsonify(
-            {"error": "Gemini API not configured. Set GOOGLE_API_KEY environment variable."}
+            {"error": "AI offline. Start Ollama with: ollama serve"}
         ), 503
 
     data = request.get_json()
@@ -4482,20 +4746,26 @@ def ai_chat():
         return jsonify({"error": "No prompt provided"}), 400
 
     try:
-        response = _gemini_generate(user_prompt, stream=False)
-        return jsonify({"response": response.text})
+        resp = _ollama_generate(user_prompt, get_system_context(), stream=False)
+        result = resp.json()
+        return jsonify({"response": result.get("response", "")})
+    except requests.exceptions.ConnectionError:
+        return jsonify({"error": "Cannot reach Ollama. Is it running? (ollama serve)"}), 503
     except Exception as e:
-        msg, code = _parse_gemini_error(e)
-        return jsonify({"error": msg}), code
+        return jsonify({"error": f"AI error: {str(e)[:200]}"}), 500
 
 
 @app.route("/api/ai/chat/stream", methods=["POST"])
 @login_required
 def ai_chat_stream():
-    """Streaming endpoint for real-time AI chat responses."""
-    if gemini_model is None:
+    """Streaming endpoint for real-time AI chat responses via Ollama."""
+    global _ollama_checked
+    if not _ollama_available:
+        _ollama_checked = False  # Allow re-check
+        _check_ollama()
+    if not _ollama_available:
         return jsonify(
-            {"error": "Gemini API not configured. Set GOOGLE_API_KEY environment variable."}
+            {"error": "AI offline. Start Ollama with: ollama serve"}
         ), 503
 
     data = request.get_json()
@@ -4507,27 +4777,22 @@ def ai_chat_stream():
     system_context = get_system_context()
 
     def generate():
-        """Generator function for Server-Sent Events (SSE) streaming."""
+        """Generator: stream Ollama NDJSON → SSE data: lines."""
         try:
-            full_prompt = system_context + "\n\nUser: " + user_prompt
-            if _gemini_sdk == "genai":
-                response = _genai_client.models.generate_content_stream(
-                    model=gemini_model,
-                    contents=full_prompt,
-                )
-            else:
-                response = gemini_model.generate_content(
-                    contents=[{"role": "user", "parts": [{"text": full_prompt}]}],
-                    stream=True,
-                )
-            for chunk in response:
-                text = chunk.text if hasattr(chunk, 'text') else str(chunk)
-                if text:
-                    yield f"data: {text}\n\n"
+            resp = _ollama_generate(user_prompt, system_context, stream=True)
+            for line in resp.iter_lines():
+                if line:
+                    chunk = json.loads(line)
+                    text = chunk.get("response", "")
+                    if text:
+                        yield f"data: {text}\n\n"
+                    if chunk.get("done"):
+                        break
             yield "data: [DONE]\n\n"
+        except requests.exceptions.ConnectionError:
+            yield "data: [ERROR] Cannot reach Ollama. Is it running?\n\n"
         except Exception as e:
-            msg, _ = _parse_gemini_error(e)
-            yield f"data: [ERROR] {msg}\n\n"
+            yield f"data: [ERROR] AI error: {str(e)[:200]}\n\n"
 
     return Response(
         generate(),
