@@ -1,0 +1,307 @@
+{% extends "base.html" %}
+
+{% block title %}QR Code Scanner{% endblock %}
+
+{% block breadcrumb %}
+<i class="fas fa-home"></i>
+<a href="{{ url_for('dashboard') }}">Dashboard</a>
+<i class="fas fa-chevron-right"></i>
+<span>Gate Scanner</span>
+{% endblock %}
+
+{% block content %}
+<div class="scanner-section">
+    <div class="page-header">
+        <h1><i class="fas fa-qrcode"></i> Gate Scanner</h1>
+        <div class="gate-selector">
+            <label for="gateLocation">Gate:</label>
+            <select id="gateLocation">
+                <option value="Main Gate">Main Gate</option>
+                <option value="West Gate">West Gate</option>
+                <option value="East Gate">East Gate</option>
+                <option value="South Gate">South Gate</option>
+            </select>
+        </div>
+    </div>
+    
+    <div class="scanner-grid">
+        <div class="scanner-card">
+            <div class="scanner-header">
+                <h3>Scan QR Code</h3>
+                <div class="direction-toggle">
+                    <button id="directionIn" class="direction-btn active">IN</button>
+                    <button id="directionOut" class="direction-btn">OUT</button>
+                </div>
+            </div>
+            <div class="scanner-body">
+                <div class="scanner-container">
+                    <div id="reader"></div>
+                    <div class="scanner-overlay"></div>
+                    <div class="scan-line"></div>
+                </div>
+                <div class="manual-entry">
+                    <p>Or enter QR code manually:</p>
+                    <div class="manual-input">
+                        <input type="text" id="manualQR" placeholder="Enter QR code hash...">
+                        <button id="manualScanBtn" class="btn btn-primary">Scan</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="recent-scans-card">
+            <div class="card-header">
+                <h3><i class="fas fa-history"></i> Recent Scans</h3>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="scans-table">
+                        <thead>
+                            <tr>
+                                <th>Status</th>
+                                <th>Name</th>
+                                <th>Type</th>
+                                <th>Direction</th>
+                                <th>Gate</th>
+                                <th>Time</th>
+                            </tr>
+                        </thead>
+                        <tbody id="recentScans">
+                            <tr class="scan-placeholder-row">
+                                <td colspan="6">Waiting for scans...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Scan Result Modal -->
+    <div id="scanResultModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="scanResultTitle">Scan Result</h3>
+                <span class="close">&times;</span>
+            </div>
+            <div id="scanResultBody" class="modal-body">
+                <!-- Dynamic content -->
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary close-modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+<script>
+let currentDirection = 'IN';
+let html5QrCode;
+
+document.addEventListener('DOMContentLoaded', function() {
+    // Direction buttons
+    const directionIn = document.getElementById('directionIn');
+    const directionOut = document.getElementById('directionOut');
+    
+    directionIn.addEventListener('click', function() {
+        currentDirection = 'IN';
+        directionIn.classList.add('active');
+        directionOut.classList.remove('active');
+    });
+    
+    directionOut.addEventListener('click', function() {
+        currentDirection = 'OUT';
+        directionOut.classList.add('active');
+        directionIn.classList.remove('active');
+    });
+    
+    // Initialize QR scanner
+    html5QrCode = new Html5Qrcode("reader");
+    const config = { fps: 10, qrbox: { width: 250, height: 250 } };
+    
+    html5QrCode.start(
+        { facingMode: "environment" },
+        config,
+        onScanSuccess,
+        onScanError
+    ).catch(err => {
+        console.error("Unable to start scanning", err);
+        document.getElementById('reader').innerHTML = '<div class="error">Camera access denied or not available</div>';
+    });
+    
+    // Manual scan
+    document.getElementById('manualScanBtn').addEventListener('click', function() {
+        const qrCode = document.getElementById('manualQR').value.trim();
+        if (qrCode) {
+            processScan(qrCode);
+            document.getElementById('manualQR').value = '';
+        }
+    });
+    
+    document.getElementById('manualQR').addEventListener('keypress', function(e) {
+        if (e.key === 'Enter') {
+            document.getElementById('manualScanBtn').click();
+        }
+    });
+    
+    // WebSocket for real-time scan updates
+    const socket = io();
+    socket.on('gate_scan', function(data) {
+        addToRecentScans(data);
+    });
+    
+    // Load recent scans
+    loadRecentScans();
+    
+    // Modal close
+    const modal = document.getElementById('scanResultModal');
+    const closeBtns = document.querySelectorAll('.close, .close-modal');
+    closeBtns.forEach(btn => {
+        btn.addEventListener('click', () => modal.classList.remove('active'));
+    });
+    
+    window.addEventListener('click', (e) => {
+        if (e.target === modal) modal.classList.remove('active');
+    });
+});
+
+function onScanSuccess(decodedText, decodedResult) {
+    processScan(decodedText);
+}
+
+function onScanError(errorMessage) {
+    // Silent fail - scanner continues
+}
+
+function processScan(qrCode) {
+    const gateLocation = document.getElementById('gateLocation').value;
+    
+    fetch('/api/scan_qr', {
+        method: 'POST',
+        headers: { 
+            'Content-Type': 'application/json',
+            'X-API-Key': '{{ config.HARDWARE_API_KEY }}'
+        },
+        body: JSON.stringify({
+            qr_code: qrCode,
+            direction: currentDirection,
+            gate_location: gateLocation
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        showScanResult(data);
+        addToRecentScans({
+            type: data.entity_type,
+            name: data.entity_name,
+            direction: currentDirection,
+            granted: data.success,
+            reason: data.message,
+            gate: gateLocation,
+            time: new Date().toLocaleTimeString()
+        });
+        
+        // Flash effect
+        const scannerCard = document.querySelector('.scanner-card');
+        scannerCard.classList.add('scan-animation');
+        setTimeout(() => scannerCard.classList.remove('scan-animation'), 300);
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        showScanResult({ success: false, message: 'Network error' });
+    });
+}
+
+function showScanResult(data) {
+    const modal = document.getElementById('scanResultModal');
+    const title = document.getElementById('scanResultTitle');
+    const body = document.getElementById('scanResultBody');
+    
+    if (data.success) {
+        title.innerHTML = '<i class="fas fa-check-circle"></i> Access Granted';
+        title.style.color = '#00cc00';
+        body.innerHTML = `
+            <div class="result-details">
+                <p><strong>${data.entity_type?.toUpperCase()}</strong></p>
+                <p>Name: ${data.entity_name}</p>
+                <p>Direction: ${currentDirection}</p>
+                <p>Gate: ${document.getElementById('gateLocation').value}</p>
+                <p>Time: ${new Date().toLocaleString()}</p>
+            </div>
+        `;
+    } else {
+        title.innerHTML = '<i class="fas fa-times-circle"></i> Access Denied';
+        title.style.color = 'var(--red-primary)';
+        body.innerHTML = `
+            <div class="result-details">
+                <p><strong>Access Denied</strong></p>
+                <p>Reason: ${data.message}</p>
+                <p>Direction: ${currentDirection}</p>
+                <p>Time: ${new Date().toLocaleString()}</p>
+            </div>
+        `;
+    }
+    
+    modal.classList.add('active');
+}
+
+function addToRecentScans(scan) {
+    const tbody = document.getElementById('recentScans');
+
+    // Remove placeholder if exists
+    const placeholder = tbody.querySelector('.scan-placeholder-row');
+    if (placeholder) placeholder.remove();
+
+    // Create new row
+    const row = document.createElement('tr');
+    row.className = `scan-row ${scan.granted ? 'granted-row' : 'denied-row'}`;
+    row.innerHTML = `
+        <td><span class="scan-status ${scan.granted ? 'granted' : 'denied'}"></span></td>
+        <td><strong>${scan.name || 'Unknown'}</strong></td>
+        <td>${scan.type || 'unknown'}</td>
+        <td><span class="direction-badge ${scan.direction === 'IN' ? 'in' : 'out'}">${scan.direction}</span></td>
+        <td>${scan.gate || '-'}</td>
+        <td>${scan.time || new Date().toLocaleTimeString()}</td>
+    `;
+
+    // Insert at top
+    tbody.insertBefore(row, tbody.firstChild);
+
+    // Keep only last 10 rows
+    while (tbody.children.length > 10) {
+        tbody.removeChild(tbody.lastChild);
+    }
+}
+
+function loadRecentScans() {
+    fetch('/api/gate_logs?limit=10')
+        .then(response => response.json())
+        .then(logs => {
+            const tbody = document.getElementById('recentScans');
+            tbody.innerHTML = '';
+
+            if (logs.length > 0) {
+                logs.forEach(log => {
+                    const row = document.createElement('tr');
+                    row.className = `scan-row ${log.granted ? 'granted-row' : 'denied-row'}`;
+                    row.innerHTML = `
+                        <td><span class="scan-status ${log.granted ? 'granted' : 'denied'}"></span></td>
+                        <td><strong>${log.name}</strong></td>
+                        <td>${log.type || '-'}</td>
+                        <td><span class="direction-badge ${log.direction === 'IN' ? 'in' : 'out'}">${log.direction}</span></td>
+                        <td>${log.gate || '-'}</td>
+                        <td>${log.time ? log.time.split(' ')[1] : '-'}</td>
+                    `;
+                    tbody.appendChild(row);
+                });
+            } else {
+                tbody.innerHTML = '<tr class="scan-placeholder-row"><td colspan="6">No recent scans</td></tr>';
+            }
+        })
+        .catch(error => {
+            console.error('Error loading recent scans:', error);
+        });
+}
+</script>
+{% endblock %}

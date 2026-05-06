@@ -1,0 +1,113 @@
+{% extends "base.html" %}
+
+{% block title %}AI Assistant{% endblock %}
+
+{% block content %}
+<div class="chat-container">
+    <div class="card">
+        <div class="card-header">
+            <h3><i class="fas fa-robot"></i> AI Assistant</h3>
+        </div>
+        <div class="card-body">
+            <div id="chat-messages" class="chat-messages">
+                <div class="message system">Hello! I'm your mine management assistant. Ask me anything about the system, or help with reports.</div>
+            </div>
+            <div class="input-group">
+                <input type="text" id="chat-input" placeholder="Type your question..." class="form-control">
+                <button id="send-btn" class="btn btn-primary">Send</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    const chatMessages = document.getElementById('chat-messages');
+    const chatInput = document.getElementById('chat-input');
+    const sendBtn = document.getElementById('send-btn');
+
+    function addMessage(text, isUser = true) {
+        const div = document.createElement('div');
+        div.className = `message ${isUser ? 'user' : 'assistant'}`;
+        div.innerHTML = `<strong>${isUser ? 'You' : 'AI'}:</strong> <span class="message-content">${text}</span>`;
+        chatMessages.appendChild(div);
+        chatMessages.scrollTop = chatMessages.scrollHeight;
+        return div.querySelector('.message-content');
+    }
+
+    function escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+
+    async function sendMessage() {
+        const prompt = chatInput.value.trim();
+        if (!prompt) return;
+
+        // Add user message
+        addMessage(prompt, true);
+        chatInput.value = '';
+        sendBtn.disabled = true;
+        sendBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Thinking...';
+
+        // Create assistant message placeholder for streaming
+        const contentSpan = addMessage('', false);
+        let fullResponse = '';
+
+        try {
+            const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content || '';
+            const res = await fetch('/api/ai/chat/stream', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },
+                body: JSON.stringify({ prompt })
+            });
+
+            if (!res.ok) {
+                const errData = await res.json();
+                contentSpan.textContent = errData.error || 'Sorry, an error occurred.';
+                sendBtn.disabled = false;
+                sendBtn.innerHTML = 'Send';
+                return;
+            }
+
+            const reader = res.body.getReader();
+            const decoder = new TextDecoder();
+
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+
+                const chunk = decoder.decode(value, { stream: true });
+                const lines = chunk.split('\n');
+
+                for (const line of lines) {
+                    if (line.startsWith('data: ')) {
+                        const data = line.slice(6);
+                        if (data === '[DONE]') {
+                            // Stream complete
+                            break;
+                        } else if (data.startsWith('[ERROR]')) {
+                            contentSpan.textContent = data.slice(8).trim();
+                        } else {
+                            // Append text to the message
+                            fullResponse += data;
+                            contentSpan.innerHTML = escapeHtml(fullResponse).replace(/\n/g, '<br>');
+                            chatMessages.scrollTop = chatMessages.scrollHeight;
+                        }
+                    }
+                }
+            }
+        } catch (err) {
+            contentSpan.textContent = 'Sorry, I encountered a connection error.';
+        } finally {
+            sendBtn.disabled = false;
+            sendBtn.innerHTML = 'Send';
+        }
+    }
+
+    sendBtn.addEventListener('click', sendMessage);
+    chatInput.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') sendMessage();
+    });
+</script>
+{% endblock %}

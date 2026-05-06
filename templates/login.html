@@ -1,0 +1,249 @@
+{% extends "base.html" %}
+
+{% block title %}Login — Mine Management System{% endblock %}
+
+{% block content %}
+<style>
+    :root {
+        --red-glow: #ff4d4d;
+        --true-black: #000000;
+    }
+    .auth-page .app { display: block; }
+    .auth-page .menu-toggle { display: none !important; }
+    .auth-page .sidebar { display: none !important; }
+    .auth-page .main-content {
+        margin-left: 0 !important;
+        padding-top: 0 !important;
+        width: 100%;
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+    .auth-page .breadcrumb { display: none !important; }
+    .login-wrapper {
+            position: relative;
+            z-index: 100;
+            width: 100%;
+            max-width: 440px;
+        }
+        .login-card {
+            background: rgba(10,10,10,0.9);
+            -webkit-backdrop-filter: blur(2px);
+            backdrop-filter: blur(2px);
+            border: 1px solid var(--steel);
+            border-radius: 24px;
+            padding: 2.5rem;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            transition: box-shadow 0.3s ease, transform 0.2s ease;
+        }
+        .login-card:hover {
+            box-shadow: 0 0 0 1px var(--red-primary), 0 15px 35px rgba(0,0,0,0.5);
+            transform: translateY(-2px);
+        }
+        .login-logo {
+            text-align: center;
+            margin-bottom: 1.5rem;
+        }
+        .login-logo i {
+            font-size: 4rem;
+            color: var(--red-primary);
+        }
+        .login-card h2 {
+            text-align: center;
+            font-size: 1.75rem;
+            font-weight: 600;
+            margin-bottom: 2rem;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            font-family: var(--font-mono);
+            background: linear-gradient(135deg, var(--text-primary) 0%, var(--red-primary) 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        .form-group {
+            margin-bottom: 1.5rem;
+        }
+        label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: 500;
+            color: var(--text-secondary);
+            font-size: 0.875rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+        input {
+            width: 100%;
+            background: var(--true-black);
+            border: 1px solid var(--steel);
+            border-radius: 8px;
+            padding: 0.75rem 1rem;
+            color: var(--text-primary);
+            font-family: var(--font-mono);
+            font-size: 0.9rem;
+            transition: all 0.2s ease;
+        }
+        input:focus {
+            border-color: var(--red-primary);
+            outline: none;
+            animation: pulseBorder 1.2s infinite;
+        }
+        @keyframes pulseBorder {
+            0% { box-shadow: 0 0 0 0 rgba(225,6,0,0.4); }
+            70% { box-shadow: 0 0 0 4px rgba(225,6,0,0); }
+            100% { box-shadow: 0 0 0 0 rgba(225,6,0,0); }
+        }
+        .btn-login {
+            position: relative;
+            z-index: 100;
+            width: 100%;
+            background: var(--red-primary);
+            border: none;
+            border-radius: 8px;
+            padding: 0.75rem;
+            font-weight: 600;
+            font-size: 1rem;
+            color: white;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            margin-top: 0.5rem;
+        }
+        .btn-login:hover {
+            background: #b80500;
+            transform: scale(1.02);
+        }
+        .btn-login:active {
+            transform: scale(0.98);
+        }
+        .error-message {
+            background: rgba(225, 6, 0, 0.15);
+            border-left: 3px solid var(--red-primary);
+            padding: 0.75rem 1rem;
+            margin-bottom: 1.5rem;
+            border-radius: 8px;
+            color: var(--red-primary);
+            font-size: 0.875rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        .login-footer {
+            text-align: center;
+            margin-top: 2rem;
+            padding-top: 1rem;
+            border-top: 1px solid var(--steel);
+            color: var(--text-secondary);
+            font-size: 0.75rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .system-status {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .live-dot {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            background-color: var(--red-primary);
+            border-radius: 50%;
+            box-shadow: 0 0 4px var(--red-glow);
+            animation: pulse 1.5s infinite;
+        }
+        @keyframes pulse {
+            0% { opacity: 0.5; transform: scale(0.8); }
+            100% { opacity: 1; transform: scale(1.2); }
+        }
+        .default-credentials {
+            margin-top: 0.5rem;
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            background: rgba(255,255,255,0.05);
+            padding: 4px 10px;
+            border-radius: 20px;
+            cursor: help;
+        }
+        .default-credentials i {
+            color: var(--red-primary);
+        }
+        .timestamp {
+            font-family: var(--font-mono);
+            font-size: 0.7rem;
+            color: var(--text-secondary);
+        }
+    </style>
+
+    <div class="login-wrapper">
+        <div class="login-card">
+            <div class="login-logo">
+                <i class="fas fa-hard-hat"></i>
+            </div>
+            <h2>Mine Management</h2>
+
+            {% if error %}
+            <div class="error-message">
+                <i class="fas fa-exclamation-triangle"></i>
+                {{ error }}
+            </div>
+            {% endif %}
+
+            <form method="POST" action="{{ url_for('login') }}" id="loginForm">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <div class="form-group">
+                    <label for="username">Username</label>
+                    <input type="text" id="username" name="username" required autofocus>
+                </div>
+
+                <div class="form-group">
+                    <label for="password">Password</label>
+                    <input type="password" id="password" name="password" required>
+                </div>
+
+                <button type="submit" class="btn-login" id="loginBtn">
+                    <i class="fas fa-sign-in-alt"></i> Login
+                </button>
+            </form>
+
+            <a href="{{ url_for('visitor_request') }}" style="display:block; text-align:center; margin-top:1.25rem; padding:0.65rem; border:1px solid var(--steel); border-radius:8px; color:var(--text-primary); text-decoration:none; font-size:0.9rem; font-weight:500; transition:all 0.2s ease; background:rgba(255,255,255,0.04);" onmouseover="this.style.borderColor='var(--red-primary)';this.style.color='var(--red-primary)'" onmouseout="this.style.borderColor='var(--steel)';this.style.color='var(--text-primary)'">
+                <i class="fas fa-id-badge"></i> Request QR — Visitor
+            </a>
+
+            <div class="login-footer">
+                <div class="system-status">
+                    <span class="live-dot"></span> System Online
+                </div>
+                <div class="timestamp" id="liveTimestamp">--:--:--</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Timestamp update
+        function updateTimestamp() {
+            const now = new Date();
+            const timeStr = now.toLocaleTimeString();
+            const tsElem = document.getElementById('liveTimestamp');
+            if (tsElem) tsElem.textContent = timeStr;
+        }
+        updateTimestamp();
+        setInterval(updateTimestamp, 1000);
+
+        // Loading state on submit
+        const loginForm = document.getElementById('loginForm');
+        const loginBtn = document.getElementById('loginBtn');
+        if (loginForm && loginBtn) {
+            loginForm.addEventListener('submit', function(e) {
+                if (loginBtn.disabled) return;
+                loginBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Logging in...';
+                loginBtn.disabled = true;
+            });
+        }
+    </script>
+{% endblock %}

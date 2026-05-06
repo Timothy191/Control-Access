@@ -1,0 +1,459 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard{% endblock %}
+
+{% block breadcrumb %}
+<i class="fas fa-home"></i>
+<a href="{{ url_for('dashboard') }}">Dashboard</a>
+{% endblock %}
+
+{% block content %}
+<div class="dashboard">
+    <div class="dashboard-header">
+        <div class="header-title">
+            <h1><i class="fas fa-tachometer-alt"></i> Control Panel</h1>
+            <p class="live-status">
+                <span class="live-dot"></span> LIVE — Real‑time telemetry
+            </p>
+        </div>
+        <div class="user-badge">
+            <i class="fas fa-user-circle"></i>
+            <span>{{ session.username }}</span>
+            <span class="role-badge">{{ session.role }}</span>
+        </div>
+    </div>
+
+    <div class="stats-grid">
+        <div class="stat-card" data-tooltip="Total active employees on site" data-stat-employees="{{ stats.employees }}">
+            <div class="stat-icon blue">
+                <i class="fas fa-users"></i>
+            </div>
+            <div class="stat-info">
+                <h3 id="employeesCount" class="counter-value">0</h3>
+                <p>Total Employees</p>
+                <span class="stat-trend positive">
+                    <i class="fas fa-arrow-up"></i> Active workforce
+                </span>
+            </div>
+            <div class="stat-sparkline">
+                <canvas id="sparkEmployees" width="80" height="30"></canvas>
+            </div>
+        </div>
+        
+        <div class="stat-card" data-tooltip="Operational vehicles in fleet" data-stat-vehicles="{{ stats.vehicles }}">
+            <div class="stat-icon green">
+                <i class="fas fa-truck"></i>
+            </div>
+            <div class="stat-info">
+                <h3 id="fleetCount" class="counter-value">0</h3>
+                <p>Fleet Vehicles</p>
+                <span class="stat-trend">Operational</span>
+            </div>
+            <div class="stat-sparkline">
+                <canvas id="sparkFleet" width="80" height="30"></canvas>
+            </div>
+        </div>
+        
+        <div class="stat-card" data-tooltip="Currently checked-in visitors" data-stat-visitors="{{ stats.visitors }}">
+            <div class="stat-icon orange">
+                <i class="fas fa-id-card"></i>
+            </div>
+            <div class="stat-info">
+                <h3 id="visitorsCount" class="counter-value">0</h3>
+                <p>Active Visitors</p>
+                <span class="stat-trend warning">On site</span>
+            </div>
+            <div class="stat-sparkline">
+                <canvas id="sparkVisitors" width="80" height="30"></canvas>
+            </div>
+        </div>
+
+        <div class="stat-card" data-tooltip="Total equipment and radio IDs" data-stat-equipment="{{ stats.equipment }}">
+            <div class="stat-icon blue">
+                <i class="fas fa-microchip"></i>
+            </div>
+            <div class="stat-info">
+                <h3 id="equipmentCount" class="counter-value">0</h3>
+                <p>Radio IDs</p>
+                <span class="stat-trend positive">Registered</span>
+            </div>
+            <div class="stat-sparkline">
+                <canvas id="sparkEquipment" width="80" height="30"></canvas>
+            </div>
+        </div>
+        
+        <div class="stat-card" data-tooltip="Requests awaiting approval" data-stat-pending="{{ stats.pending_approvals }}">
+            <div class="stat-icon red">
+                <i class="fas fa-clock"></i>
+            </div>
+            <div class="stat-info">
+                <h3 id="pendingCount" class="counter-value">0</h3>
+                <p>Pending Approvals</p>
+                <span class="stat-trend">Awaiting review</span>
+            </div>
+            <div class="progress-ring">
+                <svg width="40" height="40" viewBox="0 0 64 64">
+                    <circle cx="32" cy="32" r="28" fill="none" stroke="var(--steel)" stroke-width="4"/>
+                    <circle id="progressRing" cx="32" cy="32" r="28" fill="none" stroke="var(--red-primary)" stroke-width="4" stroke-linecap="round" stroke-dasharray="176" stroke-dashoffset="176"/>
+                </svg>
+                <div class="progress-ring-text" id="progressPercent">0%</div>
+            </div>
+        </div>
+    </div>
+
+    {% if alerts and (alerts.total_critical > 0 or alerts.total_warning > 0) %}
+    <div class="alerts-panel">
+        {% if alerts.total_critical > 0 %}
+        <div class="alert alert-critical">
+            <div class="alert-icon"><i class="fas fa-exclamation-circle"></i></div>
+            <div class="alert-content">
+                <strong>EXPIRED Certifications</strong> — Gate access blocked for affected employees
+                <div class="alert-details">
+                    {% if alerts.expired_medical > 0 %}
+                    <span class="alert-item"><i class="fas fa-heartbeat"></i> {{ alerts.expired_medical }} expired medical</span>
+                    {% endif %}
+                    {% if alerts.expired_induction > 0 %}
+                    <span class="alert-item"><i class="fas fa-graduation-cap"></i> {{ alerts.expired_induction }} expired induction</span>
+                    {% endif %}
+                </div>
+            </div>
+            <a href="{{ url_for('employees', status='Active') }}" class="btn btn-sm btn-danger">View</a>
+        </div>
+        {% endif %}
+        {% if alerts.total_warning > 0 %}
+        <div class="alert alert-warning">
+            <div class="alert-icon"><i class="fas fa-exclamation-triangle"></i></div>
+            <div class="alert-content">
+                <strong>Expiring within 30 days</strong> — Renew to avoid gate denials
+                <div class="alert-details">
+                    {% if alerts.expiring_medical > 0 %}
+                    <span class="alert-item"><i class="fas fa-heartbeat"></i> {{ alerts.expiring_medical }} medical expiring</span>
+                    {% endif %}
+                    {% if alerts.expiring_induction > 0 %}
+                    <span class="alert-item"><i class="fas fa-graduation-cap"></i> {{ alerts.expiring_induction }} induction expiring</span>
+                    {% endif %}
+                </div>
+            </div>
+            <a href="{{ url_for('employees', status='Active') }}" class="btn btn-sm btn-primary">View</a>
+        </div>
+        {% endif %}
+    </div>
+    {% endif %}
+
+    <div class="card recent-activity">
+        <div class="card-header">
+            <h3><i class="fas fa-history"></i> Recent Activity</h3>
+            <span class="live-indicator"><span class="live-dot"></span> Live</span>
+        </div>
+        <div class="card-body">
+            <div id="recentActivityLoader" class="activity-loader">
+                <i class="fas fa-spinner fa-spin"></i> Loading...
+            </div>
+            <div id="recentActivityEmpty" class="activity-empty" style="display:none;">
+                <i class="fas fa-qrcode"></i> No scans recorded today
+            </div>
+            <table id="recentActivityTable" class="activity-table" style="display:none;">
+                <thead>
+                    <tr>
+                        <th>Time</th>
+                        <th>Name</th>
+                        <th>Type</th>
+                        <th>Direction</th>
+                        <th>Gate</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody id="recentActivityBody">
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="dashboard-grid">
+        <div class="card quick-actions">
+            <div class="card-header">
+                <h3><i class="fas fa-bolt"></i> Quick Actions</h3>
+            </div>
+            <div class="card-body">
+                <div class="action-buttons">
+                    <a href="{{ url_for('employees') }}" class="btn btn-primary">
+                        <i class="fas fa-user-plus"></i> Add Employee
+                    </a>
+                    <a href="{{ url_for('fleet') }}" class="btn btn-primary">
+                        <i class="fas fa-truck"></i> Add Vehicle
+                    </a>
+                    <a href="{{ url_for('visitors') }}" class="btn btn-primary">
+                        <i class="fas fa-id-card"></i> Check-in Visitor
+                    </a>
+                    <a href="{{ url_for('pending_approvals') }}" class="btn btn-primary">
+                        <i class="fas fa-check-circle"></i> Review Approvals
+                    </a>
+                </div>
+            </div>
+        </div>
+        
+        <div class="card system-status">
+            <div class="card-header">
+                <h3><i class="fas fa-info-circle"></i> System Status</h3>
+            </div>
+            <div class="card-body">
+                <div class="status-item">
+                    <span>Database</span>
+                    <span class="status-badge success">Connected</span>
+                </div>
+                <div class="status-item">
+                    <span>System Version</span>
+                    <span>2.0.0</span>
+                </div>
+                <div class="status-item">
+                    <span>Live Mode</span>
+                    <span><span class="live-dot"></span> Active</span>
+                </div>
+                <div class="status-item">
+                    <span>Last Sync</span>
+                    <span id="liveTimestamp">--:--:--</span>
+                </div>
+                <div class="status-item">
+                    <span>User Role</span>
+                    <span class="status-badge">{{ session.role }}</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="card export-reports">
+            <div class="card-header">
+                <h3><i class="fas fa-download"></i> Export Reports</h3>
+            </div>
+            <div class="card-body">
+                <div class="action-buttons">
+                    <a href="{{ url_for('export_employees_excel') }}" class="btn btn-secondary">
+                        <i class="fas fa-users"></i> Employees (Excel)
+                    </a>
+                    <a href="{{ url_for('export_employees_pdf') }}" class="btn btn-secondary">
+                        <i class="fas fa-file-pdf"></i> Employees (PDF)
+                    </a>
+                    <a href="{{ url_for('export_visitors_excel') }}" class="btn btn-secondary">
+                        <i class="fas fa-id-card"></i> Visitors (Excel)
+                    </a>
+                    <a href="{{ url_for('export_visitors_pdf') }}" class="btn btn-secondary">
+                        <i class="fas fa-file-pdf"></i> Visitors (PDF)
+                    </a>
+                    <a href="{{ url_for('export_fleet_excel') }}" class="btn btn-secondary">
+                        <i class="fas fa-truck"></i> Fleet (Excel)
+                    </a>
+                    <a href="{{ url_for('export_gate_logs_excel') }}" class="btn btn-secondary">
+                        <i class="fas fa-qrcode"></i> Gate Logs (Excel)
+                    </a>
+                    <a href="{{ url_for('export_gate_logs_pdf') }}" class="btn btn-secondary">
+                        <i class="fas fa-file-pdf"></i> Gate Logs (PDF)
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // Helper to animate numbers
+    function animateNumber(element, finalValue, duration = 800) {
+        if (!element) return;
+        const start = 0;
+        const range = finalValue - start;
+        const startTime = performance.now();
+        function update(currentTime) {
+            const elapsed = currentTime - startTime;
+            const progress = Math.min(1, elapsed / duration);
+            const current = start + range * progress;
+            element.textContent = Math.floor(current);
+            if (progress < 1) requestAnimationFrame(update);
+            else element.textContent = finalValue;
+        }
+        requestAnimationFrame(update);
+    }
+
+    // Read stats from data attributes
+    const employeesCard = document.querySelector('[data-stat-employees]');
+    const vehiclesCard = document.querySelector('[data-stat-vehicles]');
+    const visitorsCard = document.querySelector('[data-stat-visitors]');
+    const equipmentCard = document.querySelector('[data-stat-equipment]');
+    const pendingCard = document.querySelector('[data-stat-pending]');
+    
+    const employeesCount = parseInt(employeesCard?.getAttribute('data-stat-employees') || 0);
+    const fleetCount = parseInt(vehiclesCard?.getAttribute('data-stat-vehicles') || 0);
+    const visitorsCount = parseInt(visitorsCard?.getAttribute('data-stat-visitors') || 0);
+    const equipmentCount = parseInt(equipmentCard?.getAttribute('data-stat-equipment') || 0);
+    const pendingCount = parseInt(pendingCard?.getAttribute('data-stat-pending') || 0);
+
+    // Animate counters after DOM loads
+    document.addEventListener('DOMContentLoaded', function() {
+        const empElem = document.getElementById('employeesCount');
+        const fleetElem = document.getElementById('fleetCount');
+        const visitorElem = document.getElementById('visitorsCount');
+        const equipmentElem = document.getElementById('equipmentCount');
+        const pendingElem = document.getElementById('pendingCount');
+        
+        if (empElem) animateNumber(empElem, employeesCount, 800);
+        if (fleetElem) animateNumber(fleetElem, fleetCount, 800);
+        if (visitorElem) animateNumber(visitorElem, visitorsCount, 800);
+        if (equipmentElem) animateNumber(equipmentElem, equipmentCount, 800);
+        if (pendingElem) animateNumber(pendingElem, pendingCount, 800);
+        
+        // Progress ring for approvals
+        const target = 20;
+        const percent = Math.min(100, Math.round((pendingCount / target) * 100));
+        const circumference = 2 * Math.PI * 28;
+        const offset = circumference * (1 - percent / 100);
+        const ring = document.getElementById('progressRing');
+        if (ring) {
+            ring.style.strokeDasharray = circumference;
+            ring.style.strokeDashoffset = offset;
+        }
+        const percentSpan = document.getElementById('progressPercent');
+        if (percentSpan) percentSpan.textContent = percent + '%';
+    });
+
+    // Simulated sparkline data (replace with real historical data later)
+    const sparkData = {
+        employees: [12, 15, 18, 20, 22, 25, 28],
+        fleet: [8, 9, 10, 10, 11, 12, 13],
+        visitors: [3, 4, 5, 4, 6, 5, 7],
+        equipment: [5, 6, 6, 7, 8, 8, 9]
+    };
+
+    function createSparkline(canvasId, data, color) {
+        const canvas = document.getElementById(canvasId);
+        if (!canvas) return;
+        const ctx = canvas.getContext('2d');
+        const width = canvas.width;
+        const height = canvas.height;
+        ctx.clearRect(0, 0, width, height);
+        if (!data || data.length < 2) return;
+        ctx.beginPath();
+        const step = width / (data.length - 1);
+        const max = Math.max(...data);
+        const min = Math.min(...data);
+        const range = max - min || 1;
+        data.forEach(function(value, i) {
+            const x = i * step;
+            const y = height - ((value - min) / range) * height;
+            if (i === 0) ctx.moveTo(x, y);
+            else ctx.lineTo(x, y);
+        });
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+    }
+
+    // Initialize sparklines after DOM loads
+    document.addEventListener('DOMContentLoaded', function() {
+        createSparkline('sparkEmployees', sparkData.employees, '#e10600');
+        createSparkline('sparkFleet', sparkData.fleet, '#e10600');
+        createSparkline('sparkVisitors', sparkData.visitors, '#e10600');
+        createSparkline('sparkEquipment', sparkData.equipment, '#e10600');
+    });
+
+    // Real-time timestamp
+    function updateTimestamp() {
+        const now = new Date();
+        const timeStr = now.toLocaleTimeString();
+        const tsElem = document.getElementById('liveTimestamp');
+        if (tsElem) tsElem.textContent = timeStr;
+    }
+    updateTimestamp();
+    setInterval(updateTimestamp, 1000);
+
+    // Recent Activity
+    async function loadRecentActivity() {
+        try {
+            const response = await fetch('/api/recent_activity');
+            const data = await response.json();
+            renderRecentActivity(data);
+        } catch (e) {
+            document.getElementById('recentActivityLoader').style.display = 'none';
+            document.getElementById('recentActivityEmpty').style.display = 'block';
+        }
+    }
+
+    function renderRecentActivity(data) {
+        const loader = document.getElementById('recentActivityLoader');
+        const empty = document.getElementById('recentActivityEmpty');
+        const table = document.getElementById('recentActivityTable');
+        const tbody = document.getElementById('recentActivityBody');
+
+        if (!data || data.length === 0) {
+            loader.style.display = 'none';
+            empty.style.display = 'block';
+            return;
+        }
+
+        loader.style.display = 'none';
+        table.style.display = 'table';
+        tbody.innerHTML = '';
+
+        data.forEach(function(log) {
+            const row = document.createElement('tr');
+            row.className = log.granted ? 'activity-granted' : 'activity-denied';
+            row.innerHTML = `
+                <td>${log.time}</td>
+                <td>${escapeHtml(log.name)}</td>
+                <td><span class="badge badge-${log.type}">${log.type}</span></td>
+                <td><span class="badge badge-${log.direction === 'IN' ? 'in' : 'out'}">${log.direction}</span></td>
+                <td>${escapeHtml(log.gate)}</td>
+                <td><span class="badge badge-${log.granted ? 'granted' : 'denied'}">${log.granted ? 'Granted' : 'Denied'}</span></td>
+            `;
+            tbody.appendChild(row);
+        });
+    }
+
+    function addRecentActivity(log) {
+        const empty = document.getElementById('recentActivityEmpty');
+        const table = document.getElementById('recentActivityTable');
+        const tbody = document.getElementById('recentActivityBody');
+
+        empty.style.display = 'none';
+        table.style.display = 'table';
+
+        const row = document.createElement('tr');
+        row.className = log.granted ? 'activity-granted' : 'activity-denied';
+        row.style.backgroundColor = log.granted ? 'rgba(0, 200, 0, 0.1)' : 'rgba(255, 0, 0, 0.1)';
+        row.innerHTML = `
+            <td>${log.time}</td>
+            <td>${escapeHtml(log.name)}</td>
+            <td><span class="badge badge-${log.type}">${log.type}</span></td>
+            <td><span class="badge badge-${log.direction === 'IN' ? 'in' : 'out'}">${log.direction}</span></td>
+            <td>${escapeHtml(log.gate)}</td>
+            <td><span class="badge badge-${log.granted ? 'granted' : 'denied'}">${log.granted ? 'Granted' : 'Denied'}</span></td>
+        `;
+        tbody.insertBefore(row, tbody.firstChild);
+
+        if (tbody.children.length > 10) {
+            tbody.removeChild(tbody.lastChild);
+        }
+    }
+
+    function escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+
+    function setupSocketActivity() {
+        if (typeof socket !== 'undefined' && socket) {
+            socket.on('gate_scan', function(data) {
+                addRecentActivity(data);
+            });
+        }
+    }
+
+    document.addEventListener('DOMContentLoaded', function() {
+        loadRecentActivity();
+        if (typeof socket !== 'undefined') {
+            setupSocketActivity();
+        } else {
+            setTimeout(setupSocketActivity, 1000);
+        }
+    });
+
+    setInterval(loadRecentActivity, 30000);
+</script>
+{% endblock %}

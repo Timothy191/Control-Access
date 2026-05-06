@@ -1,0 +1,8 @@
+pytest==7.4.3
+pytest-flask==1.2.0
+pytest-sqlalchemy==0.2.0
+pytest-cov==4.1.0
+factory-boy==3.3.0
+faker==20.1.0
+requests-mock==1.11.0
+freezegun==1.2.2

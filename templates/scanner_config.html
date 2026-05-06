@@ -1,0 +1,622 @@
+{% extends "base.html" %}
+
+{% block title %}Scanner Configuration{% endblock %}
+
+{% block extra_css %}
+<style>
+.scanner-config-container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 20px;
+}
+
+.config-header {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    padding: 30px;
+    border-radius: 15px;
+    margin-bottom: 30px;
+    text-align: center;
+}
+
+.config-section {
+    background: white;
+    border-radius: 10px;
+    padding: 25px;
+    margin-bottom: 25px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+}
+
+.config-section h2 {
+    color: #333;
+    margin-bottom: 20px;
+    border-bottom: 2px solid #667eea;
+    padding-bottom: 10px;
+}
+
+.server-info {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 20px;
+    margin-bottom: 25px;
+}
+
+.info-card {
+    background: #f8f9fa;
+    padding: 20px;
+    border-radius: 8px;
+    border-left: 4px solid #667eea;
+}
+
+.info-card h3 {
+    color: #667eea;
+    margin-bottom: 10px;
+    font-size: 16px;
+}
+
+.info-card .value {
+    font-size: 24px;
+    font-weight: bold;
+    color: #333;
+    font-family: 'Courier New', monospace;
+}
+
+.qr-code-container {
+    text-align: center;
+    padding: 30px;
+    background: #f8f9fa;
+    border-radius: 10px;
+    margin: 20px 0;
+}
+
+.qr-code {
+    width: 200px;
+    height: 200px;
+    margin: 0 auto;
+    background: white;
+    border: 2px solid #ddd;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    color: #999;
+}
+
+.setup-steps {
+    background: #e8f4fd;
+    border-left: 4px solid #2196F3;
+    padding: 20px;
+    border-radius: 5px;
+    margin: 20px 0;
+}
+
+.setup-steps ol {
+    margin: 0;
+    padding-left: 20px;
+}
+
+.setup-steps li {
+    margin-bottom: 10px;
+    line-height: 1.6;
+}
+
+.discovered-scanners {
+    margin-top: 20px;
+}
+
+.scanner-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 15px;
+}
+
+.scanner-table th,
+.scanner-table td {
+    padding: 12px;
+    text-align: left;
+    border-bottom: 1px solid #ddd;
+}
+
+.scanner-table th {
+    background: #667eea;
+    color: white;
+    font-weight: bold;
+}
+
+.scanner-table tr:hover {
+    background: #f5f5f5;
+}
+
+.no-scanners {
+    text-align: center;
+    padding: 40px;
+    color: #999;
+    font-style: italic;
+}
+
+.test-button {
+    background: #4CAF50;
+    color: white;
+    border: none;
+    padding: 12px 30px;
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 16px;
+    margin: 10px 5px;
+    transition: background 0.3s;
+}
+
+.test-button:hover {
+    background: #45a049;
+}
+
+.test-button:disabled {
+    background: #ccc;
+    cursor: not-allowed;
+}
+
+.status-indicator {
+    display: inline-block;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    margin-right: 8px;
+}
+
+.status-running {
+    background: #4CAF50;
+    animation: pulse 2s infinite;
+}
+
+.status-stopped {
+    background: #f44336;
+}
+
+@keyframes pulse {
+    0% { opacity: 1; }
+    50% { opacity: 0.5; }
+    100% { opacity: 1; }
+}
+
+.config-template {
+    background: #f5f5f5;
+    padding: 20px;
+    border-radius: 8px;
+    margin: 20px 0;
+    font-family: 'Courier New', monospace;
+    font-size: 14px;
+    border: 1px solid #ddd;
+}
+
+.port-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(60px, 1fr));
+    gap: 5px;
+    margin: 20px 0;
+    padding: 15px;
+    background: #f8f9fa;
+    border-radius: 8px;
+}
+
+.port-cell {
+    background: #e0e0e0;
+    padding: 8px;
+    text-align: center;
+    border-radius: 4px;
+    font-size: 12px;
+    font-weight: bold;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.port-cell:hover {
+    background: #667eea;
+    color: white;
+    transform: scale(1.1);
+}
+
+.port-cell.available {
+    background: #4CAF50;
+    color: white;
+}
+
+.port-cell.in-use {
+    background: #ff9800;
+    color: white;
+}
+
+.alert-box {
+    background: #fff3cd;
+    border: 1px solid #ffeaa7;
+    color: #856404;
+    padding: 15px;
+    border-radius: 5px;
+    margin: 20px 0;
+}
+
+.alert-box.info {
+    background: #d1ecf1;
+    border: 1px solid #bee5eb;
+    color: #0c5460;
+}
+
+.alert-box.success {
+    background: #d4edda;
+    border: 1px solid #c3e6cb;
+    color: #155724;
+}
+
+@media (max-width: 768px) {
+    .server-info {
+        grid-template-columns: 1fr;
+    }
+    
+    .port-grid {
+        grid-template-columns: repeat(auto-fill, minmax(50px, 1fr));
+    }
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="scanner-config-container">
+    <div class="config-header">
+        <h1><i class="fas fa-qrcode"></i> InfoWedge Scanner Configuration</h1>
+        <p>Configure your Chainway C66 scanners to work with the Mine Management System</p>
+    </div>
+
+    <!-- Server Information -->
+    <div class="config-section">
+        <h2><i class="fas fa-server"></i> Server Information</h2>
+        <div class="server-info">
+            <div class="info-card">
+                <h3>Server IP Address</h3>
+                <div class="value" id="serverIp">{{ server_ip }}</div>
+            </div>
+            <div class="info-card">
+                <h3>Port Range</h3>
+                <div class="value" id="portRange">{{ port_range }}</div>
+            </div>
+            <div class="info-card">
+                <h3>Discovery Port</h3>
+                <div class="value" id="discoveryPort">{{ discovery_port }}</div>
+            </div>
+            <div class="info-card">
+                <h3>Auth Token</h3>
+                <div class="value" id="authToken">{{ auth_token }}</div>
+            </div>
+        </div>
+
+        <div class="alert-box info">
+            <strong>Info:</strong> Your Chainway C66 scanners can connect to any port between 5000-7000. 
+            The system will automatically detect and process scans from any port in this range.
+        </div>
+    </div>
+
+    <!-- Configuration QR Code -->
+    <div class="config-section">
+        <h2><i class="fas fa-qrcode"></i> Quick Configuration QR Code</h2>
+        <div class="qr-code-container">
+            <div class="qr-code" id="configQr">
+                QR Code Generated<br>
+                for Scanner Setup
+            </div>
+            <p>Scan this QR code with your Chainway device to auto-configure InfoWedge settings</p>
+        </div>
+    </div>
+
+    <!-- Setup Instructions -->
+    <div class="config-section">
+        <h2><i class="fas fa-list-ol"></i> Manual Setup Instructions</h2>
+        <div class="setup-steps">
+            <ol>
+                <li><strong>Open InfoWedge App</strong> on your Chainway C66 device</li>
+                <li><strong>Create New Profile:</strong> Tap "Create Profile" and name it "MineGateSystem"</li>
+                <li><strong>Configure Input:</strong>
+                    <ul>
+                        <li>Enable "Barcode Input"</li>
+                        <li>Enable all barcode decoders (QR Code, Code 128, etc.)</li>
+                    </ul>
+                </li>
+                <li><strong>Configure Output:</strong>
+                    <ul>
+                        <li>Output Method: <strong>IP Output</strong></li>
+                        <li>Protocol: <strong>TCP</strong></li>
+                        <li>Server IP: <strong>{{ server_ip }}</strong></li>
+                        <li>Port: <strong>Any port 5000-7000</strong> (e.g., 5000)</li>
+                        <li>Data Format: <strong>Raw String</strong></li>
+                    </ul>
+                </li>
+                <li><strong>Advanced Options:</strong>
+                    <ul>
+                        <li>Connection Timeout: 10 seconds</li>
+                        <li>Retry on Failure: Enabled</li>
+                        <li>Optional: Add device prefix like "GATE1:" for identification</li>
+                    </ul>
+                </li>
+                <li><strong>Save and Activate</strong> the profile</li>
+                <li><strong>Test Scan:</strong> Scan any QR code to verify connection</li>
+            </ol>
+        </div>
+    </div>
+
+    <!-- Port Assignment -->
+    <div class="config-section">
+        <h2><i class="fas fa-network-wired"></i> Port Assignment</h2>
+        <p>Each scanner can use any port in the range 5000-7000. Here's a suggested assignment:</p>
+        
+        <div class="port-grid" id="portGrid">
+            <!-- Port cells will be generated by JavaScript -->
+        </div>
+
+        <div class="alert-box">
+            <strong>Recommended Assignment:</strong><br>
+            • Gate 1 Scanner → Port 5000<br>
+            • Gate 2 Scanner → Port 5001<br>
+            • Mobile Scanner → Port 5002<br>
+            • Backup Scanner → Port 5003
+        </div>
+    </div>
+
+    <!-- Discovery Service -->
+    <div class="config-section">
+        <h2><i class="fas fa-satellite-dish"></i> Scanner Discovery Service</h2>
+        
+        <div style="margin-bottom: 20px;">
+            <span class="status-indicator" id="discoveryStatus"></span>
+            <span id="discoveryStatusText">Checking...</span>
+        </div>
+
+        <button class="test-button" id="testDiscoveryBtn" onclick="testDiscovery()">
+            <i class="fas fa-broadcast-tower"></i> Test Discovery
+        </button>
+        
+        <button class="test-button" onclick="refreshDiscovery()">
+            <i class="fas fa-sync-alt"></i> Refresh
+        </button>
+
+        <div class="discovered-scanners">
+            <h3>Discovered Scanners</h3>
+            <div id="scannersList">
+                <div class="no-scanners">No scanners discovered yet. Click "Test Discovery" to search.</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Configuration Template -->
+    <div class="config-section">
+        <h2><i class="fas fa-code"></i> InfoWedge Configuration Template</h2>
+        <div class="config-template">
+Profile Name: MineGateSystem
+
+Input Settings:
+- Barcode Input: Enabled
+- Decoders: QR Code, Code 128, Code 39, EAN-13, UPC-A
+- Aim Mode: Continuous
+- Illumination: Auto
+
+Output Settings:
+- Output Method: IP Output
+- Protocol: TCP
+- Server IP: {{ server_ip }}
+- Port: 5000 (or any 5000-7000)
+- Data Format: Raw String
+- Connection Timeout: 10 seconds
+- Retry Count: 3
+
+Advanced Options:
+- Device Prefix: GATE1: (optional)
+- Suffix: \n (newline)
+- Character Encoding: UTF-8
+        </div>
+    </div>
+
+    <!-- Troubleshooting -->
+    <div class="config-section">
+        <h2><i class="fas fa-tools"></i> Troubleshooting</h2>
+        
+        <div class="alert-box">
+            <strong>Scanner not connecting?</strong><br>
+            • Verify server IP address is correct<br>
+            • Check network connectivity (ping {{ server_ip }})<br>
+            • Ensure port 5000-7000 is not blocked by firewall<br>
+            • Try different port within range<br>
+            • Restart InfoWedge app
+        </div>
+
+        <div class="alert-box">
+            <strong>Scans not appearing in system?</strong><br>
+            • Check Network Scanner is running in Monitoring dashboard<br>
+            • Verify scanner is using TCP (not UDP)<br>
+            • Check auth token matches if using JSON format<br>
+            • Look for error messages in server logs
+        </div>
+
+        <div class="alert-box">
+            <strong>Discovery not working?</strong><br>
+            • Ensure scanner and server are on same network<br>
+            • UDP port {{ discovery_port }} must be open<br>
+            • Some networks block broadcast packets<br>
+            • Manual configuration always works
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let discoveryStatus = null;
+
+// Initialize page
+document.addEventListener('DOMContentLoaded', () => {
+    generatePortGrid();
+    refreshDiscovery();
+    generateConfigQR();
+});
+
+// Generate port grid
+function generatePortGrid() {
+    const grid = document.getElementById('portGrid');
+    const startPort = 5000;
+    const endPort = 5020; // Show first 20 ports for demo
+    
+    for (let port = startPort; port <= endPort; port++) {
+        const cell = document.createElement('div');
+        cell.className = 'port-cell';
+        cell.textContent = port;
+        cell.title = `Port ${port} - Click to copy`;
+        cell.onclick = () => copyPort(port);
+        
+        // Mark some ports as examples
+        if (port === 5000 || port === 5001) {
+            cell.classList.add('in-use');
+            cell.title += ' (Gate Scanner)';
+        } else if (port === 5002) {
+            cell.classList.add('available');
+            cell.title += ' (Mobile Scanner)';
+        }
+        
+        grid.appendChild(cell);
+    }
+}
+
+// Copy port to clipboard
+function copyPort(port) {
+    navigator.clipboard.writeText(port).then(() => {
+        showNotification(`Port ${port} copied to clipboard`, 'success');
+    });
+}
+
+// Refresh discovery status
+async function refreshDiscovery() {
+    try {
+        const response = await fetch('/api/scanner/discovery-status');
+        const data = await response.json();
+        
+        updateDiscoveryStatus(data);
+        updateScannersList(data.discovered_scanners || []);
+        
+    } catch (error) {
+        console.error('Failed to fetch discovery status:', error);
+        document.getElementById('discoveryStatusText').textContent = 'Error fetching status';
+    }
+}
+
+// Update discovery status display
+function updateDiscoveryStatus(data) {
+    const indicator = document.getElementById('discoveryStatus');
+    const text = document.getElementById('discoveryStatusText');
+    
+    if (data.running) {
+        indicator.className = 'status-indicator status-running';
+        text.textContent = `Discovery service running on UDP port ${data.discovery_port}`;
+    } else {
+        indicator.className = 'status-indicator status-stopped';
+        text.textContent = 'Discovery service stopped';
+    }
+}
+
+// Update discovered scanners list
+function updateScannersList(scanners) {
+    const list = document.getElementById('scannersList');
+    
+    if (scanners.length === 0) {
+        list.innerHTML = '<div class="no-scanners">No scanners discovered yet. Click "Test Discovery" to search.</div>';
+        return;
+    }
+    
+    const table = document.createElement('table');
+    table.className = 'scanner-table';
+    table.innerHTML = `
+        <thead>
+            <tr>
+                <th>Scanner IP</th>
+                <th>Port</th>
+                <th>First Seen</th>
+                <th>Status</th>
+            </tr>
+        </thead>
+        <tbody>
+            ${scanners.map(scanner => `
+                <tr>
+                    <td>${scanner.ip}</td>
+                    <td>${scanner.port}</td>
+                    <td>${new Date(scanner.timestamp).toLocaleString()}</td>
+                    <td><span class="status-indicator status-running"></span> Active</td>
+                </tr>
+            `).join('')}
+        </tbody>
+    `;
+    
+    list.innerHTML = '';
+    list.appendChild(table);
+}
+
+// Test discovery
+async function testDiscovery() {
+    const btn = document.getElementById('testDiscoveryBtn');
+    btn.disabled = true;
+    btn.textContent = 'Testing...';
+    
+    try {
+        const response = await fetch('/api/scanner/test-discovery', { method: 'POST' });
+        const data = await response.json();
+        
+        if (data.success) {
+            showNotification(data.message, 'success');
+            // Wait a moment then refresh
+            setTimeout(refreshDiscovery, 1000);
+        } else {
+            showNotification(data.message, 'error');
+        }
+    } catch (error) {
+        showNotification('Failed to test discovery', 'error');
+    } finally {
+        btn.disabled = false;
+        btn.textContent = 'Test Discovery';
+    }
+}
+
+// Generate configuration QR code
+function generateConfigQR() {
+    const config = {
+        server_ip: '{{ server_ip }}',
+        port_range: '{{ port_range }}',
+        auth_token: '{{ auth_token }}',
+        profile: 'MineGateSystem'
+    };
+    
+    const qrContainer = document.getElementById('configQr');
+    qrContainer.innerHTML = `
+        <div style="font-size: 10px; line-height: 1.2;">
+            Server: {{ server_ip }}<br>
+            Ports: {{ port_range }}<br>
+            Auth: {{ auth_token }}<br>
+            Profile: MineGateSystem
+        </div>
+    `;
+}
+
+// Show notification
+function showNotification(message, type = 'info') {
+    const notification = document.createElement('div');
+    notification.className = `alert-box ${type}`;
+    notification.textContent = message;
+    notification.style.position = 'fixed';
+    notification.style.top = '20px';
+    notification.style.right = '20px';
+    notification.style.zIndex = '9999';
+    notification.style.maxWidth = '400px';
+    
+    document.body.appendChild(notification);
+    
+    setTimeout(() => {
+        notification.remove();
+    }, 5000);
+}
+
+// Auto-refresh discovery every 30 seconds
+setInterval(refreshDiscovery, 30000);
+</script>
+{% endblock %}

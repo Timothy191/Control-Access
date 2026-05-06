@@ -1,0 +1,217 @@
+{% extends "base.html" %}
+
+{% block title %}Emergency Muster{% endblock %}
+
+{% block breadcrumb %}
+<i class="fas fa-home"></i>
+<a href="{{ url_for('dashboard') }}">Dashboard</a>
+<i class="fas fa-chevron-right"></i>
+<span>Emergency Muster</span>
+{% endblock %}
+
+{% block content %}
+<div class="muster-section">
+    <div class="page-header">
+        <h1><i class="fas fa-exclamation-triangle" style="color:var(--danger)"></i> Emergency Muster Roll</h1>
+        <div class="header-actions">
+            <button class="btn btn-danger" onclick="window.print()">
+                <i class="fas fa-print"></i> Print Muster
+            </button>
+            <button class="btn btn-primary" onclick="location.reload()">
+                <i class="fas fa-sync-alt"></i> Refresh
+            </button>
+        </div>
+    </div>
+
+    <div class="muster-summary">
+        <div class="muster-stat total">
+            <div class="muster-stat-number">{{ total_on_site }}</div>
+            <div class="muster-stat-label">Total On-Site</div>
+        </div>
+        <div class="muster-stat employees">
+            <div class="muster-stat-number">{{ on_site.employees|length }}</div>
+            <div class="muster-stat-label">Employees</div>
+        </div>
+        <div class="muster-stat visitors">
+            <div class="muster-stat-number">{{ on_site.visitors|length }}</div>
+            <div class="muster-stat-label">Visitors</div>
+        </div>
+        <div class="muster-stat vehicles">
+            <div class="muster-stat-number">{{ on_site.vehicles|length }}</div>
+            <div class="muster-stat-label">Vehicles</div>
+        </div>
+    </div>
+
+    <div class="muster-timestamp">
+        <i class="fas fa-clock"></i> Muster generated: <strong id="musterTime"></strong>
+    </div>
+
+    <!-- Employees On-Site -->
+    <div class="muster-group">
+        <h2><i class="fas fa-hard-hat"></i> Employees On-Site ({{ on_site.employees|length }})</h2>
+        <div class="table-container">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>Emp Code</th>
+                        <th>Name</th>
+                        <th>Job Title</th>
+                        <th>Entry Gate</th>
+                        <th>Time In</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for person in on_site.employees %}
+                    <tr>
+                        <td>{{ loop.index }}</td>
+                        <td><code>{{ person.emp_code or '-' }}</code></td>
+                        <td><strong>{{ person.name }}</strong></td>
+                        <td>{{ person.job_title or '-' }}</td>
+                        <td>{{ person.gate }}</td>
+                        <td>{{ person.time_in.strftime('%H:%M:%S') if person.time_in else '-' }}</td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="6">
+                            <div class="empty-state">
+                                <i class="fas fa-check-circle"></i>
+                                <p>No employees currently on-site</p>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Visitors On-Site -->
+    <div class="muster-group">
+        <h2><i class="fas fa-user-tie"></i> Visitors On-Site ({{ on_site.visitors|length }})</h2>
+        <div class="table-container">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>Name</th>
+                        <th>Entry Gate</th>
+                        <th>Time In</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for person in on_site.visitors %}
+                    <tr>
+                        <td>{{ loop.index }}</td>
+                        <td><strong>{{ person.name }}</strong></td>
+                        <td>{{ person.gate }}</td>
+                        <td>{{ person.time_in.strftime('%H:%M:%S') if person.time_in else '-' }}</td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="4">
+                            <div class="empty-state">
+                                <i class="fas fa-check-circle"></i>
+                                <p>No visitors currently on-site</p>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Vehicles On-Site -->
+    <div class="muster-group">
+        <h2><i class="fas fa-truck"></i> Vehicles On-Site ({{ on_site.vehicles|length }})</h2>
+        <div class="table-container">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>Vehicle</th>
+                        <th>Entry Gate</th>
+                        <th>Time In</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for v in on_site.vehicles %}
+                    <tr>
+                        <td>{{ loop.index }}</td>
+                        <td><strong>{{ v.name }}</strong></td>
+                        <td>{{ v.gate }}</td>
+                        <td>{{ v.time_in.strftime('%H:%M:%S') if v.time_in else '-' }}</td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="4">
+                            <div class="empty-state">
+                                <i class="fas fa-check-circle"></i>
+                                <p>No vehicles currently on-site</p>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<style>
+.muster-summary {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+}
+.muster-stat {
+    background: var(--card-bg);
+    border: 1px solid var(--steel);
+    border-radius: 8px;
+    padding: 1.25rem;
+    text-align: center;
+}
+.muster-stat.total { border-left: 4px solid var(--danger); }
+.muster-stat.employees { border-left: 4px solid #2196f3; }
+.muster-stat.visitors { border-left: 4px solid #ff9800; }
+.muster-stat.vehicles { border-left: 4px solid #4caf50; }
+.muster-stat-number {
+    font-size: 2.5rem;
+    font-weight: 700;
+    color: var(--text-primary);
+}
+.muster-stat-label {
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+.muster-timestamp {
+    background: rgba(255, 23, 68, 0.08);
+    border: 1px solid rgba(255, 23, 68, 0.2);
+    border-radius: 6px;
+    padding: 0.75rem 1rem;
+    margin-bottom: 1.5rem;
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+}
+.muster-group {
+    margin-bottom: 2rem;
+}
+.muster-group h2 {
+    font-size: 1.1rem;
+    margin-bottom: 0.75rem;
+    color: var(--text-primary);
+}
+@media print {
+    .header-actions, .sidebar, nav { display: none !important; }
+    .muster-section { padding: 0; }
+}
+</style>
+
+<script>
+document.getElementById('musterTime').textContent = new Date().toLocaleString();
+</script>
+{% endblock %}

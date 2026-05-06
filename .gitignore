@@ -1,0 +1,59 @@
+# Environment variables (contains secrets)
+.env
+.env.local
+.env.production
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+dist/
+build/
+
+# Virtual environments
+venv/
+.venv/
+env/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+
+# Logs
+*.log
+server.log
+monitor.log
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Mobile apps (large, built separately)
+QrMobile/
+MineGateScannerNative/
+*.apk
+*.apk_test
+
+# Tool/IDE metadata
+.opencode/
+.windsurf/
+
+# Backup/temp scripts
+*.backup
+*.backup2
+*.before_edit
+*.current
+*.working
+cookies.txt
+ba.txt
+OpenMythos/

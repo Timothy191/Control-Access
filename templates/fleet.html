@@ -1,0 +1,363 @@
+{% extends "base.html" %}
+
+{% block title %}Fleet Management{% endblock %}
+
+{% block breadcrumb %}
+<i class="fas fa-home"></i>
+<a href="{{ url_for('dashboard') }}">Dashboard</a>
+<i class="fas fa-chevron-right"></i>
+<span>Fleet</span>
+{% endblock %}
+
+{% block content %}
+<div class="fleet-section">
+    <div class="page-header">
+        <h1><i class="fas fa-truck"></i> Fleet Management</h1>
+        {% if session.role in ['admin', 'manager'] %}
+        <a href="{{ url_for('export_fleet_excel') }}" class="btn btn-secondary">
+            <i class="fas fa-file-excel"></i> Excel
+        </a>
+        <a href="{{ url_for('export_fleet_pdf') }}" class="btn btn-primary">
+            <i class="fas fa-file-pdf"></i> PDF
+        </a>
+        <a href="{{ url_for('export_fleet_qr_zip') }}" class="btn btn-success" title="Export all QR codes as ZIP">
+            <i class="fas fa-qrcode"></i> QR Export
+        </a>
+        <button class="btn btn-secondary" id="importVehicleBtn">
+            <i class="fas fa-upload"></i> Import
+        </button>
+        <button class="btn btn-primary" id="addVehicleBtn">
+            <i class="fas fa-plus"></i> Add Vehicle
+        </button>
+        {% endif %}
+    </div>
+    
+    <div class="filter-bar">
+        <div class="filter-group">
+            <label for="statusFilter">Filter by Status:</label>
+            <select id="statusFilter">
+                <option value="all">All Vehicles</option>
+                <option value="Active">Active</option>
+                <option value="Maintenance">Maintenance</option>
+                <option value="Retired">Retired</option>
+            </select>
+        </div>
+    </div>
+    
+    <div class="table-container">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Fleet ID</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody id="vehiclesTable">
+                {% for vehicle in vehicles %}
+                <tr data-vehicle-id="{{ vehicle.id }}">
+                    <td class="vehicle-id"><strong>{{ vehicle.fleet_id }}</strong></td>
+                    <td class="actions">
+                        {% if session.role in ['admin', 'manager'] %}
+                        <button class="btn-icon edit-btn" data-id="{{ vehicle.id }}" data-fleet-id="{{ vehicle.fleet_id }}" title="Edit">
+                            <i class="fas fa-edit"></i>
+                        </button>
+                        {% endif %}
+                        {% if session.role == 'admin' %}
+                        <button class="btn-icon danger delete-btn" data-id="{{ vehicle.id }}" data-fleet-id="{{ vehicle.fleet_id }}" title="Delete">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="2">
+                        <div class="empty-state">
+                            <i class="fas fa-truck"></i>
+                            <p>No vehicles found</p>
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Add/Edit Vehicle Modal -->
+<div id="vehicleModal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3 id="modalTitle">Add New Vehicle</h3>
+            <span class="close">&times;</span>
+        </div>
+        <form id="vehicleForm" method="POST">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <input type="hidden" id="vehicleId" name="vehicle_id">
+            <div class="form-group">
+                <label for="fleet_id">Fleet ID *</label>
+                <input type="text" id="fleet_id" name="fleet_id" required>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary close-modal">Cancel</button>
+                <button type="submit" class="btn btn-primary">Save Vehicle</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Maintenance Modal -->
+<div id="maintenanceModal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>Schedule Maintenance</h3>
+            <span class="close">&times;</span>
+        </div>
+        <form id="maintenanceForm" method="POST" action="/schedule_maintenance">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <input type="hidden" id="maintenance_vehicle_id" name="vehicle_id">
+            <div class="form-group">
+                <label for="maintenance_vehicle">Vehicle</label>
+                <input type="text" id="maintenance_vehicle" readonly disabled>
+            </div>
+            <div class="form-group">
+                <label for="maintenance_date">Maintenance Date *</label>
+                <input type="date" id="maintenance_date" name="maintenance_date" required>
+            </div>
+            <div class="form-group">
+                <label for="maintenance_notes">Notes</label>
+                <textarea id="maintenance_notes" name="notes" rows="3" placeholder="Enter maintenance details..."></textarea>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary close-modal">Cancel</button>
+                <button type="submit" class="btn btn-primary">Schedule Maintenance</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Import Modal -->
+<div id="importModal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h2><i class="fas fa-upload"></i> Import Vehicles</h2>
+            <span class="close">&times;</span>
+        </div>
+        <div class="modal-body">
+            <div class="import-info">
+                <p>Upload an Excel (.xlsx) or CSV file with vehicle data.</p>
+                <a href="{{ url_for('download_import_template', entity_type='vehicles') }}" class="btn btn-sm btn-secondary">
+                    <i class="fas fa-download"></i> Download Template
+                </a>
+            </div>
+            <form id="importForm" enctype="multipart/form-data">
+                <div class="form-group">
+                    <label for="importFile">Select File</label>
+                    <input type="file" id="importFile" name="file" accept=".csv,.xlsx,.xls" required>
+                    <small class="help-text">Max 5MB. Required column: fleet_id</small>
+                </div>
+                <div id="importResult" class="import-result" style="display: none;">
+                    <div class="result-summary"></div>
+                    <ul class="error-list"></ul>
+                </div>
+            </form>
+        </div>
+        <div class="modal-footer">
+            <button type="button" class="btn btn-secondary close-modal">Cancel</button>
+            <button type="button" class="btn btn-primary" id="importSubmitBtn">
+                <i class="fas fa-upload"></i> Import
+            </button>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const vehicleModal = document.getElementById('vehicleModal');
+    const maintenanceModal = document.getElementById('maintenanceModal');
+    const modalTitle = document.getElementById('modalTitle');
+    const vehicleForm = document.getElementById('vehicleForm');
+    const maintenanceForm = document.getElementById('maintenanceForm');
+    const vehicleIdHidden = document.getElementById('vehicleId');
+    const maintenanceVehicleId = document.getElementById('maintenance_vehicle_id');
+    const maintenanceVehicleInput = document.getElementById('maintenance_vehicle');
+    
+    function openAddModal() {
+        modalTitle.textContent = 'Add New Vehicle';
+        vehicleForm.action = '/add_vehicle';
+        vehicleIdHidden.value = '';
+        document.getElementById('fleet_id').value = '';
+        vehicleModal.classList.add('active');
+    }
+    
+    function openEditModal(id, fleetId) {
+        modalTitle.textContent = 'Edit Vehicle';
+        vehicleForm.action = '/edit_vehicle/' + id;
+        vehicleIdHidden.value = id;
+        document.getElementById('fleet_id').value = fleetId;
+        vehicleModal.classList.add('active');
+    }
+    
+    function deleteVehicle(vehicleId, fleetId) {
+        if (confirm('Are you sure you want to delete vehicle ' + fleetId + '?')) {
+            const form = document.createElement('form');
+            form.method = 'POST';
+            form.action = '/delete_vehicle/' + vehicleId;
+            const csrf = document.createElement('input');
+            csrf.type = 'hidden';
+            csrf.name = 'csrf_token';
+            csrf.value = document.querySelector('meta[name="csrf-token"]').content;
+            form.appendChild(csrf);
+            document.body.appendChild(form);
+            form.submit();
+        }
+    }
+    
+    function closeModals() {
+        if (vehicleModal) vehicleModal.classList.remove('active');
+        if (maintenanceModal) maintenanceModal.classList.remove('active');
+    }
+    
+    function filterVehicles() {
+        const filterValue = document.getElementById('statusFilter').value;
+        const tableRows = document.querySelectorAll('#vehiclesTable tr');
+        tableRows.forEach(row => {
+            if (filterValue === 'all') {
+                row.style.display = '';
+            } else {
+                const status = row.getAttribute('data-status');
+                row.style.display = status === filterValue ? '' : 'none';
+            }
+        });
+    }
+    
+    const addBtn = document.getElementById('addVehicleBtn');
+    if (addBtn) addBtn.addEventListener('click', openAddModal);
+    
+    document.querySelectorAll('.edit-btn').forEach(btn => {
+        btn.addEventListener('click', function() {
+            openEditModal(
+                this.getAttribute('data-id'),
+                this.getAttribute('data-fleet-id')
+            );
+        });
+    });
+    
+    document.querySelectorAll('.delete-btn').forEach(btn => {
+        btn.addEventListener('click', function() {
+            deleteVehicle(this.getAttribute('data-id'), this.getAttribute('data-fleet-id'));
+        });
+    });
+    
+    document.querySelectorAll('.close, .close-modal').forEach(btn => {
+        btn.addEventListener('click', closeModals);
+    });
+    
+    window.addEventListener('click', function(event) {
+        if (event.target === vehicleModal) closeModals();
+        if (event.target === maintenanceModal) closeModals();
+    });
+    
+    const statusFilter = document.getElementById('statusFilter');
+    if (statusFilter) statusFilter.addEventListener('change', filterVehicles);
+    
+    if (vehicleForm) {
+        vehicleForm.addEventListener('submit', function(e) {
+            const fleetId = document.getElementById('fleet_id').value.trim();
+            if (!fleetId) {
+                e.preventDefault();
+                alert('Please enter fleet ID');
+                return false;
+            }
+            const submitBtn = this.querySelector('.btn-primary');
+            if (submitBtn) submitBtn.classList.add('btn-loading');
+        });
+    }
+
+    // Import functionality
+    const importModal = document.getElementById('importModal');
+    const importBtn = document.getElementById('importVehicleBtn');
+    const importSubmitBtn = document.getElementById('importSubmitBtn');
+    const importForm = document.getElementById('importForm');
+    const importFile = document.getElementById('importFile');
+    const importResult = document.getElementById('importResult');
+
+    if (importBtn) {
+        importBtn.addEventListener('click', function() {
+            importModal.classList.add('active');
+            importResult.style.display = 'none';
+            importForm.reset();
+        });
+    }
+
+    if (importSubmitBtn) {
+        importSubmitBtn.addEventListener('click', async function() {
+            if (!importFile.files.length) {
+                alert('Please select a file');
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append('file', importFile.files[0]);
+
+            importSubmitBtn.disabled = true;
+            importSubmitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Importing...';
+
+            try {
+                const response = await fetch('/import/vehicles', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const result = await response.json();
+                importResult.style.display = 'block';
+
+                const summary = importResult.querySelector('.result-summary');
+                const errorList = importResult.querySelector('.error-list');
+
+                if (response.ok) {
+                    summary.innerHTML = `
+                        <div class="success-message">
+                            <i class="fas fa-check-circle"></i>
+                            Imported: <strong>${result.imported}</strong> |
+                            Skipped (duplicates): <strong>${result.skipped}</strong>
+                        </div>`;
+                    summary.className = 'result-summary success';
+
+                    errorList.innerHTML = result.errors.map(e => `<li>${e}</li>`).join('');
+
+                    if (result.imported > 0) {
+                        setTimeout(() => {
+                            if (confirm(`${result.imported} vehicles imported. Refresh page to see them?`)) {
+                                window.location.reload();
+                            }
+                        }, 500);
+                    }
+                } else {
+                    summary.innerHTML = `<div class="error-message"><i class="fas fa-exclamation-circle"></i> ${result.error || 'Import failed'}</div>`;
+                    summary.className = 'result-summary error';
+                }
+            } catch (error) {
+                importResult.style.display = 'block';
+                const summary = importResult.querySelector('.result-summary');
+                summary.innerHTML = `<div class="error-message"><i class="fas fa-exclamation-circle"></i> Network error: ${error.message}</div>`;
+                summary.className = 'result-summary error';
+            } finally {
+                importSubmitBtn.disabled = false;
+                importSubmitBtn.innerHTML = '<i class="fas fa-upload"></i> Import';
+            }
+        });
+    }
+
+    // Close import modal
+    importModal.querySelector('.close').addEventListener('click', function() {
+        importModal.classList.remove('active');
+    });
+    importModal.querySelectorAll('.close-modal').forEach(btn => {
+        btn.addEventListener('click', function() {
+            importModal.classList.remove('active');
+        });
+    });
+});
+</script>
+{% endblock %}

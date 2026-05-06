@@ -1,0 +1,445 @@
+{% extends "base.html" %}
+
+{% block title %}Visitor Management{% endblock %}
+
+{% block breadcrumb %}
+<i class="fas fa-home"></i>
+<a href="{{ url_for('dashboard') }}">Dashboard</a>
+<i class="fas fa-chevron-right"></i>
+<span>Visitors</span>
+{% endblock %}
+
+{% block content %}
+<div class="visitors-section">
+    <div class="page-header">
+        <h1><i class="fas fa-id-card"></i> Visitor Management</h1>
+        <div class="header-actions">
+            <a href="{{ url_for('export_visitors_pdf', status=request.args.get('status', ''), date_from=request.args.get('date_from', ''), date_to=request.args.get('date_to', '')) }}" class="btn btn-primary">
+                <i class="fas fa-file-pdf"></i> PDF
+            </a>
+            <button class="btn btn-primary" id="checkinBtn">
+                <i class="fas fa-sign-in-alt"></i> Check-in Visitor
+            </button>
+        </div>
+    </div>
+
+    {% if session.get('role') == 'admin' %}
+    <div class="pin-management-card">
+        <form method="POST" action="{{ url_for('update_visitor_pin') }}" class="pin-form">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <span class="pin-label"><i class="fas fa-key"></i> Visitor Request PIN:</span>
+            <input type="text" name="new_pin" value="{{ current_pin }}" class="pin-input" maxlength="20" required title="Visitor Request PIN">
+            <button type="submit" class="btn btn-sm btn-primary" onclick="return confirm('Update the visitor request PIN?')">
+                <i class="fas fa-save"></i> Update
+            </button>
+        </form>
+    </div>
+    {% endif %}
+
+    <form method="GET" class="filter-bar">
+        <div class="filter-group">
+            <label for="statusFilter">Status:</label>
+            <select id="statusFilter" name="status">
+                <option value="" {% if not selected_status %}selected{% endif %}>All</option>
+                <option value="Checked In" {% if selected_status == 'Checked In' %}selected{% endif %}>Checked In</option>
+                <option value="Checked Out" {% if selected_status == 'Checked Out' %}selected{% endif %}>Checked Out</option>
+                <option value="Pending Approval" {% if selected_status == 'Pending Approval' %}selected{% endif %}>Pending Approval</option>
+                <option value="Rejected" {% if selected_status == 'Rejected' %}selected{% endif %}>Rejected</option>
+            </select>
+        </div>
+        <div class="filter-group">
+            <label for="dateFrom">Date From:</label>
+            <input type="date" id="dateFrom" name="date_from" value="{{ selected_date_from }}">
+        </div>
+        <div class="filter-group">
+            <label for="dateTo">Date To:</label>
+            <input type="date" id="dateTo" name="date_to" value="{{ selected_date_to }}">
+        </div>
+        <div class="filter-group filter-actions">
+            <button type="submit" class="btn btn-primary">
+                <i class="fas fa-filter"></i> Apply
+            </button>
+            <a href="{{ url_for('visitors') }}" class="btn btn-secondary">
+                <i class="fas fa-times"></i> Clear
+            </a>
+        </div>
+    </form>
+
+    <div class="tabs">
+        <button class="tab-btn active" data-tab="database">Visitor Database</button>
+        <button class="tab-btn" data-tab="logs">Logs</button>
+        <button class="tab-btn" data-tab="pending">Pending <span class="badge">{{ pending_visitors|length }}</span></button>
+    </div>
+    
+    <!-- Visitor Database Tab -->
+    <div id="databaseTab" class="tab-content active">
+        <div class="table-container">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>Company</th>
+                        <th>Reason</th>
+                        <th>Meeting Person</th>
+                        <th>Status</th>
+                        <th>Check-in</th>
+                        <th>QR Code</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for visitor in visitors %}
+                    <tr data-visitor-id="{{ visitor.id }}">
+                        <td><strong>{{ visitor.name }}</strong></td>
+                        <td>{{ visitor.company or '-' }}</td>
+                        <td>{{ visitor.purpose[:50] + '...' if visitor.purpose and visitor.purpose|length > 50 else visitor.purpose or '-' }}</td>
+                        <td>{{ visitor.meeting_person or '-' }}</td>
+                        <td>
+                            {% if visitor.status == 'Checked In' %}
+                            <span class="status-badge warning">Checked In</span>
+                            {% elif visitor.status == 'Checked Out' %}
+                            <span class="status-badge success">Checked Out</span>
+                            {% elif visitor.status == 'Pending Approval' %}
+                            <span class="status-badge info">Pending</span>
+                            {% elif visitor.status == 'Rejected' %}
+                            <span class="status-badge danger">Rejected</span>
+                            {% else %}
+                            <span class="status-badge">{{ visitor.status }}</span>
+                            {% endif %}
+                        </td>
+                        <td>{{ visitor.check_in_time.strftime('%Y-%m-%d %H:%M') if visitor.check_in_time else '-' }}</td>
+                        <td>
+                            {% if visitor.qr_code %}
+                            <span class="status-badge success">Generated</span>
+                            {% else %}
+                            <a href="{{ url_for('generate_qr_code', entity_type='visitor', entity_id=visitor.id) }}" class="btn btn-sm btn-primary">
+                                <i class="fas fa-qrcode"></i>
+                            </a>
+                            {% endif %}
+                        </td>
+                        <td class="actions">
+                            {% if visitor.status == 'Checked In' %}
+                            <button class="btn-icon success checkout-btn" data-id="{{ visitor.id }}" title="Check Out">
+                                <i class="fas fa-sign-out-alt"></i>
+                            </button>
+                            {% endif %}
+                            <button class="btn-icon view-btn" data-id="{{ visitor.id }}" title="View Details">
+                                <i class="fas fa-eye"></i>
+                            </button>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="8">
+                            <div class="empty-state">
+                                <i class="fas fa-user-friends"></i>
+                                <p>No visitors in database</p>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    
+    <!-- Logs Tab -->
+    <div id="logsTab" class="tab-content">
+        <div class="table-container">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Visitor Name</th>
+                        <th>Direction</th>
+                        <th>Gate</th>
+                        <th>Time</th>
+                        <th>Access</th>
+                        <th>Reason</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for log in visitor_logs %}
+                    <tr>
+                        <td>{{ log.entity_name or '-' }}</td>
+                        <td>
+                            {% if log.direction == 'IN' %}
+                            <span class="status-badge success"><i class="fas fa-arrow-right"></i> IN</span>
+                            {% else %}
+                            <span class="status-badge warning"><i class="fas fa-arrow-left"></i> OUT</span>
+                            {% endif %}
+                        </td>
+                        <td>{{ log.gate_location or '-' }}</td>
+                        <td>{{ log.scanned_at.strftime('%Y-%m-%d %H:%M:%S') if log.scanned_at else '-' }}</td>
+                        <td>
+                            {% if log.access_granted %}
+                            <span class="status-badge success">Granted</span>
+                            {% else %}
+                            <span class="status-badge danger">Denied</span>
+                            {% endif %}
+                        </td>
+                        <td>{{ log.denial_reason or '-' }}</td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="6">
+                            <div class="empty-state">
+                                <i class="fas fa-history"></i>
+                                <p>No visitor gate logs</p>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    
+    <!-- Pending Tab -->
+    <div id="pendingTab" class="tab-content">
+        <div class="table-container">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Visitor Name</th>
+                        <th>Company</th>
+                        <th>Reason</th>
+                        <th>Meeting Person</th>
+                        <th>Requested At</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for visitor in pending_visitors %}
+                    <tr>
+                        <td><strong>{{ visitor.name }}</strong></td>
+                        <td>{{ visitor.company or '-' }}</td>
+                        <td>{{ visitor.purpose or '-' }}</td>
+                        <td>{{ visitor.meeting_person or '-' }}</td>
+                        <td>{{ visitor.created_at.strftime('%Y-%m-%d %H:%M') if visitor.created_at else '-' }}</td>
+                        <td class="actions">
+                            <form method="POST" action="{{ url_for('approve_visitor', visitor_id=visitor.id) }}" style="display:inline">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                <button type="submit" class="btn btn-sm btn-success" title="Approve" onclick="return confirm('Approve this visitor?')">
+                                    <i class="fas fa-check"></i> Approve
+                                </button>
+                            </form>
+                            <form method="POST" action="{{ url_for('reject_visitor', visitor_id=visitor.id) }}" style="display:inline">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                <button type="submit" class="btn btn-sm btn-danger" title="Reject" onclick="return confirm('Reject this visitor?')">
+                                    <i class="fas fa-times"></i> Reject
+                                </button>
+                            </form>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="6">
+                            <div class="empty-state">
+                                <i class="fas fa-clock"></i>
+                                <p>No pending visitor requests</p>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Check-in Modal -->
+<div id="checkinModal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>Visitor Check-in</h3>
+            <span class="close">&times;</span>
+        </div>
+        <form id="checkinForm" action="{{ url_for('checkin_visitor') }}" method="POST">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <div class="form-group">
+                <label for="visitor_name">Visitor Name *</label>
+                <input type="text" id="visitor_name" name="name" required>
+            </div>
+            <div class="form-group">
+                <label for="visitor_company">Company</label>
+                <input type="text" id="visitor_company" name="company">
+            </div>
+            <div class="form-group">
+                <label for="host_id">Host Employee</label>
+                <select id="host_id" name="host_id">
+                    <option value="">Select Host (Optional)</option>
+                    {% for emp in employees %}
+                    <option value="{{ emp.id }}">{{ emp.first_name }} {{ emp.surname }} ({{ emp.job_title or 'N/A' }})</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="purpose">Purpose of Visit *</label>
+                <textarea id="purpose" name="purpose" rows="3" required></textarea>
+            </div>
+            <div class="form-group">
+                <label for="meeting_person">Meeting Person</label>
+                <input type="text" id="meeting_person" name="meeting_person" placeholder="Person being visited">
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary close-modal">Cancel</button>
+                <button type="submit" class="btn btn-primary">Check In</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Visitor Details Modal -->
+<div id="detailsModal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>Visitor Details</h3>
+            <span class="close">&times;</span>
+        </div>
+        <div id="visitorDetails" class="modal-body">
+            <!-- Dynamic content -->
+        </div>
+        <div class="modal-footer">
+            <button type="button" class="btn btn-secondary close-modal">Close</button>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Tab switching
+    const tabBtns = document.querySelectorAll('.tab-btn');
+    const databaseTab = document.getElementById('databaseTab');
+    const logsTab = document.getElementById('logsTab');
+    const pendingTab = document.getElementById('pendingTab');
+    const allTabs = [databaseTab, logsTab, pendingTab];
+    const tabMap = { database: databaseTab, logs: logsTab, pending: pendingTab };
+    
+    tabBtns.forEach(btn => {
+        btn.addEventListener('click', function() {
+            const tabName = this.getAttribute('data-tab');
+            tabBtns.forEach(b => b.classList.remove('active'));
+            this.classList.add('active');
+            allTabs.forEach(t => t.classList.remove('active'));
+            if (tabMap[tabName]) tabMap[tabName].classList.add('active');
+        });
+    });
+    
+    // Checkout buttons
+    const checkoutBtns = document.querySelectorAll('.checkout-btn');
+    checkoutBtns.forEach(btn => {
+        btn.addEventListener('click', function() {
+            const visitorId = this.getAttribute('data-id');
+            if (confirm('Are you sure you want to check out this visitor?')) {
+                window.location.href = '/checkout_visitor/' + visitorId;
+            }
+        });
+    });
+    
+    // View details buttons
+    const viewBtns = document.querySelectorAll('.view-btn');
+    const detailsModal = document.getElementById('detailsModal');
+    const visitorDetailsDiv = document.getElementById('visitorDetails');
+    
+    viewBtns.forEach(btn => {
+        btn.addEventListener('click', function() {
+            const visitorId = this.getAttribute('data-id');
+            fetch('/visitor_details/' + visitorId)
+                .then(response => response.json())
+                .then(data => {
+                    if (visitorDetailsDiv) {
+                        visitorDetailsDiv.innerHTML = `
+                            <div class="detail-row">
+                                <label>Name:</label>
+                                <span>${data.name}</span>
+                            </div>
+                            <div class="detail-row">
+                                <label>Company:</label>
+                                <span>${data.company || '-'}</span>
+                            </div>
+                            <div class="detail-row">
+                                <label>Purpose:</label>
+                                <p>${data.purpose || '-'}</p>
+                            </div>
+                            <div class="detail-row">
+                                <label>Meeting Person:</label>
+                                <span>${data.meeting_person || '-'}</span>
+                            </div>
+                            <div class="detail-row">
+                                <label>Check-in:</label>
+                                <span>${data.check_in_time}</span>
+                            </div>
+                            <div class="detail-row">
+                                <label>Check-out:</label>
+                                <span>${data.check_out_time || 'Still on site'}</span>
+                            </div>
+                            <div class="detail-row">
+                                <label>Status:</label>
+                                <span class="status-badge ${data.status === 'Checked In' ? 'warning' : 'success'}">${data.status}</span>
+                            </div>
+                        `;
+                    }
+                    detailsModal.classList.add('active');
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    alert('Error loading visitor details');
+                });
+        });
+    });
+    
+    // Modal functionality
+    const checkinModal = document.getElementById('checkinModal');
+    const checkinBtn = document.getElementById('checkinBtn');
+    const closeBtns = document.querySelectorAll('.close, .close-modal');
+    
+    function openModal(modal) {
+        if (modal) modal.classList.add('active');
+    }
+
+    function closeModals() {
+        const modals = document.querySelectorAll('.modal');
+        modals.forEach(modal => modal.classList.remove('active'));
+    }
+    
+    if (checkinBtn) {
+        checkinBtn.addEventListener('click', () => openModal(checkinModal));
+    }
+    
+    closeBtns.forEach(btn => {
+        btn.addEventListener('click', closeModals);
+    });
+    
+    window.addEventListener('click', function(event) {
+        const modals = document.querySelectorAll('.modal');
+        modals.forEach(modal => {
+            if (event.target === modal) closeModals();
+        });
+    });
+    
+    // Form validation with loading state
+    const checkinForm = document.getElementById('checkinForm');
+    if (checkinForm) {
+        checkinForm.addEventListener('submit', function(e) {
+            const name = document.getElementById('visitor_name').value.trim();
+            const purpose = document.getElementById('purpose').value.trim();
+            
+            if (!name) {
+                e.preventDefault();
+                alert('Please enter visitor name');
+                return false;
+            }
+            if (!purpose) {
+                e.preventDefault();
+                alert('Please enter purpose of visit');
+                return false;
+            }
+            // Add loading state to submit button
+            const submitBtn = this.querySelector('.btn-primary');
+            if (submitBtn) submitBtn.classList.add('btn-loading');
+            return true;
+        });
+    }
+});
+</script>
+{% endblock %}

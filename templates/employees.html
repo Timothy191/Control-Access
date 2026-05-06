@@ -1,0 +1,551 @@
+{% extends "base.html" %}
+
+{% block title %}Employees{% endblock %}
+
+{% block breadcrumb %}
+<i class="fas fa-home"></i>
+<a href="{{ url_for('dashboard') }}">Dashboard</a>
+<i class="fas fa-chevron-right"></i>
+<span>Employees</span>
+{% endblock %}
+
+{% block content %}
+<div class="employees-section">
+    <div class="page-header">
+        <h1><i class="fas fa-users"></i> Employee Management</h1>
+        <div class="header-actions">
+            {% if session.role in ['admin', 'manager'] %}
+            <a href="{{ url_for('export_employees_excel') }}" class="btn btn-secondary">
+                <i class="fas fa-file-excel"></i> Excel
+            </a>
+            <a href="{{ url_for('export_employees_pdf', department=request.args.get('department', ''), status=request.args.get('status', '')) }}" class="btn btn-primary">
+                <i class="fas fa-file-pdf"></i> PDF
+            </a>
+            <a href="{{ url_for('export_employees_qr_zip') }}" class="btn btn-success" title="Export all QR codes as ZIP">
+                <i class="fas fa-qrcode"></i> QR Export
+            </a>
+            <button class="btn btn-secondary" id="importEmployeeBtn">
+                <i class="fas fa-upload"></i> Import
+            </button>
+            <button class="btn btn-primary" id="addEmployeeBtn">
+                <i class="fas fa-plus"></i> Add Employee
+            </button>
+            {% endif %}
+        </div>
+    </div>
+
+    <form method="GET" class="filter-bar">
+        <div class="filter-group">
+            <label for="jobTitleFilter">JobTitle:</label>
+            <select id="jobTitleFilter" name="job_title">
+                <option value="" {% if not selected_job_title %}selected{% endif %}>All Job Titles</option>
+                {% for jt in job_titles %}
+                <option value="{{ jt }}" {% if selected_job_title == jt %}selected{% endif %}>{{ jt }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="filter-group">
+            <label for="statusFilter">Status:</label>
+            <select id="statusFilter" name="status">
+                <option value="" {% if not selected_status %}selected{% endif %}>All</option>
+                <option value="Active" {% if selected_status == 'Active' %}selected{% endif %}>Active</option>
+                <option value="Inactive" {% if selected_status == 'Inactive' %}selected{% endif %}>Inactive</option>
+                <option value="On Leave" {% if selected_status == 'On Leave' %}selected{% endif %}>On Leave</option>
+            </select>
+        </div>
+        <div class="filter-group filter-actions">
+            <button type="submit" class="btn btn-primary">
+                <i class="fas fa-filter"></i> Apply
+            </button>
+            <a href="{{ url_for('employees') }}" class="btn btn-secondary">
+                <i class="fas fa-times"></i> Clear
+            </a>
+        </div>
+    </form>
+
+    <div class="search-bar">
+        <i class="fas fa-search"></i>
+        <input type="text" id="searchEmployee" placeholder="Search employees by name, ID, or department...">
+    </div>
+    
+    <div class="table-container">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>EmpCode</th>
+                    <th>Initials</th>
+                    <th>FirstName</th>
+                    <th>SecondName</th>
+                    <th>Surname</th>
+                    <th>ID Number</th>
+                    <th>JobTitle</th>
+                    <th>Induction</th>
+                    <th>Induction Expiry</th>
+                    <th>Medical</th>
+                    <th>Medical Expiry</th>
+                    <th>Status</th>
+                    <th>QR Code</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody id="employeesTable">
+                {% for emp in employees %}
+                <tr data-employee-id="{{ emp.id }}">
+                    <td class="employee-id">{{ emp.emp_code }}</td>
+                    <td>{{ emp.initials or '-' }}</td>
+                    <td><strong>{{ emp.first_name }}</strong></td>
+                    <td>{{ emp.second_name or '-' }}</td>
+                    <td>{{ emp.surname }}</td>
+                    <td>{{ emp.id_number }}</td>
+                    <td>{{ emp.job_title or '-' }}</td>
+                    <td>{{ emp.induction or '-' }}</td>
+                    <td>
+                        {% if emp.induction_expiry %}
+                            {% if emp.induction_expiry < current_time %}
+                            <span class="expiry-badge expired">{{ emp.induction_expiry.strftime('%d %b %Y') }}</span>
+                            {% else %}
+                            <span class="expiry-badge valid">{{ emp.induction_expiry.strftime('%d %b %Y') }}</span>
+                            {% endif %}
+                        {% else %}
+                        <span class="expiry-badge none">None</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if emp.medical %}
+                        <span>{{ emp.medical }}</span>
+                        {% else %}
+                        <span>-</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if emp.medical_expiry %}
+                            {% if emp.medical_expiry < current_time %}
+                            <span class="expiry-badge expired">{{ emp.medical_expiry.strftime('%d %b %Y') }}</span>
+                            {% else %}
+                            <span class="expiry-badge valid">{{ emp.medical_expiry.strftime('%d %b %Y') }}</span>
+                            {% endif %}
+                        {% else %}
+                        <span class="expiry-badge none">None</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <span class="status-badge {% if emp.status == 'Active' %}success{% else %}warning{% endif %}">
+                            {{ emp.status }}
+                        </span>
+                    </td>
+                    <td>
+                        {% if emp.qr_code %}
+                        <a href="{{ url_for('generate_qr_code', entity_type='employee', entity_id=emp.id) }}" class="btn btn-sm btn-success" title="Download QR Code">
+                            <i class="fas fa-download"></i> Download QR
+                        </a>
+                        {% else %}
+                        <a href="{{ url_for('generate_qr_code', entity_type='employee', entity_id=emp.id) }}" class="btn btn-sm btn-primary">
+                            <i class="fas fa-qrcode"></i> Generate QR
+                        </a>
+                        {% endif %}
+                    </td>
+                    <td class="actions">
+                        {% if session.role in ['admin', 'manager'] %}
+                        <button class="btn-icon edit-btn"
+                                data-id="{{ emp.id }}"
+                                data-emp-code="{{ emp.emp_code }}"
+                                data-initials="{{ emp.initials }}"
+                                data-first-name="{{ emp.first_name }}"
+                                data-second-name="{{ emp.second_name }}"
+                                data-surname="{{ emp.surname }}"
+                                data-id-number="{{ emp.id_number }}"
+                                data-job-title="{{ emp.job_title }}"
+                                data-induction="{{ emp.induction }}"
+                                data-medical="{{ emp.medical }}"
+                                data-status="{{ emp.status }}"
+                                data-medical-expiry="{{ emp.medical_expiry.strftime('%Y-%m-%d') if emp.medical_expiry else '' }}"
+                                data-induction-expiry="{{ emp.induction_expiry.strftime('%Y-%m-%d') if emp.induction_expiry else '' }}"
+                                title="Edit">
+                            <i class="fas fa-edit"></i>
+                        </button>
+                        {% endif %}
+                        {% if session.role == 'admin' %}
+                        <button class="btn-icon danger delete-btn" data-id="{{ emp.id }}" data-surname="{{ emp.surname }}" title="Delete">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="14">
+                        <div class="empty-state">
+                            <i class="fas fa-user-friends"></i>
+                            <p>No employees found</p>
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Add/Edit Employee Modal -->
+<div id="employeeModal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3 id="modalTitle">Add New Employee</h3>
+            <span class="close">&times;</span>
+        </div>
+        <form id="employeeForm" method="POST">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <input type="hidden" id="employeeId" name="employee_id">
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="emp_code">EmpCode *</label>
+                    <input type="text" id="emp_code" name="emp_code" required>
+                </div>
+                <div class="form-group">
+                    <label for="emp_initials">Initials</label>
+                    <input type="text" id="emp_initials" name="initials">
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="emp_first_name">FirstName *</label>
+                    <input type="text" id="emp_first_name" name="first_name" required>
+                </div>
+                <div class="form-group">
+                    <label for="emp_second_name">SecondName</label>
+                    <input type="text" id="emp_second_name" name="second_name">
+                </div>
+                <div class="form-group">
+                    <label for="emp_surname">Surname *</label>
+                    <input type="text" id="emp_surname" name="surname" required>
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="emp_id_number">ID Number *</label>
+                    <input type="text" id="emp_id_number" name="id_number" required>
+                </div>
+                <div class="form-group">
+                    <label for="emp_job_title">JobTitle</label>
+                    <input type="text" id="emp_job_title" name="job_title">
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="emp_induction">Induction</label>
+                    <input type="text" id="emp_induction" name="induction">
+                </div>
+                <div class="form-group">
+                    <label for="emp_medical">Medical</label>
+                    <input type="text" id="emp_medical" name="medical">
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="emp_induction_expiry">Induction Expiry</label>
+                    <input type="date" id="emp_induction_expiry" name="induction_expiry">
+                </div>
+                <div class="form-group">
+                    <label for="emp_medical_expiry">Medical Expiry</label>
+                    <input type="date" id="emp_medical_expiry" name="medical_expiry">
+                </div>
+            </div>
+            <div class="form-group">
+                <label for="emp_status">Status</label>
+                <select id="emp_status" name="status">
+                    <option value="Active">Active</option>
+                    <option value="Inactive">Inactive</option>
+                    <option value="On Leave">On Leave</option>
+                </select>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary close-modal">Cancel</button>
+                <button type="submit" class="btn btn-primary">Save Employee</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Import Modal -->
+<div id="importModal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h2><i class="fas fa-upload"></i> Import Employees</h2>
+            <span class="close">&times;</span>
+        </div>
+        <div class="modal-body">
+            <div class="import-info">
+                <p>Upload an Excel (.xlsx) or CSV file with employee data.</p>
+                <a href="{{ url_for('download_import_template', entity_type='employees') }}" class="btn btn-sm btn-secondary">
+                    <i class="fas fa-download"></i> Download Template
+                </a>
+            </div>
+            <form id="importForm" enctype="multipart/form-data">
+                <div class="form-group">
+                    <label for="importFile">Select File</label>
+                    <input type="file" id="importFile" name="file" accept=".csv,.xlsx,.xls" required>
+                    <small class="help-text">Max 5MB. Required columns: employee_id, name</small>
+                </div>
+                <div id="importResult" class="import-result" style="display: none;">
+                    <div class="result-summary"></div>
+                    <ul class="error-list"></ul>
+                </div>
+            </form>
+        </div>
+        <div class="modal-footer">
+            <button type="button" class="btn btn-secondary close-modal">Cancel</button>
+            <button type="button" class="btn btn-primary" id="importSubmitBtn">
+                <i class="fas fa-upload"></i> Import
+            </button>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const modal = document.getElementById('employeeModal');
+    const modalTitle = document.getElementById('modalTitle');
+    const employeeForm = document.getElementById('employeeForm');
+    const employeeIdHidden = document.getElementById('employeeId');
+    const empCode = document.getElementById('emp_code');
+    const empInitials = document.getElementById('emp_initials');
+    const empFirstName = document.getElementById('emp_first_name');
+    const empSecondName = document.getElementById('emp_second_name');
+    const empSurname = document.getElementById('emp_surname');
+    const empIdNumber = document.getElementById('emp_id_number');
+    const empJobTitle = document.getElementById('emp_job_title');
+    const empInduction = document.getElementById('emp_induction');
+    const empMedical = document.getElementById('emp_medical');
+    const empStatus = document.getElementById('emp_status');
+
+    let isEditMode = false;
+
+    function openAddModal() {
+        isEditMode = false;
+        modalTitle.textContent = 'Add New Employee';
+        employeeForm.action = '/add_employee';
+        employeeIdHidden.value = '';
+        empCode.value = '';
+        empInitials.value = '';
+        empFirstName.value = '';
+        empSecondName.value = '';
+        empSurname.value = '';
+        empIdNumber.value = '';
+        empJobTitle.value = '';
+        empInduction.value = '';
+        empMedical.value = '';
+        empStatus.value = 'Active';
+        document.getElementById('emp_induction_expiry').value = '';
+        document.getElementById('emp_medical_expiry').value = '';
+        modal.classList.add('active');
+    }
+
+    function openEditModal(employeeId, empCode, initials, firstName, secondName, surname, idNumber, jobTitle, induction, medical, status, medicalExpiry, inductionExpiry) {
+        isEditMode = true;
+        modalTitle.textContent = 'Edit Employee';
+        employeeForm.action = '/edit_employee/' + employeeId;
+        employeeIdHidden.value = employeeId;
+        empCode.value = empCode;
+        empInitials.value = initials || '';
+        empFirstName.value = firstName;
+        empSecondName.value = secondName || '';
+        empSurname.value = surname;
+        empIdNumber.value = idNumber;
+        empJobTitle.value = jobTitle || '';
+        empInduction.value = induction || '';
+        empMedical.value = medical || '';
+        empStatus.value = status || 'Active';
+        document.getElementById('emp_medical_expiry').value = medicalExpiry || '';
+        document.getElementById('emp_induction_expiry').value = inductionExpiry || '';
+        modal.classList.add('active');
+    }
+    
+    function deleteEmployee(employeeId, employeeName) {
+        if (confirm('Are you sure you want to delete ' + employeeName + '?')) {
+            const form = document.createElement('form');
+            form.method = 'POST';
+            form.action = '/delete_employee/' + employeeId;
+            const csrf = document.createElement('input');
+            csrf.type = 'hidden';
+            csrf.name = 'csrf_token';
+            csrf.value = document.querySelector('meta[name="csrf-token"]').content;
+            form.appendChild(csrf);
+            document.body.appendChild(form);
+            form.submit();
+        }
+    }
+    
+    function closeModal() {
+        modal.classList.remove('active');
+    }
+    
+    function searchEmployees() {
+        const searchTerm = document.getElementById('searchEmployee').value.toLowerCase();
+        const tableRows = document.querySelectorAll('#employeesTable tr');
+        tableRows.forEach(row => {
+            const text = row.textContent.toLowerCase();
+            row.style.display = text.includes(searchTerm) ? '' : 'none';
+        });
+    }
+    
+    const addBtn = document.getElementById('addEmployeeBtn');
+    if (addBtn) addBtn.addEventListener('click', openAddModal);
+    
+    document.querySelectorAll('.edit-btn').forEach(btn => {
+        btn.addEventListener('click', function() {
+            openEditModal(
+                this.getAttribute('data-id'),
+                this.getAttribute('data-emp-code'),
+                this.getAttribute('data-initials'),
+                this.getAttribute('data-first-name'),
+                this.getAttribute('data-second-name'),
+                this.getAttribute('data-surname'),
+                this.getAttribute('data-id-number'),
+                this.getAttribute('data-job-title'),
+                this.getAttribute('data-induction'),
+                this.getAttribute('data-medical'),
+                this.getAttribute('data-status'),
+                this.getAttribute('data-medical-expiry'),
+                this.getAttribute('data-induction-expiry')
+            );
+        });
+    });
+
+    document.querySelectorAll('.delete-btn').forEach(btn => {
+        btn.addEventListener('click', function() {
+            deleteEmployee(this.getAttribute('data-id'), this.getAttribute('data-surname'));
+        });
+    });
+    
+    document.querySelectorAll('.close, .close-modal').forEach(btn => {
+        btn.addEventListener('click', closeModal);
+    });
+    
+    window.addEventListener('click', function(event) {
+        if (event.target === modal || event.target.classList.contains('modal')) {
+            closeModal();
+        }
+    });
+    
+    const searchInput = document.getElementById('searchEmployee');
+    if (searchInput) searchInput.addEventListener('keyup', searchEmployees);
+    
+    if (employeeForm) {
+        employeeForm.addEventListener('submit', function(e) {
+            const code = empCode.value.trim();
+            const firstName = empFirstName.value.trim();
+            const surname = empSurname.value.trim();
+            const idNumber = empIdNumber.value.trim();
+            if (!code) {
+                e.preventDefault();
+                alert('Please enter EmpCode');
+                return false;
+            }
+            if (!firstName) {
+                e.preventDefault();
+                alert('Please enter FirstName');
+                return false;
+            }
+            if (!surname) {
+                e.preventDefault();
+                alert('Please enter Surname');
+                return false;
+            }
+            if (!idNumber) {
+                e.preventDefault();
+                alert('Please enter ID Number');
+                return false;
+            }
+            // Add loading state to submit button
+            const submitBtn = this.querySelector('.btn-primary');
+            if (submitBtn) submitBtn.classList.add('btn-loading');
+        });
+    }
+
+    // Import functionality
+    const importModal = document.getElementById('importModal');
+    const importBtn = document.getElementById('importEmployeeBtn');
+    const importSubmitBtn = document.getElementById('importSubmitBtn');
+    const importForm = document.getElementById('importForm');
+    const importFile = document.getElementById('importFile');
+    const importResult = document.getElementById('importResult');
+
+    if (importBtn) {
+        importBtn.addEventListener('click', function() {
+            importModal.classList.add('active');
+            importResult.style.display = 'none';
+            importForm.reset();
+        });
+    }
+
+    if (importSubmitBtn) {
+        importSubmitBtn.addEventListener('click', async function() {
+            if (!importFile.files.length) {
+                alert('Please select a file');
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append('file', importFile.files[0]);
+
+            importSubmitBtn.disabled = true;
+            importSubmitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Importing...';
+
+            try {
+                const response = await fetch('/import/employees', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const result = await response.json();
+                importResult.style.display = 'block';
+
+                const summary = importResult.querySelector('.result-summary');
+                const errorList = importResult.querySelector('.error-list');
+
+                if (response.ok) {
+                    summary.innerHTML = `
+                        <div class="success-message">
+                            <i class="fas fa-check-circle"></i>
+                            Imported: <strong>${result.imported}</strong> |
+                            Skipped (duplicates): <strong>${result.skipped}</strong>
+                        </div>`;
+                    summary.className = 'result-summary success';
+
+                    errorList.innerHTML = result.errors.map(e => `<li>${e}</li>`).join('');
+
+                    if (result.imported > 0) {
+                        setTimeout(() => {
+                            if (confirm(`${result.imported} employees imported. Refresh page to see them?`)) {
+                                window.location.reload();
+                            }
+                        }, 500);
+                    }
+                } else {
+                    summary.innerHTML = `<div class="error-message"><i class="fas fa-exclamation-circle"></i> ${result.error || 'Import failed'}</div>`;
+                    summary.className = 'result-summary error';
+                }
+            } catch (error) {
+                importResult.style.display = 'block';
+                const summary = importResult.querySelector('.result-summary');
+                summary.innerHTML = `<div class="error-message"><i class="fas fa-exclamation-circle"></i> Network error: ${error.message}</div>`;
+                summary.className = 'result-summary error';
+            } finally {
+                importSubmitBtn.disabled = false;
+                importSubmitBtn.innerHTML = '<i class="fas fa-upload"></i> Import';
+            }
+        });
+    }
+
+    // Close import modal
+    importModal.querySelector('.close').addEventListener('click', function() {
+        importModal.classList.remove('active');
+    });
+    importModal.querySelectorAll('.close-modal').forEach(btn => {
+        btn.addEventListener('click', function() {
+            importModal.classList.remove('active');
+        });
+    });
+});
+</script>
+{% endblock %}

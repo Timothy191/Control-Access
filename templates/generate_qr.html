@@ -1,0 +1,183 @@
+{% extends "base.html" %}
+
+{% block title %}Generate QR Codes{% endblock %}
+
+{% block breadcrumb %}
+<i class="fas fa-home"></i>
+<a href="{{ url_for('dashboard') }}">Dashboard</a>
+<i class="fas fa-chevron-right"></i>
+<span>Generate QR</span>
+{% endblock %}
+
+{% block content %}
+<div class="generate-qr-section">
+    <div class="page-header">
+        <h1><i class="fas fa-qrcode"></i> Generate QR Codes</h1>
+    </div>
+    
+    <div class="tabs">
+        <button class="tab-btn active" data-tab="employees">Employees</button>
+        <button class="tab-btn" data-tab="vehicles">Vehicles</button>
+        <button class="tab-btn" data-tab="visitors">Visitors</button>
+    </div>
+    
+    <div id="employeesTab" class="tab-content active">
+        <div class="table-container">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Name</th>
+                        <th>Position</th>
+                        <th>QR Code</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for emp in employees %}
+                    <tr>
+                        <td class="employee-id">{{ emp.employee_id }}</td>
+                        <td><strong>{{ emp.name }}</strong></td>
+                        <td>{{ emp.position or '-' }}</td>
+                        <td>
+                            {% if emp.qr_code %}
+                            <span class="status-badge success">Generated</span>
+                            {% else %}
+                            <span class="status-badge warning">Not Generated</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <a href="{{ url_for('generate_qr_code', entity_type='employee', entity_id=emp.id) }}" class="btn btn-sm btn-primary">
+                                <i class="fas fa-qrcode"></i> Generate
+                            </a>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="5">
+                            <div class="empty-state">
+                                <i class="fas fa-user-friends"></i>
+                                <p>No employees found</p>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    
+    <div id="vehiclesTab" class="tab-content">
+        <div class="table-container">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Fleet ID</th>
+                        <th>Registration Expiry</th>
+                        <th>Status</th>
+                        <th>QR Code</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for vehicle in vehicles %}
+                    <tr>
+                        <td class="vehicle-id">{{ vehicle.fleet_id }}</td>
+                        <td>{{ vehicle.registration_expiry.strftime('%Y-%m-%d') if vehicle.registration_expiry else '-' }}</td>
+                        <td>{{ vehicle.status }}</td>
+                        <td>
+                            {% if vehicle.qr_code %}
+                            <span class="status-badge success">Generated</span>
+                            {% else %}
+                            <span class="status-badge warning">Not Generated</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <a href="{{ url_for('generate_qr_code', entity_type='vehicle', entity_id=vehicle.id) }}" class="btn btn-sm btn-primary">
+                                <i class="fas fa-qrcode"></i> Generate
+                            </a>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="5">
+                            <div class="empty-state">
+                                <i class="fas fa-truck"></i>
+                                <p>No vehicles found</p>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    
+    <div id="visitorsTab" class="tab-content">
+        <div class="table-container">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>Company</th>
+                        <th>Host</th>
+                        <th>QR Code</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for visitor in visitors %}
+                    <tr>
+                        <td><strong>{{ visitor.name }}</strong></td>
+                        <td>{{ visitor.company or '-' }}</td>
+                        <td>{{ visitor.host.name if visitor.host else '-' }}</td>
+                        <td>
+                            {% if visitor.qr_code %}
+                            <span class="status-badge success">Generated</span>
+                            {% else %}
+                            <span class="status-badge warning">Not Generated</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <a href="{{ url_for('generate_qr_code', entity_type='visitor', entity_id=visitor.id) }}" class="btn btn-sm btn-primary">
+                                <i class="fas fa-qrcode"></i> Generate
+                            </a>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="5">
+                            <div class="empty-state">
+                                <i class="fas fa-id-card"></i>
+                                <p>No active visitors found</p>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const tabBtns = document.querySelectorAll('.tab-btn');
+    const tabs = {
+        employees: document.getElementById('employeesTab'),
+        vehicles: document.getElementById('vehiclesTab'),
+        visitors: document.getElementById('visitorsTab')
+    };
+    
+    tabBtns.forEach(btn => {
+        btn.addEventListener('click', function() {
+            const tabName = this.getAttribute('data-tab');
+            tabBtns.forEach(b => b.classList.remove('active'));
+            this.classList.add('active');
+            Object.values(tabs).forEach(tab => tab.classList.remove('active'));
+            tabs[tabName].classList.add('active');
+        });
+    });
+});
+</script>
+{% endblock %}

@@ -1,0 +1,819 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
+    <title>{% block title %}Mine Management System{% endblock %}</title>
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,400;14..32,500;14..32,600;14..32,700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <!-- Chart.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <!-- QRCode.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
+    <!-- Socket.IO -->
+    <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <!-- Main styles -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <style>
+        /* ===== ADDITIONAL STYLES ===== */
+        .menu-toggle {
+            display: none;
+            position: fixed;
+            top: 1rem;
+            left: 1rem;
+            z-index: 1100;
+            background: var(--dark-card);
+            border: 1px solid var(--steel);
+            border-radius: 8px;
+            padding: 0.5rem;
+            color: var(--red-primary);
+            cursor: pointer;
+        }
+        @media (max-width: 768px) {
+            .menu-toggle { display: block; }
+            .sidebar {
+                transform: translateX(-100%);
+                transition: transform 0.3s ease;
+                z-index: 1050;
+            }
+            .sidebar.open { transform: translateX(0); }
+            .main-content {
+                margin-left: 0;
+                padding-top: 4rem;
+            }
+        }
+        @media (min-width: 769px) {
+            .sidebar {
+                width: 60px;
+                transition: width 0.3s ease;
+                overflow: hidden;
+            }
+            .sidebar:hover {
+                width: 260px;
+            }
+            .sidebar .nav-item i {
+                min-width: 20px;
+                text-align: center;
+            }
+            .sidebar .nav-item span,
+            .sidebar .logo span,
+            .sidebar .user-info span:not(.role-badge),
+            .sidebar .logout-btn span {
+                opacity: 0;
+                white-space: nowrap;
+                transition: opacity 0.2s ease 0.1s;
+            }
+            .sidebar:hover .nav-item span,
+            .sidebar:hover .logo span,
+            .sidebar:hover .user-info span:not(.role-badge),
+            .sidebar:hover .logout-btn span {
+                opacity: 1;
+            }
+            .sidebar .logo span {
+                display: none;
+            }
+            .sidebar:hover .logo span {
+                display: inline;
+            }
+            .sidebar-header {
+                justify-content: center;
+                padding: 1.5rem 0.75rem;
+            }
+            .sidebar:hover .sidebar-header {
+                justify-content: flex-start;
+            }
+            .sidebar-header .logo {
+                justify-content: center;
+            }
+            .sidebar:hover .sidebar-header .logo {
+                justify-content: flex-start;
+            }
+            .nav-item {
+                justify-content: center;
+                padding: 12px 15px;
+            }
+            .sidebar:hover .nav-item {
+                justify-content: flex-start;
+            }
+            .sidebar-footer {
+                flex-direction: column;
+                align-items: center;
+                padding: 1rem 0.75rem;
+                gap: 10px;
+            }
+            .sidebar:hover .sidebar-footer {
+                flex-direction: row;
+                justify-content: space-between;
+            }
+            .user-info {
+                flex-direction: column;
+                align-items: center;
+                gap: 5px;
+            }
+            .sidebar:hover .user-info {
+                flex-direction: row;
+                gap: 10px;
+            }
+            .logout-btn {
+                justify-content: center;
+                padding: 8px;
+            }
+            .sidebar:hover .logout-btn {
+                justify-content: flex-start;
+                padding: 8px 15px;
+            }
+            .main-content {
+                margin-left: 60px;
+                transition: margin-left 0.3s ease;
+            }
+        }
+        .skeleton {
+            background: linear-gradient(90deg, #1a1a1a 25%, #2a2a2a 50%, #1a1a1a 75%);
+            background-size: 200% 100%;
+            animation: shimmer 1.5s infinite;
+            border-radius: 8px;
+        }
+        @keyframes shimmer {
+            0% { background-position: 200% 0; }
+            100% { background-position: -200% 0; }
+        }
+        .counter-value { transition: all 0.3s ease-out; }
+        [data-tooltip] {
+            position: relative;
+            cursor: help;
+        }
+        [data-tooltip]:before {
+            content: attr(data-tooltip);
+            position: absolute;
+            bottom: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            background: var(--dark-card);
+            border: 1px solid var(--steel);
+            color: var(--text-primary);
+            padding: 0.25rem 0.5rem;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            white-space: nowrap;
+            z-index: 1000;
+            display: none;
+            pointer-events: none;
+        }
+        [data-tooltip]:hover:before { display: block; }
+        html { scroll-behavior: smooth; }
+        a:focus-visible, button:focus-visible, input:focus-visible {
+            outline: 2px solid var(--red-primary);
+            outline-offset: 2px;
+        }
+        h1 { font-size: clamp(1.5rem, 5vw, 2rem); }
+        h2 { font-size: clamp(1.25rem, 4vw, 1.5rem); }
+        .card, .stat-card {
+            position: relative;
+            background: linear-gradient(145deg, rgba(10,10,10,0.85) 0%, rgba(12,12,12,0.85) 100%);
+            border: 1px solid var(--steel);
+            -webkit-backdrop-filter: blur(4px);
+            backdrop-filter: blur(4px);
+        }
+        .card::after, .stat-card::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: radial-gradient(circle at 20% 30%, rgba(225,6,0,0.03) 0%, transparent 70%);
+            pointer-events: none;
+        }
+        .progress-ring {
+            width: 60px;
+            height: 60px;
+            position: relative;
+        }
+        .progress-ring svg { transform: rotate(-90deg); }
+        .progress-ring-text {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-family: var(--font-mono);
+            font-size: 0.8rem;
+            font-weight: bold;
+            color: var(--red-primary);
+        }
+        .notification {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: var(--dark-card);
+            border-left: 4px solid var(--red-primary);
+            padding: 12px 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            z-index: 2000;
+            animation: slideIn 0.3s ease;
+            color: var(--text-primary);
+        }
+        @keyframes slideIn {
+            from { transform: translateX(100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+
+        /* 3D Background container */
+        #bg-canvas-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: -1;
+            pointer-events: none;
+        }
+        /* Ensure main content sits above background and has no solid background */
+        .app, .auth-container, .login-wrapper {
+            position: relative;
+            z-index: 100;
+        }
+        .main-content {
+            background-color: transparent !important;
+            position: relative;
+            z-index: 50;
+        }
+        /* Optional: add a subtle dark overlay to improve text readability */
+        .content-wrapper {
+            position: relative;
+            z-index: 100;
+        }
+/* Cards with semi‑transparency */
+.card, .stat-card, .login-card {
+    background: rgba(10,10,10,0.85);
+    -webkit-backdrop-filter: blur(4px);
+    backdrop-filter: blur(4px);
+}
+
+/* Scanner Section Styles */
+.scanner-section {
+    padding: 1.5rem;
+}
+
+.scanner-section .page-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1.5rem;
+    flex-wrap: wrap;
+    gap: 1rem;
+}
+
+.scanner-section .page-header h1 {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.gate-selector {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.gate-selector label {
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+}
+
+.gate-selector select {
+    padding: 0.5rem 1rem;
+    background: var(--dark-card);
+    border: 1px solid var(--steel);
+    border-radius: 8px;
+    color: var(--text-primary);
+    cursor: pointer;
+}
+
+.scanner-grid {
+    display: grid;
+    grid-template-columns: 1fr 1.5fr;
+    gap: 1.5rem;
+}
+
+@media (max-width: 1024px) {
+    .scanner-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+.scanner-card, .recent-scans-card {
+    background: var(--dark-card);
+    border: 1px solid var(--steel);
+    border-radius: 12px;
+    overflow: hidden;
+}
+
+.scanner-header, .card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1rem 1.25rem;
+    border-bottom: 1px solid var(--steel);
+    background: rgba(42, 42, 42, 0.3);
+}
+
+.scanner-header h3, .card-header h3 {
+    margin: 0;
+    font-size: 1rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.direction-toggle {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.direction-btn {
+    padding: 0.5rem 1rem;
+    background: transparent;
+    border: 1px solid var(--steel);
+    border-radius: 6px;
+    color: var(--text-secondary);
+    cursor: pointer;
+    font-weight: 600;
+    transition: all 0.2s;
+}
+
+.direction-btn:hover {
+    border-color: var(--red-primary);
+    color: var(--text-primary);
+}
+
+.direction-btn.active {
+    background: var(--red-primary);
+    border-color: var(--red-primary);
+    color: white;
+}
+
+.scanner-body {
+    padding: 1.25rem;
+}
+
+.scanner-container {
+    position: relative;
+    background: #000;
+    border-radius: 8px;
+    overflow: hidden;
+    margin-bottom: 1rem;
+    min-height: 250px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+#reader {
+    width: 100%;
+}
+
+#reader video {
+    border-radius: 8px;
+}
+
+.scanner-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    border: 2px solid var(--red-primary);
+    border-radius: 8px;
+    pointer-events: none;
+    opacity: 0.5;
+}
+
+.scan-line {
+    position: absolute;
+    left: 10%;
+    right: 10%;
+    height: 2px;
+    background: linear-gradient(90deg, transparent, var(--red-primary), transparent);
+    animation: scanMove 2s linear infinite;
+}
+
+@keyframes scanMove {
+    0% { top: 20%; }
+    50% { top: 80%; }
+    100% { top: 20%; }
+}
+
+.manual-entry {
+    text-align: center;
+}
+
+.manual-entry p {
+    color: var(--text-secondary);
+    margin-bottom: 0.75rem;
+    font-size: 0.9rem;
+}
+
+.manual-input {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.manual-input input {
+    flex: 1;
+    padding: 0.75rem 1rem;
+    background: var(--dark-bg);
+    border: 1px solid var(--steel);
+    border-radius: 8px;
+    color: var(--text-primary);
+}
+
+.manual-input input:focus {
+    outline: none;
+    border-color: var(--red-primary);
+}
+
+.card-body {
+    padding: 1rem;
+    max-height: 400px;
+    overflow-y: auto;
+}
+
+.table-responsive {
+    overflow-x: auto;
+}
+
+.scanner-card.scan-animation {
+    animation: flashGreen 0.3s ease;
+}
+
+@keyframes flashGreen {
+    0%, 100% { box-shadow: none; }
+    50% { box-shadow: 0 0 20px rgba(0, 200, 83, 0.5); }
+}
+
+/* Modal Styles */
+.modal {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.8);
+    z-index: 1000;
+    align-items: center;
+    justify-content: center;
+}
+
+.modal.active {
+    display: flex;
+}
+
+.modal-content {
+    background: var(--dark-card);
+    border: 1px solid var(--steel);
+    border-radius: 12px;
+    width: 90%;
+    max-width: 400px;
+    animation: modalSlide 0.3s ease;
+}
+
+@keyframes modalSlide {
+    from { transform: translateY(-20px); opacity: 0; }
+    to { transform: translateY(0); opacity: 1; }
+}
+
+.modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1rem 1.25rem;
+    border-bottom: 1px solid var(--steel);
+}
+
+.modal-header h3 {
+    margin: 0;
+    font-size: 1.1rem;
+}
+
+.modal-header .close {
+    font-size: 1.5rem;
+    cursor: pointer;
+    color: var(--text-secondary);
+}
+
+.modal-body {
+    padding: 1.25rem;
+}
+
+.result-details {
+    text-align: center;
+}
+
+.result-details p {
+    margin: 0.5rem 0;
+}
+
+.modal-footer {
+    padding: 1rem 1.25rem;
+    border-top: 1px solid var(--steel);
+    text-align: right;
+}
+</style>
+</head>
+<body {% if request.endpoint == 'login' %}class="auth-page"{% endif %}>
+    <!-- 3D Background Container -->
+    <div id="bg-canvas-container" {% if request.endpoint == 'login' %}style="display:none"{% endif %}></div>
+
+    <button class="menu-toggle" id="menuToggle" aria-label="Menu">
+        <i class="fas fa-bars"></i>
+    </button>
+
+    <div class="app">
+        <aside class="sidebar" id="sidebar">
+            <div class="sidebar-header">
+                <div class="logo">
+                    <img src="{{ url_for('static', filename='logo.png') }}" alt="Mine Management Logo" class="logo-img">
+                    <span>Mine Manager</span>
+                </div>
+            </div>
+            <nav class="sidebar-nav">
+                <a href="{{ url_for('dashboard') }}" class="nav-item {% if request.endpoint == 'dashboard' %}active{% endif %}">
+                    <i class="fas fa-tachometer-alt"></i>
+                    <span>Dashboard</span>
+                </a>
+                <a href="{{ url_for('employees') }}" class="nav-item {% if request.endpoint == 'employees' %}active{% endif %}">
+                    <i class="fas fa-users"></i>
+                    <span>Employees</span>
+                </a>
+                <a href="{{ url_for('fleet') }}" class="nav-item {% if request.endpoint == 'fleet' %}active{% endif %}">
+                    <i class="fas fa-truck"></i>
+                    <span>Fleet</span>
+                </a>
+                <a href="{{ url_for('equipment') }}" class="nav-item {% if request.endpoint == 'equipment' %}active{% endif %}">
+                    <i class="fas fa-microchip"></i>
+                    <span>Equipment</span>
+                </a>
+                <a href="{{ url_for('visitors') }}" class="nav-item {% if request.endpoint == 'visitors' %}active{% endif %}">
+                    <i class="fas fa-id-card"></i>
+                    <span>Visitors</span>
+                </a>
+                <a href="{{ url_for('pending_approvals') }}" class="nav-item {% if request.endpoint == 'pending_approvals' %}active{% endif %}">
+                    <i class="fas fa-clipboard-list"></i>
+                    <span>Pending Approvals</span>
+                </a>
+                <a href="{{ url_for('qr_scanner') }}" class="nav-item {% if request.endpoint == 'qr_scanner' %}active{% endif %}">
+                    <i class="fas fa-qrcode"></i>
+                    <span>Gate Scanner</span>
+                </a>
+                <a href="{{ url_for('gate_logs') }}" class="nav-item {% if request.endpoint == 'gate_logs' %}active{% endif %}">
+                    <i class="fas fa-history"></i>
+                    <span>Gate Logs</span>
+                </a>
+                <a href="{{ url_for('emergency_muster') }}" class="nav-item {% if request.endpoint == 'emergency_muster' %}active{% endif %}">
+                    <i class="fas fa-exclamation-triangle"></i>
+                    <span>Muster</span>
+                </a>
+                <a href="{{ url_for('generate_qr_page') }}" class="nav-item {% if request.endpoint == 'generate_qr_page' %}active{% endif %}">
+                    <i class="fas fa-qrcode"></i>
+                    <span>Generate QR</span>
+                </a>
+                <a href="{{ url_for('ai_chat_page') }}" class="nav-item {% if request.endpoint == 'ai_chat_page' %}active{% endif %}">
+                    <i class="fas fa-robot"></i>
+                    <span>AI Assistant</span>
+                </a>
+                {% if session.role == 'admin' %}
+                <a href="{{ url_for('monitoring') }}" class="nav-item {% if request.endpoint == 'monitoring' %}active{% endif %}">
+                    <i class="fas fa-chart-line"></i>
+                    <span>Monitoring</span>
+                </a>
+                <a href="{{ url_for('audit_logs') }}" class="nav-item {% if request.endpoint == 'audit_logs' %}active{% endif %}">
+                    <i class="fas fa-shield-alt"></i>
+                    <span>Audit Logs</span>
+                </a>
+                <a href="{{ url_for('manage_users') }}" class="nav-item {% if request.endpoint == 'manage_users' %}active{% endif %}">
+                    <i class="fas fa-users-cog"></i>
+                    <span>Users</span>
+                </a>
+                {% endif %}
+            </nav>
+            <div class="sidebar-footer">
+                <div class="synced-clock-container" style="padding: 10px 15px; border-bottom: 1px solid rgba(255,255,255,0.1); font-size: 12px; color: #aaa;">
+                    <i class="fas fa-clock"></i>
+                    <span class="synced-clock">--:--:--</span>
+                </div>
+                <div class="user-info">
+                    <i class="fas fa-user-circle"></i>
+                    <span>{{ session.username }}</span>
+                    <span class="role-badge">{{ session.role }}</span>
+                </div>
+                <a href="{{ url_for('logout') }}" class="logout-btn">
+                    <i class="fas fa-sign-out-alt"></i>
+                    <span>Logout</span>
+                </a>
+            </div>
+        </aside>
+        <main class="main-content">
+            <div class="breadcrumb">
+                {% block breadcrumb %}
+                <i class="fas fa-home"></i>
+                <a href="{{ url_for('dashboard') }}">Dashboard</a>
+                {% if request.endpoint != 'dashboard' %}
+                    <i class="fas fa-chevron-right"></i>
+                    <span>{% block page_name %}{% endblock %}</span>
+                {% endif %}
+                {% endblock %}
+            </div>
+            <div class="content-wrapper">
+                {% block content %}{% endblock %}
+            </div>
+        </main>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+    <!-- Three.js and background script -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script>
+        (function() {
+            const container = document.getElementById('bg-canvas-container');
+            if (!container) return;
+
+            const scene = new THREE.Scene();
+            scene.background = null;
+            const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
+            camera.position.z = 30;
+
+            const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+            renderer.setClearColor(0x000000, 0);
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.domElement.style.position = 'fixed';
+            renderer.domElement.style.top = '0';
+            renderer.domElement.style.left = '0';
+            renderer.domElement.style.zIndex = '-1';
+            renderer.domElement.style.pointerEvents = 'none';
+            container.appendChild(renderer.domElement);
+
+            // Torus knot
+            const geometry = new THREE.TorusKnotGeometry(10, 2, 200, 32, 3, 4);
+            const material = new THREE.MeshStandardMaterial({ color: 0xe10600, roughness: 0.3, metalness: 0.7 });
+            const knot = new THREE.Mesh(geometry, material);
+            scene.add(knot);
+
+            // Stars
+            const starGeometry = new THREE.BufferGeometry();
+            const starCount = 1500;
+            const starPositions = new Float32Array(starCount * 3);
+            for (let i = 0; i < starCount; i++) {
+                starPositions[i*3] = (Math.random() - 0.5) * 200;
+                starPositions[i*3+1] = (Math.random() - 0.5) * 200;
+                starPositions[i*3+2] = (Math.random() - 0.5) * 100 - 50;
+            }
+            starGeometry.setAttribute('position', new THREE.BufferAttribute(starPositions, 3));
+            const starMaterial = new THREE.PointsMaterial({ color: 0xffffff, size: 0.2 });
+            const stars = new THREE.Points(starGeometry, starMaterial);
+            scene.add(stars);
+
+            // Lights
+            const ambientLight = new THREE.AmbientLight(0x404040);
+            scene.add(ambientLight);
+            const directionalLight = new THREE.DirectionalLight(0xffffff, 1);
+            directionalLight.position.set(1, 2, 1);
+            scene.add(directionalLight);
+            const backLight = new THREE.PointLight(0xe10600, 0.5);
+            backLight.position.set(0, 0, -5);
+            scene.add(backLight);
+
+            function animate() {
+                requestAnimationFrame(animate);
+                knot.rotation.x += 0.005;
+                knot.rotation.y += 0.01;
+                stars.rotation.y += 0.0005;
+                stars.rotation.x += 0.0003;
+                renderer.render(scene, camera);
+            }
+            animate();
+
+            window.addEventListener('resize', () => {
+                camera.aspect = window.innerWidth / window.innerHeight;
+                camera.updateProjectionMatrix();
+                renderer.setSize(window.innerWidth, window.innerHeight);
+            });
+        })();
+    </script>
+    <script>
+        // Mobile sidebar toggle
+        const toggle = document.getElementById('menuToggle');
+        const sidebar = document.getElementById('sidebar');
+        if (toggle && sidebar) {
+            toggle.addEventListener('click', () => sidebar.classList.toggle('open'));
+            document.addEventListener('click', (e) => {
+                if (window.innerWidth <= 768 && !sidebar.contains(e.target) && !toggle.contains(e.target)) {
+                    sidebar.classList.remove('open');
+                }
+            });
+        }
+
+        // Remove skeleton loaders
+        document.addEventListener('DOMContentLoaded', () => {
+            document.querySelectorAll('.skeleton').forEach(el => el.classList.remove('skeleton'));
+        });
+
+        // WebSocket connection
+        const socket = io();
+        socket.on('connect', () => {
+            console.log('Connected to WebSocket');
+            socket.emit('request_stats');
+        });
+        socket.on('stats_update', (data) => {
+            const emp = document.getElementById('employeesCount');
+            if (emp && data.employees !== undefined) emp.textContent = data.employees;
+            const fleet = document.getElementById('fleetCount');
+            if (fleet && data.vehicles !== undefined) fleet.textContent = data.vehicles;
+            const visitors = document.getElementById('visitorsCount');
+            if (visitors && data.visitors !== undefined) visitors.textContent = data.visitors;
+            const pending = document.getElementById('pendingCount');
+            if (pending && data.pending_approvals !== undefined) pending.textContent = data.pending_approvals;
+        });
+        socket.on('visitor_checkin', (data) => {
+            const notification = document.createElement('div');
+            notification.className = 'notification';
+            notification.innerHTML = `<i class="fas fa-bell"></i> New visitor: ${data.name} has checked in`;
+            document.body.appendChild(notification);
+            setTimeout(() => notification.remove(), 3000);
+        });
+        socket.on('gate_scan', (data) => {
+            const notification = document.createElement('div');
+            notification.className = 'notification';
+            notification.innerHTML = `<i class="fas fa-qrcode"></i> ${data.name} (${data.type}) scanned ${data.direction} - ${data.granted ? 'Granted' : 'Denied'}`;
+            document.body.appendChild(notification);
+            setTimeout(() => notification.remove(), 3000);
+        });
+
+        // Time Sync Service
+        let serverTimeOffset = 0;
+        let lastTimeSync = 0;
+
+        async function syncTime() {
+            try {
+                const startTime = Date.now();
+                const response = await fetch('/api/time/sync');
+                const data = await response.json();
+                const endTime = Date.now();
+                
+                // Calculate server time with network latency adjustment
+                const roundTripTime = endTime - startTime;
+                const serverTime = data.unix_timestamp * 1000;
+                const adjustedServerTime = serverTime + (roundTripTime / 2);
+                
+                // Calculate offset between client and server
+                serverTimeOffset = adjustedServerTime - endTime;
+                lastTimeSync = Date.now();
+                
+                console.log(`Time synced: offset=${serverTimeOffset}ms, latency=${roundTripTime}ms`);
+                return data;
+            } catch (error) {
+                console.error('Time sync failed:', error);
+                return null;
+            }
+        }
+
+        // Get synced server time
+        function getSyncedTime() {
+            return new Date(Date.now() + serverTimeOffset);
+        }
+
+        // Initial sync
+        syncTime();
+
+        // Periodic sync every 5 minutes
+        setInterval(syncTime, 300000);
+
+        // Display synced time in header if clock element exists
+        function updateClock() {
+            const clockElements = document.querySelectorAll('.synced-clock');
+            if (clockElements.length > 0) {
+                const syncedTime = getSyncedTime();
+                const timeString = syncedTime.toLocaleTimeString();
+                clockElements.forEach(el => el.textContent = timeString);
+            }
+        }
+
+        // Update clock every second
+        setInterval(updateClock, 1000);
+
+        // Expose time sync functions globally
+        window.timeSync = {
+            sync: syncTime,
+            getTime: getSyncedTime,
+            getOffset: () => serverTimeOffset,
+            lastSync: () => lastTimeSync
+        };
+    </script>
+</body>
+</html>

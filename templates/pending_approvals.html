@@ -1,0 +1,589 @@
+{% extends "base.html" %}
+
+{% block title %}Pending Approvals{% endblock %}
+
+{% block breadcrumb %}
+<i class="fas fa-home"></i>
+<a href="{{ url_for('dashboard') }}">Dashboard</a>
+<i class="fas fa-chevron-right"></i>
+<span>Pending Approvals</span>
+{% endblock %}
+
+{% block content %}
+<style>
+.entity-details-section {
+    margin-top: 15px;
+    padding-top: 15px;
+    border-top: 1px solid var(--steel);
+}
+.entity-details-section h4 {
+    color: var(--red-primary);
+    margin-bottom: 10px;
+    font-size: 14px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+.detail-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 8px 0;
+    border-bottom: 1px solid rgba(255,255,255,0.05);
+}
+.detail-row:last-child {
+    border-bottom: none;
+}
+.detail-row label {
+    color: var(--gray);
+    font-weight: 500;
+}
+.detail-row span {
+    color: var(--text-primary);
+    font-family: 'JetBrains Mono', monospace;
+}
+.status-badge {
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 12px;
+    font-weight: 600;
+}
+.status-badge.pending {
+    background: rgba(255, 152, 0, 0.2);
+    color: #ff9800;
+}
+.status-badge.approved {
+    background: rgba(76, 175, 80, 0.2);
+    color: #4caf50;
+}
+.status-badge.rejected {
+    background: rgba(244, 67, 54, 0.2);
+    color: #f44336;
+}
+.target-selection {
+    display: flex;
+    gap: 15px;
+    margin-bottom: 10px;
+    padding: 10px;
+    background: rgba(255,255,255,0.05);
+    border-radius: 6px;
+}
+.checkbox-label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+    color: var(--text-primary);
+    font-size: 14px;
+}
+.checkbox-label input[type="radio"] {
+    cursor: pointer;
+}
+.checkbox-label span {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
+.form-section {
+    margin-top: 15px;
+    padding-top: 15px;
+    border-top: 1px solid var(--steel);
+}
+.form-section h4 {
+    color: var(--red-primary);
+    margin-bottom: 12px;
+    font-size: 14px;
+    text-transform: uppercase;
+}
+.form-group {
+    margin-bottom: 12px;
+}
+.form-group label {
+    display: block;
+    color: var(--gray);
+    font-size: 12px;
+    margin-bottom: 4px;
+}
+.form-group input,
+.form-group select {
+    width: 100%;
+    padding: 8px 12px;
+    background: var(--steel);
+    border: 1px solid var(--steel);
+    border-radius: 4px;
+    color: var(--text-primary);
+    font-family: inherit;
+}
+.form-group input:focus,
+.form-group select:focus {
+    outline: none;
+    border-color: var(--red-primary);
+}
+</style>
+<div class="approvals-section">
+    <div class="page-header">
+        <h1><i class="fas fa-clipboard-list"></i> Pending Approvals</h1>
+        <div class="stats-badge">
+            <i class="fas fa-bell"></i>
+            <span id="pendingCount">{{ approvals|length }}</span> Pending
+        </div>
+    </div>
+    
+    <div class="approvals-container" id="approvalsContainer">
+        {% if approvals %}
+            {% for approval in approvals %}
+            <div class="approval-card" data-approval-id="{{ approval.id }}">
+                <div class="approval-header">
+                    <div class="approval-type">
+                        <i class="fas {% if approval.request_type == 'Visitor' %}fa-id-card{% elif approval.request_type == 'Vehicle' %}fa-truck{% elif approval.request_type == 'Maintenance' %}fa-wrench{% else %}fa-clipboard{% endif %}"></i>
+                        <h3>{{ approval.request_type }} Request</h3>
+                    </div>
+                    <span class="status-badge pending">Pending</span>
+                </div>
+                <div class="approval-body">
+                    <div class="approval-details">
+                        <div class="detail-row">
+                            <label>Requester:</label>
+                            <span>{{ approval.requester_name }}</span>
+                        </div>
+                        <div class="detail-row">
+                            <label>Request ID:</label>
+                            <span>#{{ approval.request_id }}</span>
+                        </div>
+                        <div class="detail-row">
+                            <label>Date:</label>
+                            <span>{{ approval.created_at.strftime('%Y-%m-%d %H:%M') }}</span>
+                        </div>
+                        <div class="detail-row">
+                            <label>Details:</label>
+                            <p class="approval-details-text">{{ approval.details }}</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="approval-footer">
+                    {% if session.role in ['admin', 'manager'] %}
+                    <div class="target-selection">
+                        <label class="checkbox-label">
+                            <input type="radio" name="target_{{ approval.id }}" value="employees" class="target-radio" data-id="{{ approval.id }}" checked>
+                            <span><i class="fas fa-user"></i> Employees</span>
+                        </label>
+                        <label class="checkbox-label">
+                            <input type="radio" name="target_{{ approval.id }}" value="fleet" class="target-radio" data-id="{{ approval.id }}">
+                            <span><i class="fas fa-truck"></i> Fleet</span>
+                        </label>
+                    </div>
+                    <button class="btn btn-success approve-btn" data-id="{{ approval.id }}">
+                        <i class="fas fa-check"></i> Approve
+                    </button>
+                    <button class="btn btn-danger reject-btn" data-id="{{ approval.id }}">
+                        <i class="fas fa-times"></i> Reject
+                    </button>
+                    {% endif %}
+                    <button class="btn btn-secondary view-btn" data-id="{{ approval.id }}">
+                        <i class="fas fa-eye"></i> View Details
+                    </button>
+                </div>
+            </div>
+            {% endfor %}
+        {% else %}
+            <div class="empty-state">
+                <i class="fas fa-check-circle"></i>
+                <h3>No Pending Approvals</h3>
+                <p>All requests have been processed</p>
+            </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Approval Details Modal -->
+<div id="approvalModal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>Approval Details</h3>
+            <span class="close">&times;</span>
+        </div>
+        <div id="approvalDetails" class="modal-body">
+            <!-- Dynamic content -->
+        </div>
+        <div class="modal-footer">
+            <button type="button" class="btn btn-secondary close-modal">Close</button>
+        </div>
+    </div>
+</div>
+
+<!-- Approval Modal with Scanned Details Form -->
+<div id="commentModal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3><i class="fas fa-check-circle"></i> Approve Request</h3>
+            <span class="close">&times;</span>
+        </div>
+        <div class="modal-body">
+            <form id="commentForm">
+                <!-- Target Table Selection -->
+                <div class="form-section">
+                    <h4><i class="fas fa-database"></i> Target Database</h4>
+                    <div class="target-selection">
+                        <label class="checkbox-label">
+                            <input type="radio" name="target_table" value="employees" id="targetEmployees" checked>
+                            <span><i class="fas fa-user"></i> Employees</span>
+                        </label>
+                        <label class="checkbox-label">
+                            <input type="radio" name="target_table" value="fleet" id="targetFleet">
+                            <span><i class="fas fa-truck"></i> Fleet</span>
+                        </label>
+                    </div>
+                </div>
+                
+                <!-- Scanned Details (Auto-saved from QR scan) -->
+                <div class="form-section" id="scannedDetailsSection">
+                    <h4><i class="fas fa-id-card"></i> Scanned Details</h4>
+                    <p style="color: var(--gray); font-size: 12px; margin-bottom: 10px;">
+                        <i class="fas fa-info-circle"></i> Data from QR scan will be saved automatically
+                    </p>
+                    
+                    <!-- Employee Fields (read-only) -->
+                    <div id="employeeFields">
+                        <div class="form-group">
+                            <label for="empName">Full Name</label>
+                            <input type="text" id="empName" name="name" placeholder="Will be auto-filled from scan" readonly>
+                        </div>
+                        <div class="form-group">
+                            <label for="empId">Employee ID</label>
+                            <input type="text" id="empId" name="employee_id" placeholder="Will be auto-filled from scan" readonly>
+                        </div>
+                        <div class="form-group">
+                            <label for="empPosition">Position</label>
+                            <input type="text" id="empPosition" name="position" placeholder="Will be auto-filled from scan" readonly>
+                        </div>
+                        <div class="form-group">
+                            <label for="empDepartment">Department</label>
+                            <input type="text" id="empDepartment" name="department" placeholder="Will be auto-filled from scan" readonly>
+                        </div>
+                    </div>
+                    
+                    <!-- Fleet Fields (hidden by default) -->
+                    <div id="fleetFields" style="display: none;">
+                        <div class="form-group">
+                            <label for="vehRegistration">Registration Number</label>
+                            <input type="text" id="vehRegistration" name="registration" placeholder="Will be auto-filled" readonly>
+                        </div>
+                        <div class="form-group">
+                            <label for="vehType">Vehicle Type</label>
+                            <select id="vehType" name="type" disabled>
+                                <option value="Truck">Truck</option>
+                                <option value="Car">Car</option>
+                                <option value="SUV">SUV</option>
+                                <option value="Van">Van</option>
+                                <option value="Tractor">Tractor</option>
+                                <option value="Other">Other</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="vehModel">Model</label>
+                            <input type="text" id="vehModel" name="model" placeholder="Will be auto-filled" readonly>
+                        </div>
+                        <div class="form-group">
+                            <label for="vehCapacity">Capacity</label>
+                            <input type="text" id="vehCapacity" name="capacity" placeholder="Will be auto-filled" readonly>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Comments -->
+                <div class="form-section">
+                    <h4><i class="fas fa-comment"></i> Comments</h4>
+                    <div class="form-group">
+                        <textarea id="commentText" name="comment" rows="3" placeholder="Enter approval comments..."></textarea>
+                    </div>
+                </div>
+            </form>
+        </div>
+        <div class="modal-footer">
+            <button type="button" class="btn btn-secondary close-modal">Cancel</button>
+            <button type="button" class="btn btn-success submit-comment"><i class="fas fa-check"></i> Approve & Add</button>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    let currentApprovalId = null;
+    let currentAction = null;
+    
+    // Modal elements
+    const approvalModal = document.getElementById('approvalModal');
+    const commentModal = document.getElementById('commentModal');
+    const approvalDetailsDiv = document.getElementById('approvalDetails');
+    
+    // Close modal function
+    function closeModals() {
+        if (approvalModal) approvalModal.classList.remove('active');
+        if (commentModal) commentModal.classList.remove('active');
+        currentApprovalId = null;
+        currentAction = null;
+    }
+
+    // Open approval details modal
+    function openApprovalDetails(approvalId) {
+        if (approvalModal) {
+            fetch('/api/approval/' + approvalId)
+                .then(response => response.json())
+                .then(data => {
+                    if (approvalDetailsDiv) {
+                        let detailsHtml = `
+                            <div class="detail-row">
+                                <label>Request Type:</label>
+                                <span>${data.request_type}</span>
+                            </div>
+                            <div class="detail-row">
+                                <label>Requester:</label>
+                                <span>${data.requester_name}</span>
+                            </div>
+                            <div class="detail-row">
+                                <label>Request ID:</label>
+                                <span>#${data.request_id}</span>
+                            </div>
+                            <div class="detail-row">
+                                <label>Date:</label>
+                                <span>${data.created_at}</span>
+                            </div>
+                            <div class="detail-row">
+                                <label>Status:</label>
+                                <span class="status-badge ${data.status.toLowerCase()}">${data.status}</span>
+                            </div>
+                        `;
+
+                        // Add entity-specific details if available
+                        if (data.entity_data) {
+                            const entity = data.entity_data;
+                            detailsHtml += `<div class="entity-details-section">
+                                <h4>${data.request_type} Details</h4>`;
+
+                            if (entity.employee_id) {
+                                detailsHtml += `
+                                    <div class="detail-row"><label>Employee ID:</label><span>${entity.employee_id}</span></div>
+                                    <div class="detail-row"><label>Name:</label><span>${entity.name}</span></div>
+                                    <div class="detail-row"><label>Position:</label><span>${entity.position}</span></div>
+                                    <div class="detail-row"><label>Department:</label><span>${entity.department}</span></div>
+                                    <div class="detail-row"><label>Medical Expiry:</label><span>${entity.medical_expiry}</span></div>
+                                    <div class="detail-row"><label>Induction Expiry:</label><span>${entity.induction_expiry}</span></div>
+                                `;
+                            } else if (entity.registration) {
+                                detailsHtml += `
+                                    <div class="detail-row"><label>Registration:</label><span>${entity.registration}</span></div>
+                                    <div class="detail-row"><label>Type:</label><span>${entity.type}</span></div>
+                                    <div class="detail-row"><label>Model:</label><span>${entity.model}</span></div>
+                                    <div class="detail-row"><label>Capacity:</label><span>${entity.capacity}</span></div>
+                                `;
+                            } else if (entity.company) {
+                                detailsHtml += `
+                                    <div class="detail-row"><label>Name:</label><span>${entity.name}</span></div>
+                                    <div class="detail-row"><label>Company:</label><span>${entity.company}</span></div>
+                                    <div class="detail-row"><label>Purpose:</label><span>${entity.purpose}</span></div>
+                                    <div class="detail-row"><label>Host:</label><span>${entity.host_name}</span></div>
+                                `;
+                            }
+
+                            detailsHtml += `</div>`;
+                        }
+
+                        if (data.details) {
+                            detailsHtml += `
+                                <div class="detail-row">
+                                    <label>Details:</label>
+                                    <p>${data.details}</p>
+                                </div>
+                            `;
+                        }
+
+                        approvalDetailsDiv.innerHTML = detailsHtml;
+                    }
+                    approvalModal.classList.add('active');
+                })
+                .catch(error => {
+                    console.error('Error fetching approval details:', error);
+                    alert('Error loading approval details');
+                });
+        }
+    }
+
+    // Toggle between employee and fleet fields
+    const targetRadios = document.querySelectorAll('input[name="target_table"]');
+    targetRadios.forEach(radio => {
+        radio.addEventListener('change', function() {
+            const empFields = document.getElementById('employeeFields');
+            const fleetFields = document.getElementById('fleetFields');
+            if (this.value === 'employees') {
+                empFields.style.display = 'block';
+                fleetFields.style.display = 'none';
+            } else {
+                empFields.style.display = 'none';
+                fleetFields.style.display = 'block';
+            }
+        });
+    });
+
+    // Open comment modal for approval/rejection
+    function openCommentModal(approvalId, action) {
+        currentApprovalId = approvalId;
+        currentAction = action;
+        
+        // Clear form
+        document.getElementById('commentText').value = '';
+        document.getElementById('empName').value = '';
+        document.getElementById('empId').value = '';
+        document.getElementById('empPosition').value = '';
+        document.getElementById('empDepartment').value = '';
+        document.getElementById('vehRegistration').value = '';
+        document.getElementById('vehModel').value = '';
+        document.getElementById('vehCapacity').value = '';
+        
+        // Reset to employees view
+        document.getElementById('targetEmployees').checked = true;
+        document.getElementById('employeeFields').style.display = 'block';
+        document.getElementById('fleetFields').style.display = 'none';
+        
+        // Get selected target from card radio if exists
+        const cardRadio = document.querySelector(`input[name="target_${approvalId}"]:checked`);
+        if (cardRadio) {
+            if (cardRadio.value === 'fleet') {
+                document.getElementById('targetFleet').checked = true;
+                document.getElementById('employeeFields').style.display = 'none';
+                document.getElementById('fleetFields').style.display = 'block';
+            }
+        }
+        
+        // Fetch approval details to populate form
+        fetch('/api/approval/' + approvalId)
+            .then(response => response.json())
+            .then(data => {
+                if (data.scanned_data) {
+                    const scanned = data.scanned_data;
+                    document.getElementById('empName').value = scanned.name || '';
+                    document.getElementById('empId').value = scanned.employee_id || '';
+                    document.getElementById('empPosition').value = scanned.position || '';
+                    document.getElementById('empDepartment').value = scanned.department || '';
+                    document.getElementById('vehRegistration').value = scanned.employee_id || '';
+                    document.getElementById('vehModel').value = scanned.name || '';
+                }
+            })
+            .catch(error => console.error('Error fetching scanned data:', error));
+        
+        if (commentModal) commentModal.classList.add('active');
+    }
+    
+    // Submit approval/rejection with form data
+    const submitBtn = document.querySelector('.submit-comment');
+    if (submitBtn) {
+        submitBtn.addEventListener('click', function() {
+            // Add loading state
+            this.classList.add('btn-loading');
+            const comment = document.getElementById('commentText').value;
+            
+            if (currentApprovalId && currentAction) {
+                const url = currentAction === 'approve' 
+                    ? '/approve_request/' + currentApprovalId 
+                    : '/reject_request/' + currentApprovalId;
+                
+                // Build form data
+                let formData = {};
+                let targetTable = 'employees';
+                
+                if (currentAction === 'approve') {
+                    targetTable = document.querySelector('input[name="target_table"]:checked').value;
+                    
+                    if (targetTable === 'employees') {
+                        formData = {
+                            name: document.getElementById('empName').value,
+                            employee_id: document.getElementById('empId').value,
+                            position: document.getElementById('empPosition').value,
+                            department: document.getElementById('empDepartment').value
+                        };
+                    } else {
+                        formData = {
+                            registration: document.getElementById('vehRegistration').value,
+                            type: document.getElementById('vehType').value,
+                            model: document.getElementById('vehModel').value,
+                            capacity: document.getElementById('vehCapacity').value
+                        };
+                    }
+                }
+                
+                fetch(url, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ 
+                        comment: comment,
+                        target_table: targetTable,
+                        form_data: formData
+                    })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    this.classList.remove('btn-loading');
+                    if (data.success) {
+                        alert(data.message || 'Request approved successfully');
+                        closeModals();
+                        location.reload();
+                    } else {
+                        alert('Error: ' + (data.message || 'Unknown error'));
+                    }
+                })
+                .catch(error => {
+                    this.classList.remove('btn-loading');
+                    console.error('Error:', error);
+                    alert('Error processing request');
+                });
+            } else {
+                this.classList.remove('btn-loading');
+            }
+        });
+    }
+    
+    // Approve button handlers
+    const approveBtns = document.querySelectorAll('.approve-btn');
+    approveBtns.forEach(btn => {
+        btn.addEventListener('click', function() {
+            const approvalId = this.getAttribute('data-id');
+            openCommentModal(approvalId, 'approve');
+        });
+    });
+    
+    // Reject button handlers
+    const rejectBtns = document.querySelectorAll('.reject-btn');
+    rejectBtns.forEach(btn => {
+        btn.addEventListener('click', function() {
+            const approvalId = this.getAttribute('data-id');
+            openCommentModal(approvalId, 'reject');
+        });
+    });
+    
+    // View details button handlers
+    const viewBtns = document.querySelectorAll('.view-btn');
+    viewBtns.forEach(btn => {
+        btn.addEventListener('click', function() {
+            const approvalId = this.getAttribute('data-id');
+            openApprovalDetails(approvalId);
+        });
+    });
+    
+    // Close modal handlers
+    const closeButtons = document.querySelectorAll('.close, .close-modal');
+    closeButtons.forEach(btn => {
+        btn.addEventListener('click', closeModals);
+    });
+
+    // Close modal when clicking outside
+    window.addEventListener('click', function(event) {
+        if (event.target === approvalModal) closeModals();
+        if (event.target === commentModal) closeModals();
+    });
+
+    // Close modal on Escape key
+    document.addEventListener('keydown', function(event) {
+        if (event.key === 'Escape') closeModals();
+    });
+});
+</script>
+{% endblock %}

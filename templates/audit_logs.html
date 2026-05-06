@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+
+{% block title %}Audit Logs{% endblock %}
+
+{% block breadcrumb %}
+<i class="fas fa-home"></i>
+<a href="{{ url_for('dashboard') }}">Dashboard</a>
+<i class="fas fa-chevron-right"></i>
+<span>Audit Logs</span>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1><i class="fas fa-shield-alt"></i> Audit Trail</h1>
+</div>
+
+<div class="table-container">
+    <table class="data-table">
+        <thead>
+            <tr>
+                <th>Time</th>
+                <th>User</th>
+                <th>Action</th>
+                <th>Entity</th>
+                <th>Details</th>
+                <th>IP</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for log in logs %}
+            <tr>
+                <td><code>{{ log.created_at.strftime('%Y-%m-%d %H:%M:%S') }}</code></td>
+                <td><strong>{{ log.user }}</strong></td>
+                <td>
+                    {% if log.action == 'login' %}
+                    <span class="badge badge-in">{{ log.action }}</span>
+                    {% elif log.action == 'create' %}
+                    <span class="badge badge-granted">{{ log.action }}</span>
+                    {% elif log.action == 'delete' %}
+                    <span class="badge badge-denied">{{ log.action }}</span>
+                    {% elif log.action == 'approve' %}
+                    <span class="badge badge-granted">{{ log.action }}</span>
+                    {% elif log.action == 'reject' %}
+                    <span class="badge badge-denied">{{ log.action }}</span>
+                    {% else %}
+                    <span class="badge">{{ log.action }}</span>
+                    {% endif %}
+                </td>
+                <td>{{ log.entity_type }}{% if log.entity_id %} #{{ log.entity_id }}{% endif %}</td>
+                <td>{{ log.details or '-' }}</td>
+                <td><code>{{ log.ip_address or '-' }}</code></td>
+            </tr>
+            {% else %}
+            <tr>
+                <td colspan="6">
+                    <div class="empty-state">
+                        <i class="fas fa-shield-alt"></i>
+                        <p>No audit entries yet</p>
+                    </div>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

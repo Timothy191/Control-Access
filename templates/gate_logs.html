@@ -1,0 +1,125 @@
+{% extends "base.html" %}
+
+{% block title %}Gate Access Logs{% endblock %}
+
+{% block breadcrumb %}
+<i class="fas fa-home"></i>
+<a href="{{ url_for('dashboard') }}">Dashboard</a>
+<i class="fas fa-chevron-right"></i>
+<span>Gate Logs</span>
+{% endblock %}
+
+{% block content %}
+<div class="gate-logs-section">
+    <div class="page-header">
+        <h1><i class="fas fa-qrcode"></i> Gate Access Logs</h1>
+        <div class="export-buttons">
+            <a href="{{ url_for('export_gate_logs_excel') }}" class="btn btn-primary">
+                <i class="fas fa-download"></i> Excel
+            </a>
+            <a href="{{ url_for('export_gate_logs_pdf', type=request.args.get('type', ''), direction=request.args.get('direction', ''), status=request.args.get('status', ''), date_from=request.args.get('date_from', ''), date_to=request.args.get('date_to', '')) }}" class="btn btn-primary">
+                <i class="fas fa-file-pdf"></i> PDF
+            </a>
+        </div>
+    </div>
+
+    <form method="GET" class="filter-bar">
+        <div class="filter-group">
+            <label for="typeFilter">Filter by Type:</label>
+            <select id="typeFilter" name="type">
+                <option value="" {% if not selected_type %}selected{% endif %}>All</option>
+                <option value="employee" {% if selected_type == 'employee' %}selected{% endif %}>Employees</option>
+                <option value="vehicle" {% if selected_type == 'vehicle' %}selected{% endif %}>Vehicles</option>
+                <option value="visitor" {% if selected_type == 'visitor' %}selected{% endif %}>Visitors</option>
+            </select>
+        </div>
+        <div class="filter-group">
+            <label for="directionFilter">Direction:</label>
+            <select id="directionFilter" name="direction">
+                <option value="" {% if not selected_direction %}selected{% endif %}>All</option>
+                <option value="IN" {% if selected_direction == 'IN' %}selected{% endif %}>IN</option>
+                <option value="OUT" {% if selected_direction == 'OUT' %}selected{% endif %}>OUT</option>
+            </select>
+        </div>
+        <div class="filter-group">
+            <label for="statusFilter">Status:</label>
+            <select id="statusFilter" name="status">
+                <option value="" {% if not selected_status %}selected{% endif %}>All</option>
+                <option value="granted" {% if selected_status == 'granted' %}selected{% endif %}>Granted</option>
+                <option value="denied" {% if selected_status == 'denied' %}selected{% endif %}>Denied</option>
+            </select>
+        </div>
+        <div class="filter-group">
+            <label for="dateFrom">Date From:</label>
+            <input type="date" id="dateFrom" name="date_from" value="{{ selected_date_from }}">
+        </div>
+        <div class="filter-group">
+            <label for="dateTo">Date To:</label>
+            <input type="date" id="dateTo" name="date_to" value="{{ selected_date_to }}">
+        </div>
+        <div class="filter-group filter-actions">
+            <button type="submit" class="btn btn-primary">
+                <i class="fas fa-filter"></i> Apply
+            </button>
+            <a href="{{ url_for('gate_logs') }}" class="btn btn-secondary">
+                <i class="fas fa-times"></i> Clear
+            </a>
+        </div>
+    </form>
+    
+    <div class="table-container">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Time</th>
+                    <th>Type</th>
+                    <th>Name</th>
+                    <th>Direction</th>
+                    <th>Status</th>
+                    <th>Gate</th>
+                    <th>Scanned By</th>
+                </tr>
+            </thead>
+            <tbody id="logsTable">
+                {% for log in logs %}
+                <tr data-type="{{ log.access_type }}" data-direction="{{ log.direction }}" data-granted="{{ log.access_granted }}">
+                    <td>{{ log.scanned_at.strftime('%Y-%m-%d %H:%M:%S') }}</td>
+                    <td>
+                        <span class="type-badge">
+                            <i class="fas {% if log.access_type == 'employee' %}fa-user{% elif log.access_type == 'vehicle' %}fa-truck{% else %}fa-id-card{% endif %}"></i>
+                            {{ log.access_type|title }}
+                        </span>
+                    </td>
+                    <td><strong>{{ log.entity_name }}</strong></td>
+                    <td>
+                        <span class="direction-badge {% if log.direction == 'IN' %}in{% else %}out{% endif %}">
+                            {{ log.direction }}
+                        </span>
+                    </td>
+                    <td>
+                        {% if log.access_granted %}
+                        <span class="status-badge success">Granted</span>
+                        {% else %}
+                        <span class="status-badge danger">Denied</span>
+                        <div class="denial-reason">{{ log.denial_reason }}</div>
+                        {% endif %}
+                    </td>
+                    <td>{{ log.gate_location }}</td>
+                    <td>{{ log.scanned_by }}</td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="7">
+                        <div class="empty-state">
+                            <i class="fas fa-history"></i>
+                            <p>No gate logs found</p>
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+{% endblock %}

@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Device Onboarding Terminal</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            color: #fff;
+            padding-bottom: 50px;
+        }
+        
+        .terminal-container {
+            text-align: center;
+            max-width: 1200px;
+            width: 100%;
+            padding: 40px;
+        }
+        
+        .header {
+            margin-bottom: 40px;
+        }
+        
+        .header h1 {
+            font-size: 3rem;
+            font-weight: 300;
+            letter-spacing: 4px;
+            text-transform: uppercase;
+            color: #00d4ff;
+            text-shadow: 0 0 30px rgba(0, 212, 255, 0.5);
+        }
+        
+        .header p {
+            font-size: 1.2rem;
+            color: #8892b0;
+            margin-top: 10px;
+        }
+        
+        .qr-layout {
+            display: flex;
+            justify-content: center;
+            gap: 40px;
+            margin: 40px 0;
+            flex-wrap: wrap;
+        }
+        
+        .qr-section {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 20px;
+            padding: 40px;
+            border: 2px solid rgba(0, 212, 255, 0.3);
+            box-shadow: 0 0 60px rgba(0, 212, 255, 0.1);
+            flex: 1;
+            min-width: 350px;
+            max-width: 500px;
+            position: relative;
+        }
+        
+        .step-badge {
+            position: absolute;
+            top: -20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #00d4ff;
+            color: #000;
+            padding: 8px 20px;
+            border-radius: 20px;
+            font-weight: bold;
+            font-size: 1.2rem;
+            letter-spacing: 1px;
+            box-shadow: 0 5px 15px rgba(0, 212, 255, 0.4);
+        }
+        
+        .step-badge.step2 {
+            background: #64ffda;
+            box-shadow: 0 5px 15px rgba(100, 255, 218, 0.4);
+        }
+        
+        .qr-section h2 {
+            font-size: 1.5rem;
+            color: #fff;
+            margin-bottom: 25px;
+            margin-top: 10px;
+            font-weight: 400;
+            letter-spacing: 1px;
+        }
+        
+        .qr-code {
+            display: inline-block;
+            padding: 20px;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4);
+        }
+        
+        .qr-code img {
+            width: 250px;
+            height: 250px;
+        }
+        
+        .instructions {
+            margin-top: 25px;
+            font-size: 1.1rem;
+            color: #a8b2d1;
+            line-height: 1.8;
+            text-align: left;
+            padding: 0 20px;
+        }
+        
+        .instructions strong {
+            color: #00d4ff;
+        }
+        
+        .download-btn {
+            display: inline-block;
+            padding: 12px 25px;
+            background: #00d4ff;
+            color: #0a192f;
+            text-decoration: none;
+            border-radius: 8px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            transition: all 0.3s ease;
+            box-shadow: 0 10px 30px rgba(0, 212, 255, 0.2);
+            margin-top: 20px;
+            width: 100%;
+            text-align: center;
+        }
+
+        .download-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 15px 40px rgba(0, 212, 255, 0.4);
+            background: #33e5ff;
+        }
+        
+        .download-btn.secondary {
+            background: transparent;
+            border: 2px solid #64ffda;
+            color: #64ffda;
+            box-shadow: none;
+        }
+        
+        .download-btn.secondary:hover {
+            background: rgba(100, 255, 218, 0.1);
+            box-shadow: 0 5px 20px rgba(100, 255, 218, 0.2);
+        }
+
+        .stats-section {
+            display: flex;
+            justify-content: center;
+            gap: 40px;
+            margin-top: 40px;
+            flex-wrap: wrap;
+        }
+        
+        .stat-card {
+            background: rgba(255, 255, 255, 0.03);
+            padding: 25px 40px;
+            border-radius: 15px;
+            text-align: center;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            min-width: 180px;
+        }
+        
+        .stat-value {
+            font-size: 2.5rem;
+            font-weight: 700;
+            color: #64ffda;
+            display: block;
+        }
+        
+        .stat-label {
+            font-size: 0.85rem;
+            color: #8892b0;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            margin-top: 10px;
+            display: block;
+        }
+        
+        .status-indicator {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            background: #00ff88;
+            border-radius: 50%;
+            margin-right: 10px;
+            animation: pulse 2s infinite;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 1; box-shadow: 0 0 10px #00ff88; }
+            50% { opacity: 0.5; box-shadow: 0 0 20px #00ff88; }
+        }
+        
+        .server-info {
+            margin-top: 40px;
+            padding: 20px 40px;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 10px;
+            display: inline-block;
+        }
+        
+        .server-info span {
+            color: #a8b2d1;
+            font-size: 1rem;
+        }
+        
+        .server-info strong {
+            color: #00d4ff;
+        }
+        
+        .refresh-btn {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: rgba(255, 255, 255, 0.1);
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            color: #fff;
+            cursor: pointer;
+            font-size: 0.9rem;
+            z-index: 100;
+        }
+        
+        .refresh-btn:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
+    </style>
+</head>
+<body>
+    <button class="refresh-btn" onclick="location.reload()">⟳ Refresh</button>
+    
+    <div class="terminal-container">
+        <div class="header">
+            <h1>Scanner Provisioning</h1>
+            <p>Deploy custom software and auto-configure in two steps</p>
+        </div>
+        
+        <div class="qr-layout">
+            <!-- Step 1: Download App -->
+            <div class="qr-section">
+                <div class="step-badge">STEP 1</div>
+                <h2>📥 Download Scanner App</h2>
+                <div class="qr-code">
+                    <img src="{{ app_qr_image }}" alt="App Download QR Code">
+                </div>
+                <div class="instructions">
+                    <p><strong>1.</strong> Scan this QR with any generic camera</p>
+                    <p><strong>2.</strong> Download the custom APK</p>
+                    <p><strong>3.</strong> Install and open the application</p>
+                    
+                    <a href="{{ app_download_url }}" class="download-btn">
+                        Download Custom APK
+                    </a>
+                </div>
+            </div>
+
+            <!-- Step 2: Auto-Configure -->
+            <div class="qr-section">
+                <div class="step-badge step2">STEP 2</div>
+                <h2>⚙️ Auto-Configure Scanner</h2>
+                <div class="qr-code">
+                    <img src="{{ config_qr_image }}" alt="Config QR Code">
+                </div>
+                <div class="instructions">
+                    <p><strong>1.</strong> Open the newly installed Scanner App</p>
+                    <p><strong>2.</strong> Point the scanner at this QR code</p>
+                    <p><strong>3.</strong> The app will instantly configure itself!</p>
+                    
+                    <!-- Fallback for legacy InfoWedge users -->
+                    <a href="{{ config_url }}" class="download-btn secondary" style="margin-top: 10px; font-size: 0.8rem; padding: 8px;">
+                        Legacy InfoWedge Download
+                    </a>
+                </div>
+            </div>
+        </div>
+        
+        <div class="server-info">
+            <span><span class="status-indicator"></span>Server: <strong>{{ server_ip }}</strong></span>
+            <span style="margin-left: 30px;">Port: <strong>{{ server_port }}</strong></span>
+        </div>
+        
+        <div class="stats-section">
+            <div class="stat-card">
+                <span class="stat-value">{{ stats.total_devices }}</span>
+                <span class="stat-label">Total Devices</span>
+            </div>
+            <div class="stat-card">
+                <span class="stat-value">{{ stats.active_devices }}</span>
+                <span class="stat-label">Active Now</span>
+            </div>
+            <div class="stat-card">
+                <span class="stat-value">{{ stats.total_scans }}</span>
+                <span class="stat-label">Total Scans</span>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        // Auto-refresh every 30 seconds
+        setTimeout(() => location.reload(), 30000);
+    </script>
+</body>
+</html>
