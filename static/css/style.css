@@ -1041,3 +1041,38 @@ select.form-control {
 .on-site-gauge .card-body { min-height: 140px; }
 .status-badge.success { color: #4caf50; }
 .status-badge.danger { color: #f44336; }
+
+/* Pagination */
+.pagination-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 1rem 0;
+    margin-top: 0.5rem;
+    border-top: 1px solid var(--steel);
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+.pagination-info {
+    color: var(--text-secondary);
+    font-size: 0.85rem;
+}
+.pagination-controls {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    flex-wrap: wrap;
+}
+.pagination-controls .btn-sm {
+    min-width: 32px;
+    text-align: center;
+    padding: 0.3rem 0.6rem;
+    font-size: 0.8rem;
+}
+.pagination-current {
+    pointer-events: none;
+}
+.pagination-ellipsis {
+    padding: 0 4px;
+    color: var(--text-secondary);
+}

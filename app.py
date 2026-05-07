@@ -126,7 +126,8 @@ def json_500(error):
 
 # ------------------- Ollama Local AI Configuration -------------------
 OLLAMA_BASE_URL = os.environ.get("OLLAMA_URL", "http://localhost:11434")
-OLLAMA_MODEL = os.environ.get("OLLAMA_MODEL", "mine-assistant")
+OLLAMA_MODEL = os.environ.get("OLLAMA_MODEL", "mine-assistant-fast")
+OLLAMA_MODEL_FULL = os.environ.get("OLLAMA_MODEL_FULL", "mine-assistant")
 _ollama_available = False
 _ollama_checked = False
 
@@ -758,10 +759,17 @@ def dashboard():
     return render_template("dashboard.html", stats=stats, alerts=alerts)
 
 
+_dashboard_history_cache = {"data": None, "ts": 0}
+
 @app.route("/api/dashboard/stats_history")
 @login_required
 def dashboard_stats_history():
-    """Return 7-day sparkline data, 24h gate scan histogram, and on-site count."""
+    """Return 7-day sparkline data, 24h gate scan histogram, and on-site count.
+    Cached for 10 seconds to avoid redundant queries under concurrent load."""
+    import time as _t
+    _now = _t.time()
+    if _dashboard_history_cache["data"] and (_now - _dashboard_history_cache["ts"]) < 10:
+        return jsonify(_dashboard_history_cache["data"])
     from sqlalchemy import func, extract
 
     now = _utcnow()
@@ -822,7 +830,7 @@ def dashboard_stats_history():
         .scalar()
     ) or 0
 
-    return jsonify({
+    result = {
         "sparklines": {
             "employees": sparkline_data,
             "fleet": [max(0, v // 3) for v in sparkline_data],
@@ -835,7 +843,10 @@ def dashboard_stats_history():
         },
         "on_site": on_site_count,
         "capacity": 500,
-    })
+    }
+    _dashboard_history_cache["data"] = result
+    _dashboard_history_cache["ts"] = _now
+    return jsonify(result)
 
 
 @app.route("/api/ai/status")
@@ -849,6 +860,7 @@ def ai_status():
     return jsonify({
         "available": _ollama_available,
         "model": OLLAMA_MODEL,
+        "model_full": OLLAMA_MODEL_FULL,
         "url": OLLAMA_BASE_URL,
     })
 
@@ -1255,6 +1267,9 @@ def handle_stats_request():
 def employees():
     job_title = request.args.get("job_title", "")
     status = request.args.get("status", "")
+    page = request.args.get("page", 1, type=int)
+    per_page = request.args.get("per_page", 50, type=int)
+    per_page = min(per_page, 200)  # cap
 
     query = db_session.query(Employee)
     if job_title:
@@ -1262,7 +1277,11 @@ def employees():
     if status:
         query = query.filter(Employee.status == status)
 
-    employees = query.all()
+    total = query.count()
+    total_pages = max(1, (total + per_page - 1) // per_page)
+    page = max(1, min(page, total_pages))
+    employees_list = query.offset((page - 1) * per_page).limit(per_page).all()
+
     # Get distinct job titles for filter dropdown
     job_titles = (
         db_session.query(Employee.job_title.distinct())
@@ -1272,11 +1291,15 @@ def employees():
     job_titles = [d[0] for d in job_titles]
     return render_template(
         "employees.html",
-        employees=employees,
+        employees=employees_list,
         job_titles=job_titles,
         selected_job_title=job_title,
         selected_status=status,
         current_time=_utcnow(),
+        page=page,
+        total_pages=total_pages,
+        total=total,
+        per_page=per_page,
     )
 
 
@@ -2321,6 +2344,9 @@ def gate_logs():
     status = request.args.get("status", "")
     date_from = request.args.get("date_from", "")
     date_to = request.args.get("date_to", "")
+    page = request.args.get("page", 1, type=int)
+    per_page = request.args.get("per_page", 50, type=int)
+    per_page = min(per_page, 200)  # cap
 
     query = db_session.query(GateLog).order_by(GateLog.scanned_at.desc())
 
@@ -2342,7 +2368,11 @@ def gate_logs():
             GateLog.scanned_at <= end_date.replace(hour=23, minute=59, second=59)
         )
 
-    logs = query.limit(500).all()
+    total = query.count()
+    total_pages = max(1, (total + per_page - 1) // per_page)
+    page = max(1, min(page, total_pages))
+    logs = query.offset((page - 1) * per_page).limit(per_page).all()
+
     return render_template(
         "gate_logs.html",
         logs=logs,
@@ -2351,6 +2381,10 @@ def gate_logs():
         selected_status=status,
         selected_date_from=date_from,
         selected_date_to=date_to,
+        page=page,
+        total_pages=total_pages,
+        total=total,
+        per_page=per_page,
     )
 
 
@@ -4709,13 +4743,16 @@ def get_system_context():
     )
 
 
-def _ollama_generate(prompt, system_ctx, stream=False):
-    """Call Ollama local AI. Returns full text or streaming response."""
+def _ollama_generate(prompt, system_ctx, stream=False, use_full=False):
+    """Call Ollama local AI. Returns full text or streaming response.
+    use_full=True selects the 3B model for complex analysis."""
+    model = OLLAMA_MODEL_FULL if use_full else OLLAMA_MODEL
     payload = {
-        "model": OLLAMA_MODEL,
+        "model": model,
         "prompt": prompt,
         "system": system_ctx,
         "stream": stream,
+        "keep_alive": "10m",
     }
     resp = requests.post(
         f"{OLLAMA_BASE_URL}/api/generate",

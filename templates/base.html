@@ -15,8 +15,9 @@
     <script defer src="{{ url_for('static', filename='js/dashboard-gl.js') }}"></script>
     <!-- Socket.IO -->
     <script defer src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
-    <!-- Font Awesome -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <!-- Font Awesome (solid only — saves ~60KB vs all.min.css) -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/fontawesome.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/solid.min.css">
     <!-- Main styles -->
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
     <style>
@@ -223,7 +224,7 @@
             to { transform: translateX(0); opacity: 1; }
         }
 
-        /* 3D Background container */
+        /* CSS-only animated background (replaces three.js — saves 603KB) */
         #bg-canvas-container {
             position: fixed;
             top: 0;
@@ -637,75 +638,40 @@
     </div>
 
     <script src="{{ url_for('static', filename='js/main.js') }}"></script>
-    <!-- Three.js and background script -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-    <script>
-        (function() {
-            const container = document.getElementById('bg-canvas-container');
-            if (!container) return;
-
-            const scene = new THREE.Scene();
-            scene.background = null;
-            const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
-            camera.position.z = 30;
-
-            const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
-            renderer.setClearColor(0x000000, 0);
-            renderer.setSize(window.innerWidth, window.innerHeight);
-            renderer.domElement.style.position = 'fixed';
-            renderer.domElement.style.top = '0';
-            renderer.domElement.style.left = '0';
-            renderer.domElement.style.zIndex = '-1';
-            renderer.domElement.style.pointerEvents = 'none';
-            container.appendChild(renderer.domElement);
-
-            // Torus knot
-            const geometry = new THREE.TorusKnotGeometry(10, 2, 200, 32, 3, 4);
-            const material = new THREE.MeshStandardMaterial({ color: 0xe10600, roughness: 0.3, metalness: 0.7 });
-            const knot = new THREE.Mesh(geometry, material);
-            scene.add(knot);
-
-            // Stars
-            const starGeometry = new THREE.BufferGeometry();
-            const starCount = 1500;
-            const starPositions = new Float32Array(starCount * 3);
-            for (let i = 0; i < starCount; i++) {
-                starPositions[i*3] = (Math.random() - 0.5) * 200;
-                starPositions[i*3+1] = (Math.random() - 0.5) * 200;
-                starPositions[i*3+2] = (Math.random() - 0.5) * 100 - 50;
-            }
-            starGeometry.setAttribute('position', new THREE.BufferAttribute(starPositions, 3));
-            const starMaterial = new THREE.PointsMaterial({ color: 0xffffff, size: 0.2 });
-            const stars = new THREE.Points(starGeometry, starMaterial);
-            scene.add(stars);
-
-            // Lights
-            const ambientLight = new THREE.AmbientLight(0x404040);
-            scene.add(ambientLight);
-            const directionalLight = new THREE.DirectionalLight(0xffffff, 1);
-            directionalLight.position.set(1, 2, 1);
-            scene.add(directionalLight);
-            const backLight = new THREE.PointLight(0xe10600, 0.5);
-            backLight.position.set(0, 0, -5);
-            scene.add(backLight);
-
-            function animate() {
-                requestAnimationFrame(animate);
-                knot.rotation.x += 0.005;
-                knot.rotation.y += 0.01;
-                stars.rotation.y += 0.0005;
-                stars.rotation.x += 0.0003;
-                renderer.render(scene, camera);
-            }
-            animate();
-
-            window.addEventListener('resize', () => {
-                camera.aspect = window.innerWidth / window.innerHeight;
-                camera.updateProjectionMatrix();
-                renderer.setSize(window.innerWidth, window.innerHeight);
-            });
-        })();
-    </script>
+    <!-- CSS-only animated background (replaces three.js — saves 603KB + continuous CPU/GPU) -->
+    <style>
+        #bg-canvas-container::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: radial-gradient(ellipse at 20% 50%, rgba(225,6,0,0.08) 0%, transparent 50%),
+                        radial-gradient(ellipse at 80% 20%, rgba(225,6,0,0.05) 0%, transparent 40%),
+                        radial-gradient(ellipse at 50% 80%, rgba(100,20,0,0.06) 0%, transparent 50%);
+            animation: bgPulse 12s ease-in-out infinite alternate;
+        }
+        #bg-canvas-container::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background-image: radial-gradient(1px 1px at 10% 20%, rgba(255,255,255,0.15) 50%, transparent 50%),
+                              radial-gradient(1px 1px at 30% 60%, rgba(255,255,255,0.10) 50%, transparent 50%),
+                              radial-gradient(1px 1px at 50% 10%, rgba(255,255,255,0.12) 50%, transparent 50%),
+                              radial-gradient(1px 1px at 70% 80%, rgba(255,255,255,0.08) 50%, transparent 50%),
+                              radial-gradient(1px 1px at 90% 40%, rgba(255,255,255,0.10) 50%, transparent 50%),
+                              radial-gradient(1px 1px at 15% 90%, rgba(255,255,255,0.07) 50%, transparent 50%),
+                              radial-gradient(1px 1px at 85% 55%, rgba(255,255,255,0.09) 50%, transparent 50%),
+                              radial-gradient(1px 1px at 45% 35%, rgba(255,255,255,0.11) 50%, transparent 50%);
+            animation: starDrift 30s linear infinite;
+        }
+        @keyframes bgPulse {
+            0%   { opacity: 0.6; transform: scale(1); }
+            100% { opacity: 1;   transform: scale(1.05); }
+        }
+        @keyframes starDrift {
+            0%   { transform: translateY(0); }
+            100% { transform: translateY(-20px); }
+        }
+    </style>
     <script>
         // Mobile sidebar toggle
         const toggle = document.getElementById('menuToggle');

@@ -110,12 +110,12 @@ class GateLog(Base):
     __tablename__ = "gate_logs"
 
     id = Column(Integer, primary_key=True)
-    access_type = Column(String(20))  # employee, vehicle, visitor
-    entity_id = Column(Integer)  # ID of the entity
+    access_type = Column(String(20), index=True)  # employee, vehicle, visitor
+    entity_id = Column(Integer, index=True)  # ID of the entity
     entity_name = Column(String(100))
-    direction = Column(String(10))  # IN or OUT
+    direction = Column(String(10), index=True)  # IN or OUT
     qr_data = Column(String(200))
-    access_granted = Column(Boolean, default=True)
+    access_granted = Column(Boolean, default=True, index=True)
     denial_reason = Column(String(200))
     gate_location = Column(String(50))
     scanned_at = Column(DateTime, default=datetime.utcnow, index=True)
@@ -163,7 +163,7 @@ class Approval(Base):
     request_id = Column(Integer)
     requester_name = Column(String(100))
     details = Column(Text)
-    status = Column(String(20), default="Pending")
+    status = Column(String(20), default="Pending", index=True)
     approved_by = Column(String(100))
     approval_date = Column(DateTime)
     comments = Column(Text)
