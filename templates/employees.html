@@ -3,32 +3,32 @@
 {% block title %}Employees{% endblock %}
 
 {% block breadcrumb %}
-<i class="fas fa-home"></i>
+<i class="ti ti-home"></i>
 <a href="{{ url_for('dashboard') }}">Dashboard</a>
-<i class="fas fa-chevron-right"></i>
+<i class="ti ti-chevron-right"></i>
 <span>Employees</span>
 {% endblock %}
 
 {% block content %}
 <div class="employees-section">
     <div class="page-header">
-        <h1><i class="fas fa-users"></i> Employee Management</h1>
+        <h1><i class="ti ti-users"></i> Employee Management</h1>
         <div class="header-actions">
             {% if session.role in ['admin', 'manager'] %}
             <a href="{{ url_for('export_employees_excel') }}" class="btn btn-secondary">
-                <i class="fas fa-file-excel"></i> Excel
+                <i class="ti ti-file-type-xls"></i> Excel
             </a>
             <a href="{{ url_for('export_employees_pdf', department=request.args.get('department', ''), status=request.args.get('status', '')) }}" class="btn btn-primary">
-                <i class="fas fa-file-pdf"></i> PDF
+                <i class="ti ti-file-type-pdf"></i> PDF
             </a>
             <a href="{{ url_for('export_employees_qr_zip') }}" class="btn btn-success" title="Export all QR codes as ZIP">
-                <i class="fas fa-qrcode"></i> QR Export
+                <i class="ti ti-qrcode"></i> QR Export
             </a>
             <button class="btn btn-secondary" id="importEmployeeBtn">
-                <i class="fas fa-upload"></i> Import
+                <i class="ti ti-upload"></i> Import
             </button>
             <button class="btn btn-primary" id="addEmployeeBtn">
-                <i class="fas fa-plus"></i> Add Employee
+                <i class="ti ti-plus"></i> Add Employee
             </button>
             {% endif %}
         </div>
@@ -55,16 +55,16 @@
         </div>
         <div class="filter-group filter-actions">
             <button type="submit" class="btn btn-primary">
-                <i class="fas fa-filter"></i> Apply
+                <i class="ti ti-filter"></i> Apply
             </button>
             <a href="{{ url_for('employees') }}" class="btn btn-secondary">
-                <i class="fas fa-times"></i> Clear
+                <i class="ti ti-x"></i> Clear
             </a>
         </div>
     </form>
 
     <div class="search-bar">
-        <i class="fas fa-search"></i>
+        <i class="ti ti-search"></i>
         <input type="text" id="searchEmployee" placeholder="Search employees by name, ID, or department...">
     </div>
     
@@ -136,11 +136,11 @@
                     <td>
                         {% if emp.qr_code %}
                         <a href="{{ url_for('generate_qr_code', entity_type='employee', entity_id=emp.id) }}" class="btn btn-sm btn-success" title="Download QR Code">
-                            <i class="fas fa-download"></i> Download QR
+                            <i class="ti ti-download"></i> Download QR
                         </a>
                         {% else %}
                         <a href="{{ url_for('generate_qr_code', entity_type='employee', entity_id=emp.id) }}" class="btn btn-sm btn-primary">
-                            <i class="fas fa-qrcode"></i> Generate QR
+                            <i class="ti ti-qrcode"></i> Generate QR
                         </a>
                         {% endif %}
                     </td>
@@ -161,12 +161,12 @@
                                 data-medical-expiry="{{ emp.medical_expiry.strftime('%Y-%m-%d') if emp.medical_expiry else '' }}"
                                 data-induction-expiry="{{ emp.induction_expiry.strftime('%Y-%m-%d') if emp.induction_expiry else '' }}"
                                 title="Edit">
-                            <i class="fas fa-edit"></i>
+                            <i class="ti ti-edit"></i>
                         </button>
                         {% endif %}
                         {% if session.role == 'admin' %}
                         <button class="btn-icon danger delete-btn" data-id="{{ emp.id }}" data-surname="{{ emp.surname }}" title="Delete">
-                            <i class="fas fa-trash"></i>
+                            <i class="ti ti-trash"></i>
                         </button>
                         {% endif %}
                     </td>
@@ -175,7 +175,7 @@
                 <tr>
                     <td colspan="14">
                         <div class="empty-state">
-                            <i class="fas fa-user-friends"></i>
+                            <i class="ti ti-user-circle"></i>
                             <p>No employees found</p>
                         </div>
                     </td>
@@ -293,14 +293,14 @@
 <div id="importModal" class="modal">
     <div class="modal-content">
         <div class="modal-header">
-            <h2><i class="fas fa-upload"></i> Import Employees</h2>
+            <h2><i class="ti ti-upload"></i> Import Employees</h2>
             <span class="close">&times;</span>
         </div>
         <div class="modal-body">
             <div class="import-info">
                 <p>Upload an Excel (.xlsx) or CSV file with employee data.</p>
                 <a href="{{ url_for('download_import_template', entity_type='employees') }}" class="btn btn-sm btn-secondary">
-                    <i class="fas fa-download"></i> Download Template
+                    <i class="ti ti-download"></i> Download Template
                 </a>
             </div>
             <form id="importForm" enctype="multipart/form-data">
@@ -318,7 +318,7 @@
         <div class="modal-footer">
             <button type="button" class="btn btn-secondary close-modal">Cancel</button>
             <button type="button" class="btn btn-primary" id="importSubmitBtn">
-                <i class="fas fa-upload"></i> Import
+                <i class="ti ti-upload"></i> Import
             </button>
         </div>
     </div>
@@ -512,7 +512,7 @@ document.addEventListener('DOMContentLoaded', function() {
             formData.append('file', importFile.files[0]);
 
             importSubmitBtn.disabled = true;
-            importSubmitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Importing...';
+            importSubmitBtn.innerHTML = '<i class="ti ti-loader"></i> Importing...';
 
             try {
                 const response = await fetch('/import/employees', {
@@ -529,7 +529,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 if (response.ok) {
                     summary.innerHTML = `
                         <div class="success-message">
-                            <i class="fas fa-check-circle"></i>
+                            <i class="ti ti-check-circle"></i>
                             Imported: <strong>${result.imported}</strong> |
                             Skipped (duplicates): <strong>${result.skipped}</strong>
                         </div>`;
@@ -545,17 +545,17 @@ document.addEventListener('DOMContentLoaded', function() {
                         }, 500);
                     }
                 } else {
-                    summary.innerHTML = `<div class="error-message"><i class="fas fa-exclamation-circle"></i> ${result.error || 'Import failed'}</div>`;
+                    summary.innerHTML = `<div class="error-message"><i class="ti ti-alert-circle"></i> ${result.error || 'Import failed'}</div>`;
                     summary.className = 'result-summary error';
                 }
             } catch (error) {
                 importResult.style.display = 'block';
                 const summary = importResult.querySelector('.result-summary');
-                summary.innerHTML = `<div class="error-message"><i class="fas fa-exclamation-circle"></i> Network error: ${error.message}</div>`;
+                summary.innerHTML = `<div class="error-message"><i class="ti ti-alert-circle"></i> Network error: ${error.message}</div>`;
                 summary.className = 'result-summary error';
             } finally {
                 importSubmitBtn.disabled = false;
-                importSubmitBtn.innerHTML = '<i class="fas fa-upload"></i> Import';
+                importSubmitBtn.innerHTML = '<i class="ti ti-upload"></i> Import';
             }
         });
     }

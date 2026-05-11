@@ -3,22 +3,22 @@
 {% block title %}Gate Access Logs{% endblock %}
 
 {% block breadcrumb %}
-<i class="fas fa-home"></i>
+<i class="ti ti-home"></i>
 <a href="{{ url_for('dashboard') }}">Dashboard</a>
-<i class="fas fa-chevron-right"></i>
+<i class="ti ti-chevron-right"></i>
 <span>Gate Logs</span>
 {% endblock %}
 
 {% block content %}
 <div class="gate-logs-section">
     <div class="page-header">
-        <h1><i class="fas fa-qrcode"></i> Gate Access Logs</h1>
+        <h1><i class="ti ti-qrcode"></i> Gate Access Logs</h1>
         <div class="export-buttons">
             <a href="{{ url_for('export_gate_logs_excel') }}" class="btn btn-primary">
-                <i class="fas fa-download"></i> Excel
+                <i class="ti ti-file-type-xls"></i> Excel
             </a>
             <a href="{{ url_for('export_gate_logs_pdf', type=request.args.get('type', ''), direction=request.args.get('direction', ''), status=request.args.get('status', ''), date_from=request.args.get('date_from', ''), date_to=request.args.get('date_to', '')) }}" class="btn btn-primary">
-                <i class="fas fa-file-pdf"></i> PDF
+                <i class="ti ti-file-type-pdf"></i> PDF
             </a>
         </div>
     </div>
@@ -59,10 +59,10 @@
         </div>
         <div class="filter-group filter-actions">
             <button type="submit" class="btn btn-primary">
-                <i class="fas fa-filter"></i> Apply
+                <i class="ti ti-filter"></i> Apply
             </button>
             <a href="{{ url_for('gate_logs') }}" class="btn btn-secondary">
-                <i class="fas fa-times"></i> Clear
+                <i class="ti ti-x"></i> Clear
             </a>
         </div>
     </form>
@@ -82,7 +82,9 @@
             </thead>
             <tbody id="logsTable">
                 {% for log in logs %}
-                <tr data-type="{{ log.access_type }}" data-direction="{{ log.direction }}" data-granted="{{ log.access_granted }}">
+                {% set is_unknown = log.entity_name == 'Unknown' or 'Unassigned' in log.entity_name %}
+                {% set parsed = log.parsed_qr_data|from_json if log.parsed_qr_data else {} %}
+                <tr data-type="{{ log.access_type }}" data-direction="{{ log.direction }}" data-granted="{{ log.access_granted }}" class="{% if is_unknown %}unknown-entity{% endif %}">
                     <td>{{ log.scanned_at.strftime('%Y-%m-%d %H:%M:%S') }}</td>
                     <td>
                         <span class="type-badge">
@@ -90,7 +92,21 @@
                             {{ log.access_type|title }}
                         </span>
                     </td>
-                    <td><strong>{{ log.entity_name }}</strong></td>
+                    <td>
+                        <strong>{{ log.entity_name }}</strong>
+                        {% if is_unknown %}
+                        <span class="unknown-badge">UNKNOWN</span>
+                        {% endif %}
+                        {% if parsed and (parsed.employee_id or parsed.name or parsed.fleet_id) %}
+                        <div class="extracted-data">
+                            {% if parsed.employee_id %}<span class="extracted-field">ID: {{ parsed.employee_id }}</span>{% endif %}
+                            {% if parsed.name %}<span class="extracted-field">Name: {{ parsed.name }}</span>{% endif %}
+                            {% if parsed.position %}<span class="extracted-field">Job: {{ parsed.position }}</span>{% endif %}
+                            {% if parsed.department %}<span class="extracted-field">Dept: {{ parsed.department }}</span>{% endif %}
+                            {% if parsed.fleet_id %}<span class="extracted-field">Fleet: {{ parsed.fleet_id }}</span>{% endif %}
+                        </div>
+                        {% endif %}
+                    </td>
                     <td>
                         <span class="direction-badge {% if log.direction == 'IN' %}in{% else %}out{% endif %}">
                             {{ log.direction }}
@@ -111,7 +127,7 @@
                 <tr>
                     <td colspan="7">
                         <div class="empty-state">
-                            <i class="fas fa-history"></i>
+                            <i class="ti ti-history"></i>
                             <p>No gate logs found</p>
                         </div>
                     </td>

@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Gate Scanner — Arch-System</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body, html {
+            background: #0a0a0a;
+            color: #fff;
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            height: 100%;
+            width: 100%;
+            overflow: hidden;
+            user-select: none;
+        }
+
+        /* ─── IDLE STATE ─── */
+        #idle-screen {
+            position: fixed; inset: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            background: #0a0a0a;
+            z-index: 10;
+            transition: opacity 0.3s;
+        }
+
+        .scan-icon {
+            font-size: 6rem;
+            margin-bottom: 2rem;
+            animation: pulse 2s infinite;
+        }
+
+        .idle-title {
+            font-size: 2.5rem;
+            font-weight: 700;
+            letter-spacing: 4px;
+            text-transform: uppercase;
+            color: #e10600;
+            margin-bottom: 0.5rem;
+        }
+
+        .idle-sub {
+            font-size: 1.1rem;
+            color: #555;
+            letter-spacing: 2px;
+        }
+
+        .scan-beam {
+            width: 280px;
+            height: 2px;
+            background: linear-gradient(90deg, transparent, #e10600, transparent);
+            margin-top: 3rem;
+            animation: beam 2s infinite;
+        }
+
+        /* Input that captures keyboard emulator strokes - invisible */
+        #qr-capture {
+            position: fixed;
+            top: -999px;
+            left: -999px;
+            opacity: 0;
+            width: 1px;
+            height: 1px;
+        }
+
+        .typing-indicator {
+            position: fixed;
+            bottom: 2rem;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 0.75rem;
+            color: #333;
+            letter-spacing: 2px;
+        }
+
+        .buffer-display {
+            position: fixed;
+            bottom: 3.5rem;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 0.8rem;
+            color: #333;
+            font-family: monospace;
+            max-width: 80vw;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        /* ─── RESULT OVERLAY ─── */
+        #result-overlay {
+            position: fixed; inset: 0;
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            z-index: 100;
+            transition: background-color 0.2s;
+        }
+
+        #result-overlay.approved { background: #006400; }
+        #result-overlay.denied   { background: #8b0000; }
+        #result-overlay.active   { display: flex; }
+
+        .result-icon {
+            font-size: 10rem;
+            line-height: 1;
+            margin-bottom: 1.5rem;
+            animation: popIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+
+        .result-status {
+            font-size: 4rem;
+            font-weight: 900;
+            letter-spacing: 8px;
+            text-transform: uppercase;
+            margin-bottom: 1rem;
+        }
+
+        .result-name {
+            font-size: 2.5rem;
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+            opacity: 0.95;
+        }
+
+        .result-detail {
+            font-size: 1.3rem;
+            opacity: 0.7;
+            margin-bottom: 1rem;
+        }
+
+        .result-reason {
+            margin-top: 1rem;
+            font-size: 1.4rem;
+            font-weight: 600;
+            background: rgba(0,0,0,0.25);
+            padding: 0.75rem 2rem;
+            border-radius: 10px;
+        }
+
+        .countdown-bar {
+            position: fixed;
+            bottom: 0; left: 0;
+            height: 6px;
+            background: rgba(255,255,255,0.4);
+            transition: width linear;
+        }
+
+        .result-footer {
+            position: fixed;
+            bottom: 1.5rem;
+            font-size: 0.8rem;
+            opacity: 0.4;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+        }
+
+        /* ─── SPINNER (processing) ─── */
+        #processing {
+            position: fixed; inset: 0;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            background: rgba(0,0,0,0.85);
+            z-index: 90;
+            font-size: 1.5rem;
+            letter-spacing: 4px;
+            color: #aaa;
+        }
+        #processing.active { display: flex; }
+
+        /* ─── ANIMATIONS ─── */
+        @keyframes pulse {
+            0%, 100% { opacity: 0.4; transform: scale(1); }
+            50%       { opacity: 1;   transform: scale(1.08); }
+        }
+
+        @keyframes beam {
+            0%   { opacity: 0; transform: scaleX(0); }
+            50%  { opacity: 1; transform: scaleX(1); }
+            100% { opacity: 0; transform: scaleX(0); }
+        }
+
+        @keyframes popIn {
+            0%   { transform: scale(0.3); opacity: 0; }
+            70%  { transform: scale(1.1); }
+            100% { transform: scale(1);   opacity: 1; }
+        }
+    </style>
+</head>
+<body>
+
+<!-- ─── IDLE SCREEN ─── -->
+<div id="idle-screen">
+    <div class="scan-icon">⬛</div>
+    <div class="idle-title">Ready to Scan</div>
+    <div class="idle-sub">Present QR Code to Scanner</div>
+    <div class="scan-beam"></div>
+</div>
+
+<!-- ─── PROCESSING ─── -->
+<div id="processing">⏳ &nbsp; PROCESSING...</div>
+
+<!-- ─── RESULT OVERLAY ─── -->
+<div id="result-overlay">
+    <div class="result-icon" id="result-icon"></div>
+    <div class="result-status" id="result-status"></div>
+    <div class="result-name"   id="result-name"></div>
+    <div class="result-detail" id="result-detail"></div>
+    <div class="result-reason" id="result-reason" style="display:none"></div>
+    <div class="countdown-bar" id="countdown-bar"></div>
+    <div class="result-footer">Arch-System Gate Access Control</div>
+</div>
+
+<!-- ─── Hidden input captures keyboard emulator ─── -->
+<input id="qr-capture" type="text" autocomplete="off" autofocus>
+<div class="buffer-display" id="buffer-display"></div>
+<div class="typing-indicator">● KEYBOARD EMULATOR ACTIVE — SCANNER READY</div>
+
+<script>
+    const SERVER = window.location.origin;
+    const RESET_MS  = 4000;   // how long to show result before resetting
+    const COMMIT_MS = 300;    // wait after last keystroke before submitting
+
+    let buffer = '';
+    let commitTimer = null;
+    let busy = false;
+    const capture = document.getElementById('qr-capture');
+
+    // ── Keep focus on the hidden input at all times ──
+    document.addEventListener('click', () => { if (!busy) capture.focus(); });
+    document.addEventListener('keydown', () => capture.focus());
+    setInterval(() => { if (!busy) capture.focus(); }, 500);
+    capture.focus();
+
+    // ── Capture keyboard emulator input ──
+    capture.addEventListener('input', () => {
+        if (busy) return;
+        buffer = capture.value.trim();
+        document.getElementById('buffer-display').textContent = buffer.length > 3 ? '●●●●●●●' : '';
+
+        clearTimeout(commitTimer);
+        if (buffer.length > 0) {
+            commitTimer = setTimeout(() => submitScan(buffer), COMMIT_MS);
+        }
+    });
+
+    // Many keyboard emulators send Enter after the code
+    capture.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' && buffer.length > 0) {
+            clearTimeout(commitTimer);
+            submitScan(buffer);
+        }
+    });
+
+    // ── Submit scan to server ──
+    function submitScan(code) {
+        if (busy) return;
+        busy = true;
+        buffer = '';
+        capture.value = '';
+
+        showProcessing(true);
+
+        fetch(`${SERVER}/api/c66`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'text/plain' },
+            body: code
+        })
+        .then(r => r.json())
+        .then(data => {
+            showProcessing(false);
+            showResult(data);
+        })
+        .catch(() => {
+            showProcessing(false);
+            showResult({ success: false, name: 'SERVER ERROR', message: 'Could not reach server' });
+        });
+    }
+
+    // ── Show / hide processing spinner ──
+    function showProcessing(show) {
+        document.getElementById('processing').classList.toggle('active', show);
+    }
+
+    // ── Render the full-screen result ──
+    function showResult(data) {
+        const overlay  = document.getElementById('result-overlay');
+        const idle     = document.getElementById('idle-screen');
+        const approved = data.success === true || data.open_gate === true;
+
+        overlay.className = 'active ' + (approved ? 'approved' : 'denied');
+
+        document.getElementById('result-icon').textContent   = approved ? '✅' : '❌';
+        document.getElementById('result-status').textContent = approved ? 'APPROVED' : 'DENIED';
+        document.getElementById('result-name').textContent   = data.name || data.entity_name || 'UNKNOWN';
+
+        const detail = [
+            (data.entity_type || 'SCAN').toUpperCase(),
+            data.direction || ''
+        ].filter(Boolean).join(' · ');
+        document.getElementById('result-detail').textContent = detail;
+
+        const reasonEl = document.getElementById('result-reason');
+        if (!approved && data.message && data.message !== 'Access denied') {
+            reasonEl.textContent = data.message;
+            reasonEl.style.display = 'block';
+        } else {
+            reasonEl.style.display = 'none';
+        }
+
+        // Countdown bar animation
+        const bar = document.getElementById('countdown-bar');
+        bar.style.transition = 'none';
+        bar.style.width = '100%';
+        requestAnimationFrame(() => {
+            bar.style.transition = `width ${RESET_MS}ms linear`;
+            bar.style.width = '0%';
+        });
+
+        // Vibration if running inside a WebView on the device
+        if (navigator.vibrate) {
+            approved ? navigator.vibrate([80, 40, 80]) : navigator.vibrate(600);
+        }
+
+        // Hide idle screen
+        idle.style.display = 'none';
+
+        // Auto-reset
+        setTimeout(() => {
+            overlay.className = '';
+            overlay.style.display = 'none';
+            idle.style.display = 'flex';
+            busy = false;
+            capture.focus();
+        }, RESET_MS);
+    }
+
+    // ── InfoWedge / C66 WebView: listen for postMessage from InfoWedge plugin ──
+    window.addEventListener('message', (e) => {
+        const d = e.data;
+        if (!d) return;
+        let code = null;
+        if (typeof d === 'string') code = d.trim();
+        else if (d.barcodeData) code = d.barcodeData;
+        else if (d.barcode) code = d.barcode;
+        else if (d.data)    code = d.data;
+        if (code && !busy) submitScan(code);
+    });
+
+    // ── Also expose a global function for InfoWedge to call via JS injection ──
+    window.onScan = function(code) { if (!busy) submitScan(code); };
+</script>
+</body>
+</html>

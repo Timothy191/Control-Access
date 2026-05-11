@@ -1,0 +1,135 @@
+{
+  "profile_name": "Mine Management PC-Forward",
+  "profile_description": "Forward C66 scans to PC at 192.168.0.217",
+  "version": "1.0",
+  "created": "2026-05-07",
+  "target_system": "Mine Management System v2.1.0",
+  "pc_connection": {
+    "pc_ip": "192.168.0.217",
+    "pc_name": "tim-desktop",
+    "connection_type": "USB-RNDIS",
+    "device_detected": {
+      "manufacturer": "CHAINWAY",
+      "product": "BENGAL-IDP",
+      "serial": "67b8d1c2",
+      "usb_id": "05c6:90db",
+      "interface": "wwan0"
+    }
+  },
+  "endpoints": {
+    "primary": {
+      "url": "http://192.168.0.217:8080/api/c66",
+      "method": "POST",
+      "description": "PC endpoint - direct USB forwarding"
+    },
+    "alternative": {
+      "url": "http://192.168.0.217:8080/api/scan_alt", 
+      "method": "POST",
+      "description": "PC alternative endpoint"
+    }
+  },
+  "infowedge_settings": {
+    "basic": {
+      "profile_name": "Mine Management PC-Forward",
+      "enabled": true,
+      "auto_start": true,
+      "background_mode": true
+    },
+    "input": {
+      "scanner_device": "C66 Built-in Scanner",
+      "input_source": "Barcode Scanner",
+      "decoder_types": [
+        "QR Code",
+        "Code 128", 
+        "Code 39",
+        "EAN-13",
+        "UPC-A",
+        "DataMatrix",
+        "PDF417"
+      ],
+      "scan_mode": "Continuous",
+      "aim_mode": "Dot",
+      "illumination": "Auto"
+    },
+    "output": {
+      "output_type": "IP Output",
+      "ip_settings": {
+        "target_url": "http://192.168.0.217:8080/api/c66",
+        "port": 8080,
+        "protocol": "HTTP",
+        "method": "POST",
+        "content_type": "application/json",
+        "timeout": 5000,
+        "retry_attempts": 3,
+        "retry_delay": 1000
+      },
+      "data_format": {
+        "format": "JSON",
+        "field_mapping": {
+          "barcodeData": "{{barcode}}",
+          "barcodeType": "{{barcodeFormat}}",
+          "timestamp": "{{timestamp}}",
+          "device": "{{deviceID}}",
+          "scanner": "C66-PC",
+          "pc_target": "192.168.0.217"
+        }
+      }
+    },
+    "advanced": {
+      "keystroke_output": false,
+      "intent_output": false,
+      "ip_output": true,
+      "buffer_scans": true,
+      "buffer_size": 100,
+      "auto_send_buffer": true,
+      "send_on_connect": true,
+      "heartbeat_interval": 30000,
+      "connection_timeout": 10000
+    }
+  },
+  "pc_integration": {
+    "connection_method": "USB-RNDIS",
+    "network_interface": "wwan0",
+    "forwarding_enabled": true,
+    "local_processing": false,
+    "direct_to_pc": true
+  },
+  "testing": {
+    "pc_endpoint_test": {
+      "url": "http://192.168.0.217:8080/api/c66",
+      "method": "POST",
+      "test_data": {
+        "barcodeData": "C66-PC-TEST-SCAN",
+        "device": "C66-PC-Forward",
+        "scanner": "C66"
+      }
+    },
+    "validation_steps": [
+      "1. Configure InfoWedge with PC IP (192.168.0.217)",
+      "2. Test USB-RNDIS connection to PC",
+      "3. Scan test QR code",
+      "4. Verify scan appears on PC server logs",
+      "5. Confirm access control response"
+    ]
+  },
+  "troubleshooting": {
+    "pc_connection_issues": [
+      {
+        "problem": "PC not reachable from Android device",
+        "solution": "Check USB-RNDIS connection and PC firewall"
+      },
+      {
+        "problem": "No network connectivity via USB",
+        "solution": "Verify USB cable and restart Android device"
+      },
+      {
+        "problem": "Server not responding on PC",
+        "solution": "Ensure mine management system is running on port 8080"
+      }
+    ],
+    "log_locations": {
+      "infowedge": "/sdcard/Android/data/com.symbol.datawedge/files/logs/",
+      "pc_server": "/home/tim/Desktop/01.mine-management-system/server.log"
+    }
+  }
+}

@@ -13,18 +13,19 @@ class TestEmployee:
         response = authenticated_client.get("/employees")
         assert response.status_code == 200
         assert b"EMP001" in response.data
-        assert b"John Doe" in response.data
+        assert b"John" in response.data
+        assert b"Doe" in response.data
 
     def test_add_employee(self, authenticated_client):
         response = authenticated_client.post(
             "/add_employee",
             data={
-                "employee_id_field": "EMP002",
-                "name": "Jane Smith",
-                "position": "Manager",
-                "department": "HR",
-                "phone": "9876543210",
-                "email": "jane@example.com",
+                "emp_code": "EMP002",
+                "initials": "JS",
+                "first_name": "Jane",
+                "surname": "Smith",
+                "id_number": "9876543210",
+                "job_title": "Manager",
                 "status": "Active",
             },
             follow_redirects=True,
@@ -32,29 +33,29 @@ class TestEmployee:
 
         assert response.status_code == 200
         assert b"EMP002" in response.data
-        assert b"Jane Smith" in response.data
+        assert b"Jane" in response.data
+        assert b"Smith" in response.data
 
     def test_edit_employee(self, authenticated_client, sample_employee):
         response = authenticated_client.post(
             f"/edit_employee/{sample_employee.id}",
             data={
-                "employee_id_field": "EMP001",
-                "name": "John Updated",
-                "position": "Senior Engineer",
-                "department": "Mining",
-                "phone": "1234567890",
-                "email": "john@example.com",
+                "emp_code": "EMP001",
+                "first_name": "John",
+                "surname": "Updated",
+                "id_number": "1234567890",
+                "job_title": "Senior Engineer",
                 "status": "Active",
             },
             follow_redirects=True,
         )
 
         assert response.status_code == 200
-        assert b"John Updated" in response.data
+        assert b"Updated" in response.data
 
     def test_delete_employee(self, authenticated_client, sample_employee):
         emp_id = sample_employee.id
-        response = authenticated_client.get(
+        response = authenticated_client.post(
             f"/delete_employee/{emp_id}", follow_redirects=True
         )
 
@@ -67,10 +68,11 @@ class TestEmployee:
         self, authenticated_client, sample_employee
     ):
         emp2 = Employee(
-            employee_id="EMP003",
-            name="Bob Wilson",
-            position="Technician",
-            department="Operations",
+            emp_code="EMP003",
+            first_name="Bob",
+            surname="Wilson",
+            id_number="5555555555",
+            job_title="Technician",
             status="Active",
         )
         db_session.add(emp2)

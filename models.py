@@ -122,6 +122,7 @@ class GateLog(Base):
     scanned_by = Column(String(100))
     ip_address = Column(String(50))
     user_agent = Column(String(200))
+    parsed_qr_data = Column(Text, nullable=True)  # JSON string with extracted QR fields
 
     employee_id = Column(Integer, ForeignKey("employees.id"), nullable=True)
     vehicle_id = Column(Integer, ForeignKey("vehicles.id"), nullable=True)
@@ -191,3 +192,17 @@ class AuditLog(Base):
     details = Column(Text)
     ip_address = Column(String(50))
     created_at = Column(DateTime, default=datetime.utcnow)
+
+
+class GateMapping(Base):
+    """Maps scanner device IPs to physical gate locations."""
+    __tablename__ = "gate_mappings"
+
+    id = Column(Integer, primary_key=True)
+    ip_address = Column(String(50), unique=True, nullable=False, index=True)
+    scanner_id = Column(String(100), nullable=True)  # e.g., "infowedge:192.168.0.160:9100"
+    gate_name = Column(String(100), nullable=False)  # e.g., "Extension Gate 1"
+    location_description = Column(String(200), nullable=True)
+    is_active = Column(Boolean, default=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

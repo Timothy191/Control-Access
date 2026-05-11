@@ -1,0 +1,226 @@
+{
+  "profile_name": "Mine Management Dual-Mode",
+  "profile_description": "Auto-switching USB/WiFi configuration for C66 scanner",
+  "version": "2.0",
+  "created": "2026-05-07",
+  "target_system": "Mine Management System v2.1.0",
+  "connection_modes": {
+    "usb_primary": {
+      "enabled": true,
+      "priority": 1,
+      "ip_address": "192.168.0.217",
+      "connection_type": "USB-RNDIS",
+      "endpoint": "http://192.168.0.217:8080/api/c66",
+      "fallback": "wifi_backup"
+    },
+    "wifi_backup": {
+      "enabled": true,
+      "priority": 2,
+      "ip_address": "192.168.0.217",
+      "connection_type": "WiFi",
+      "endpoint": "http://192.168.0.217:8080/api/c66",
+      "network_ssid": "YOUR_WIFI_SSID",
+      "auto_connect": true
+    }
+  },
+  "endpoints": {
+    "primary_usb": {
+      "url": "http://192.168.0.217:8080/api/c66",
+      "method": "POST",
+      "description": "USB connection - primary when plugged in"
+    },
+    "backup_wifi": {
+      "url": "http://192.168.0.217:8080/api/c66",
+      "method": "POST",
+      "description": "WiFi connection - fallback when unplugged"
+    },
+    "alternative": {
+      "url": "http://192.168.0.217:8080/api/scan_alt",
+      "method": "POST",
+      "description": "Alternative endpoint for both modes"
+    }
+  },
+  "infowedge_settings": {
+    "basic": {
+      "profile_name": "Mine Management Dual-Mode",
+      "enabled": true,
+      "auto_start": true,
+      "background_mode": true,
+      "connection_failover": true
+    },
+    "input": {
+      "scanner_device": "C66 Built-in Scanner",
+      "input_source": "Barcode Scanner",
+      "decoder_types": [
+        "QR Code",
+        "Code 128",
+        "Code 39",
+        "EAN-13",
+        "UPC-A",
+        "DataMatrix",
+        "PDF417"
+      ],
+      "scan_mode": "Continuous",
+      "aim_mode": "Dot",
+      "illumination": "Auto"
+    },
+    "output": {
+      "output_type": "IP Output",
+      "ip_settings": {
+        "primary_url": "http://192.168.0.217:8080/api/c66",
+        "backup_url": "http://192.168.0.217:8080/api/c66",
+        "port": 8080,
+        "protocol": "HTTP",
+        "method": "POST",
+        "content_type": "application/json",
+        "timeout": 5000,
+        "retry_attempts": 3,
+        "retry_delay": 1000,
+        "failover_enabled": true,
+        "connection_check_interval": 15000
+      },
+      "data_format": {
+        "format": "JSON",
+        "field_mapping": {
+          "barcodeData": "{{barcode}}",
+          "barcodeType": "{{barcodeFormat}}",
+          "timestamp": "{{timestamp}}",
+          "device": "{{deviceID}}",
+          "scanner": "C66-Dual",
+          "connection_mode": "{{connectionType}}",
+          "pc_target": "192.168.0.217"
+        }
+      }
+    },
+    "advanced": {
+      "keystroke_output": false,
+      "intent_output": false,
+      "ip_output": true,
+      "buffer_scans": true,
+      "buffer_size": 200,
+      "auto_send_buffer": true,
+      "send_on_connect": true,
+      "heartbeat_interval": 15000,
+      "connection_timeout": 5000,
+      "failover_timeout": 3000
+    }
+  },
+  "connection_management": {
+    "usb_detection": {
+      "check_interval": 5000,
+      "auto_switch": true,
+      "priority_override": true
+    },
+    "wifi_detection": {
+      "check_interval": 10000,
+      "auto_connect": true,
+      "preferred_networks": ["YOUR_WIFI_SSID"],
+      "fallback_to_any": true
+    },
+    "switching_logic": {
+      "usb_plugged": {
+        "action": "switch_to_usb",
+        "disable_wifi": false,
+        "buffer_wifi_scans": true
+      },
+      "usb_unplugged": {
+        "action": "switch_to_wifi",
+        "enable_wifi": true,
+        "send_buffered_scans": true
+      },
+      "both_available": {
+        "action": "prefer_usb",
+        "wifi_standby": true
+      },
+      "neither_available": {
+        "action": "buffer_only",
+        "max_buffer_size": 500
+      }
+    }
+  },
+  "network_configuration": {
+    "usb_connection": {
+      "interface": "wwan0",
+      "ip_range": "192.168.0.0/24",
+      "gateway": "192.168.0.1",
+      "dns": ["192.168.0.1", "8.8.8.8"]
+    },
+    "wifi_connection": {
+      "interface": "wlan0",
+      "ip_range": "192.168.0.0/24",
+      "gateway": "192.168.0.1",
+      "dns": ["192.168.0.1", "8.8.8.8"],
+      "scan_networks": true,
+      "auto_reconnect": true
+    }
+  },
+  "testing": {
+    "dual_mode_test": {
+      "usb_test": {
+        "url": "http://192.168.0.217:8080/api/c66",
+        "expected_connection": "USB-RNDIS"
+      },
+      "wifi_test": {
+        "url": "http://192.168.0.217:8080/api/c66",
+        "expected_connection": "WiFi"
+      },
+      "switch_test": {
+        "scenario": "unplug_usb",
+        "expected_behavior": "auto_switch_to_wifi"
+      }
+    },
+    "validation_steps": [
+      "1. Connect C66 via USB - verify USB mode active",
+      "2. Test scans via USB connection",
+      "3. Unplug USB - verify auto-switch to WiFi",
+      "4. Test scans via WiFi connection",
+      "5. Reconnect USB - verify switch back to USB",
+      "6. Verify buffered scans sent on reconnection"
+    ]
+  },
+  "troubleshooting": {
+    "connection_issues": [
+      {
+        "problem": "USB not detected",
+        "solution": "Check USB cable and enable USB tethering"
+      },
+      {
+        "problem": "WiFi not connecting",
+        "solution": "Verify WiFi credentials and network availability"
+      },
+      {
+        "problem": "Not switching between modes",
+        "solution": "Check failover settings and connection intervals"
+      },
+      {
+        "problem": "Buffered scans not sending",
+        "solution": "Verify buffer settings and connection restoration"
+      }
+    ],
+    "log_locations": {
+      "infowedge": "/sdcard/Android/data/com.symbol.datawedge/files/logs/",
+      "connection": "/sdcard/Android/data/com.symbol.datawedge/files/connection.log",
+      "pc_server": "/home/tim/Desktop/01.mine-management-system/server.log"
+    }
+  },
+  "setup_instructions": {
+    "usb_setup": [
+      "1. Connect C66 to PC via USB",
+      "2. Enable USB tethering on C66",
+      "3. InfoWedge will auto-detect USB connection",
+      "4. Primary endpoint: http://192.168.0.217:8080/api/c66"
+    ],
+    "wifi_setup": [
+      "1. Connect C66 to same WiFi network as PC",
+      "2. Configure WiFi credentials in InfoWedge",
+      "3. InfoWedge will use WiFi when USB unavailable",
+      "4. Same endpoint: http://192.168.0.217:8080/api/c66"
+    ],
+    "auto_switching": [
+      "1. USB plugged in → Automatic USB mode",
+      "2. USB unplugged → Automatic WiFi mode",
+      "3. Both available → USB preferred, WiFi standby",
+      "4. Neither available → Buffer scans until connection"
+    ]
+  }
+}

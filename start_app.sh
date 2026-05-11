@@ -1,19 +1,26 @@
 #!/bin/bash
 
-# Mine Management System Startup Script
-# This script activates the virtual environment and starts the app
+# Arch-System Startup Script
+# This script activates the virtual environment and starts the app.
 
-echo "Starting Mine Management System..."
+echo "Starting Arch-System..."
 
 # Activate virtual environment
-source venv/bin/activate
+if [ -f "venv/bin/activate" ]; then
+    source venv/bin/activate
+elif [ -f ".venv/bin/activate" ]; then
+    source .venv/bin/activate
+fi
 
-# Set Google API Key (replace with your actual key)
-export GOOGLE_API_KEY="AIzaSyCameHH0vtHQVgoG7jvVXutjyReWEsEv0"
+# Validate required environment variables
+if [ -z "$SECRET_KEY" ]; then
+    echo "WARNING: SECRET_KEY not set. Set via .env or export."
+fi
 
-# Set Hardware API Key for scanner authentication
-export HARDWARE_API_KEY="9b862d34e04d209d1cf6fbcb1ccf78c30083afddc8afbed8246ece65964f3bf9"
+if [ -z "$OLLAMA_CLOUD_API_KEY" ] && [ "$OLLAMA_USE_CLOUD" = "true" ]; then
+    echo "WARNING: OLLAMA_USE_CLOUD=true but OLLAMA_CLOUD_API_KEY not set."
+fi
 
 # Start the application
-echo "Starting Flask application with automatic port management..."
+echo "Starting Flask application..."
 python app.py

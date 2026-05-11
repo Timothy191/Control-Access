@@ -1,8 +1,7 @@
 import pytest
 from app import app, db_session
-from database import Base, engine
+from database import Base
 from models import User, Employee, Vehicle, Visitor
-from datetime import datetime
 
 
 @pytest.fixture(scope="function")
@@ -16,7 +15,13 @@ def test_app():
 
 @pytest.fixture(scope="function")
 def db_cleanup():
+    # Clean before test to ensure fresh state
+    db_session.rollback()
+    for table in reversed(Base.metadata.sorted_tables):
+        db_session.execute(table.delete())
+    db_session.commit()
     yield
+    # Clean after test
     db_session.rollback()
     for table in reversed(Base.metadata.sorted_tables):
         db_session.execute(table.delete())
@@ -42,12 +47,11 @@ def authenticated_client(test_app, db_cleanup):
 @pytest.fixture
 def sample_employee(db_cleanup):
     emp = Employee(
-        employee_id="EMP001",
-        name="John Doe",
-        position="Engineer",
-        department="Mining",
-        phone="1234567890",
-        email="john@example.com",
+        emp_code="EMP001",
+        first_name="John",
+        surname="Doe",
+        id_number="1234567890",
+        job_title="Engineer",
         status="Active",
     )
     db_session.add(emp)

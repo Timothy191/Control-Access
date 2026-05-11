@@ -62,7 +62,7 @@ def init_db():
         admin.set_password("admin")
         db_session.add(admin)
         db_session.commit()
-        print("Default admin user created (username: admin, password: admin)")
+        print("Default admin user created (username: admin)")
 
     # Seed default visitor request PIN if it doesn't exist
     from models import SiteSetting
@@ -72,7 +72,14 @@ def init_db():
         pin = SiteSetting(key="visitor_request_pin", value="1234")
         db_session.add(pin)
         db_session.commit()
-        print("Default visitor request PIN set to: 1234")
+        print("Default visitor request PIN configured")
+
+
+@event.listens_for(engine, "close")
+def _run_sqlite_optimize(dbapi_conn, connection_record):
+    cursor = dbapi_conn.cursor()
+    cursor.execute("PRAGMA optimize")
+    cursor.close()
 
 
 def shutdown_session(exception=None):

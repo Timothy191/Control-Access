@@ -1,262 +1,334 @@
 #!/bin/bash
-# MINE MANAGEMENT SYSTEM - FULL SERVER DEPLOYMENT
-# Handles cleanup, dep sync, env validation, app startup, tmux dashboard, and browser launch.
+# -----------------------------------------------------------------------------
+# ARCH-SYSTEM - SUPREME SERVER DEPLOYMENT ENGINE (v2.2.0)
+# -----------------------------------------------------------------------------
+# Handles: Cleanup, Performance, Firewall, AI, Tmux Grid, Monitoring, Dashboards.
+# -----------------------------------------------------------------------------
 
 set -uo pipefail
-PROJECT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
-SESSION_NAME="mine-system"
-APP_PORT=8080
 
-# Colors
+# --- CONFIGURATION ---
+PROJECT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+SESSION_NAME="arch-system"
+APP_PORT=8080
+VENV_DIR="$PROJECT_DIR/venv"
+PYTHON_BIN="$VENV_DIR/bin/python"
+
+# --- CLI ARGUMENTS ---
+USE_TERMINAL=false
+NO_BROWSER=false
+SEED_DATA=false
+FULL_CLEAN=false
+
+usage() {
+    echo "Usage: $0 [OPTIONS]"
+    echo ""
+    echo "Options:"
+    echo "  --terminal    Use separate gnome-terminal windows instead of tmux"
+    echo "  --no-browser  Skip auto-opening browser"
+    echo "  --seed        Import employees from Excel and seed historical logs"
+    echo "  --clean       Deep clean: delete logs, clear ports aggressively, wipe cache"
+    echo "  --help        Show this help message"
+    echo ""
+    echo "Default behavior: Launches services in tmux with browser auto-open"
+    exit 0
+}
+
+for arg in "$@"; do
+    case $arg in
+        --terminal) USE_TERMINAL=true ;;
+        --no-browser) NO_BROWSER=true ;;
+        --seed) SEED_DATA=true ;;
+        --clean) FULL_CLEAN=true ;;
+        --help) usage ;;
+    esac
+done
+
+# --- COLORS & UI ---
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
+MAGENTA='\033[0;35m'
 CYAN='\033[0;36m'
 BOLD='\033[1m'
 DIM='\033[2m'
 NC='\033[0m'
 
-# Detect LAN IP
+# --- BANNER ---
+draw_banner() {
+    clear
+    echo -e "${BOLD}${CYAN}"
+    echo "  █████╗ ██████╗  ██████╗██╗  ██╗       ███████╗██╗   ██╗███████╗████████╗███████╗███╗   ███╗"
+    echo " ██╔══██╗██╔══██╗██╔════╝██║  ██║       ██╔════╝╚██╗ ██╔╝██╔════╝╚══██╔══╝██╔════╝████╗ ████║"
+    echo " ███████║██████╔╝██║     ███████║       ███████╗ ╚████╔╝ ███████╗   ██║   █████╗  ██╔████╔██║"
+    echo " ██╔══██║██╔══██╗██║     ██╔══██║       ╚════██║  ╚██╔╝  ╚════██║   ██║   ██╔══╝  ██║╚██╔╝██║"
+    echo " ██║  ██║██║  ██║╚██████╗██║  ██║       ███████║   ██║   ███████║   ██║   ███████╗██║ ╚═╝ ██║"
+    echo " ╚═╝  ╚═╝╚═╝  ╚═╝ ╚═════╝╚═╝  ╚═╝       ╚══════╝   ╚═╝   ╚══════╝   ╚═╝   ╚══════╝╚═╝     ╚═╝"
+    echo -e "                                                                        ${NC}${DIM}v2.2.0${NC}"
+    echo -e "${BLUE} ══════════════════════════════════════════════════════════════════════════════════════════ ${NC}"
+}
+
+step_count=0
+step() {
+    step_count=$((step_count+1))
+    echo -e "\n${BOLD}${CYAN}[$step_count]${NC} ${BOLD}$1${NC}"
+}
+
+# Start Execution
+draw_banner
+
+# --- 1. CLEANUP ---
+step "Initializing Environment Cleanup"
+
+# Aggressive process killing
+echo -en "  ${DIM}Terminating existing services...${NC}"
+for proc in "app.py" "monitor.py" "log_viewer.py" "scan_ingestion.py" "seed_historical_logs.py" "bulk_simulate.py" "npx expo"; do
+    pkill -9 -f "python.*$proc" 2>/dev/null || true
+    pkill -9 -f "$proc" 2>/dev/null || true
+done
+tmux kill-session -t "$SESSION_NAME" 2>/dev/null || true
+echo -e " ${GREEN}✓ DONE${NC}"
+
+echo -en "  ${DIM}Purging listener ports...${NC}"
+# Common ports for this app and industrial hardware (C66/Infowedge)
+for port in $APP_PORT 8081 8082 5000 6000 7000 9100 9101 9102; do
+    # Kill tcp and udp using fuser
+    fuser -k -n tcp "$port" 2>/dev/null || true
+    fuser -k -n udp "$port" 2>/dev/null || true
+    
+    # Aggressive fallback with lsof if available
+    if command -v lsof >/dev/null 2>&1; then
+        lsof -ti :$port | xargs kill -9 2>/dev/null || true
+    fi
+done
+echo -e " ${GREEN}✓ DONE${NC}"
+
+if [ "$FULL_CLEAN" = true ]; then
+    echo -en "  ${DIM}Performing deep clean (logs & cache)...${NC}"
+    # Delete logs
+    rm -f "$PROJECT_DIR"/*.log
+    # Delete python cache
+    find "$PROJECT_DIR" -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
+    # Delete temporary session files
+    rm -rf "$PROJECT_DIR"/.pytest_cache 2>/dev/null || true
+    echo -e " ${GREEN}✓ DONE${NC}"
+fi
+
+# --- 2. OPTIMIZATION ---
+step "System Performance Optimization"
+if sudo -n true 2>/dev/null || [ $EUID -eq 0 ]; then
+    if [ -d /sys/devices/system/cpu/cpu0/cpufreq ]; then
+        echo -en "  ${DIM}Setting CPU governor to performance...${NC}"
+        echo "performance" | sudo tee /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor > /dev/null || true
+        echo -e " ${GREEN}✓ DONE${NC}"
+    fi
+    if command -v ufw >/dev/null 2>&1; then
+        echo -en "  ${DIM}Configuring firewall (UFW)...${NC}"
+        for p in $APP_PORT 8081 8082; do sudo ufw allow "$p/tcp" 2>/dev/null || true; done
+        echo -e " ${GREEN}✓ DONE${NC}"
+    fi
+else
+    echo -e "  ${YELLOW}⚠ Skipping privileged optimizations (run with sudo for performance boost)${NC}"
+fi
+
+# --- 3. DEPENDENCIES ---
+step "Synchronizing Dependencies"
+if [ ! -d "$VENV_DIR" ]; then
+    echo -en "  ${DIM}Creating virtual environment...${NC}"
+    python3 -m venv "$VENV_DIR"
+    echo -e " ${GREEN}✓${NC}"
+fi
+
+echo -en "  ${DIM}Installing requirements...${NC}"
+"$VENV_DIR/bin/pip" install -q --upgrade pip
+"$VENV_DIR/bin/pip" install -q -r "$PROJECT_DIR/requirements.txt" rich psutil plotext 2>/dev/null
+if [ -f "$PROJECT_DIR/test_requirements.txt" ]; then
+    "$VENV_DIR/bin/pip" install -q -r "$PROJECT_DIR/test_requirements.txt" 2>/dev/null
+fi
+echo -e " ${GREEN}✓ DONE${NC}"
+
+if [ -d "$PROJECT_DIR/QrMobile" ] && [ ! -d "$PROJECT_DIR/QrMobile/node_modules" ]; then
+    echo -en "  ${DIM}Installing Mobile dependencies (npm)...${NC}"
+    (cd "$PROJECT_DIR/QrMobile" && npm install -q)
+    echo -e " ${GREEN}✓ DONE${NC}"
+fi
+
+# --- 4. VALIDATION ---
+step "Validating Code Integrity"
+if ! "$PYTHON_BIN" -m py_compile "$PROJECT_DIR/app.py" 2>/dev/null; then
+    echo -e "  ${RED}✗ Syntax error in app.py — Fix before deploying!${NC}"
+    exit 1
+fi
+echo -e "  ${GREEN}✓ app.py syntax OK${NC}"
+
+# --- 5. AI ENGINE ---
+step "Checking Ollama AI Engine"
+if command -v ollama >/dev/null 2>&1; then
+    if ! curl -sf http://localhost:11434/api/tags >/dev/null 2>&1; then
+        echo -en "  ${DIM}Starting Ollama service...${NC}"
+        nohup ollama serve >/dev/null 2>&1 &
+        sleep 3
+    fi
+    
+    OLLAMA_MODELS=$(curl -sf http://localhost:11434/api/tags | python3 -c "import sys,json; print(', '.join(m['name'] for m in json.load(sys.stdin).get('models',[])))" 2>/dev/null)
+    echo -e "  ${GREEN}✓ Ollama ready${NC} ${DIM}(Models: ${OLLAMA_MODELS:-None})${NC}"
+    
+    for model in mine-assistant-fast mine-assistant; do
+        if ! echo "$OLLAMA_MODELS" | grep -q "$model"; then
+            echo -e "  ${YELLOW}⚠ Missing model: $model. Creating...${NC}"
+            if [ -f "$PROJECT_DIR/Modelfile.mine" ]; then
+                ollama create "$model" -f "$PROJECT_DIR/Modelfile.mine" >/dev/null 2>&1 &
+            fi
+        fi
+    done
+else
+    echo -e "  ${YELLOW}⚠ Ollama not found. AI Chat will be offline.${NC}"
+fi
+
+# --- 6. DATA INITIALIZATION ---
+if [ "$SEED_DATA" = true ]; then
+    step "Initializing Data (Excel Import & Simulation)"
+    if [ -f "$PROJECT_DIR/import_employees_excel.py" ]; then
+        echo -en "  ${DIM}Importing employees from Excel...${NC}"
+        "$PYTHON_BIN" "$PROJECT_DIR/import_employees_excel.py" >/dev/null 2>&1
+        echo -e " ${GREEN}✓ DONE${NC}"
+    fi
+    if [ -f "$PROJECT_DIR/seed_historical_logs.py" ]; then
+        echo -en "  ${DIM}Generating 5 days of historical logs...${NC}"
+        "$PYTHON_BIN" "$PROJECT_DIR/seed_historical_logs.py" >/dev/null 2>&1
+        echo -e " ${GREEN}✓ DONE${NC}"
+    fi
+fi
+
+# --- 7. SERVICE DEPLOYMENT ---
 LAN_IP=$(hostname -I 2>/dev/null | awk '{print $1}')
 [ -z "$LAN_IP" ] && LAN_IP="localhost"
 
-step=0
-step() { step=$((step+1)); echo -e "\n${BOLD}${YELLOW}[$step] $1${NC}"; }
-
-echo -e ""
-echo -e "${BOLD}${BLUE}╔══════════════════════════════════════════════════════════════╗${NC}"
-echo -e "${BOLD}${BLUE}║         MINE MANAGEMENT SYSTEM — DEPLOY ALL                 ║${NC}"
-echo -e "${BOLD}${BLUE}╚══════════════════════════════════════════════════════════════╝${NC}"
-
-# ─────────────────────────────────────────────────────────────
-step "Cleaning old processes & ports"
-# ─────────────────────────────────────────────────────────────
-pkill -f "python.*app.py"      2>/dev/null || true
-pkill -f "python.*monitor.py"  2>/dev/null || true
-pkill -f "python.*log_viewer"  2>/dev/null || true
-tmux kill-session -t "$SESSION_NAME" 2>/dev/null || true
-
-for port in $APP_PORT 8081 8082 5000 6000 7000; do
-    fuser -k "${port}/tcp" 2>/dev/null || true
-done
-sleep 1
-echo -e "  ${GREEN}✓ Environment clean${NC}"
-
-# ─────────────────────────────────────────────────────────────
-step "Configuring firewall"
-# ─────────────────────────────────────────────────────────────
-if sudo -n true 2>/dev/null; then
-    if command -v ufw >/dev/null 2>&1; then
-        for p in $APP_PORT 8081 8082; do
-            sudo ufw allow "$p/tcp" 2>/dev/null || true
-        done
-        echo -e "  ${GREEN}✓ ufw rules added${NC}"
-    elif command -v iptables >/dev/null 2>&1; then
-        for p in $APP_PORT 8081 8082; do
-            sudo iptables -I INPUT -p tcp --dport "$p" -j ACCEPT 2>/dev/null || true
-        done
-        echo -e "  ${GREEN}✓ iptables rules added${NC}"
+if [ "$USE_TERMINAL" = true ]; then
+    step "Launching Services in Terminal Windows"
+    
+    # Terminal 1: Log Viewer
+    gnome-terminal \
+        --title="[1] Mine System - Log Viewer" \
+        --working-directory="$PROJECT_DIR" \
+        -- bash -c "source venv/bin/activate && python3 log_viewer.py" 2>/dev/null &
+    
+    # Terminal 2: Monitor
+    gnome-terminal \
+        --title="[2] Mine System - Monitor" \
+        --working-directory="$PROJECT_DIR" \
+        -- bash -c "source venv/bin/activate && python3 monitor.py" 2>/dev/null &
+    
+    # Terminal 3: Scan Ingestion
+    gnome-terminal \
+        --title="[3] Mine System - Ingestion" \
+        --working-directory="$PROJECT_DIR" \
+        -- bash -c "source venv/bin/activate && python3 scan_ingestion.py" 2>/dev/null &
+    
+    # Terminal 4: Mobile (if exists)
+    if [ -d "$PROJECT_DIR/QrMobile" ]; then
+        gnome-terminal \
+            --title="[4] Mine System - Mobile" \
+            --working-directory="$PROJECT_DIR/QrMobile" \
+            -- bash -c "npx expo start" 2>/dev/null &
     fi
+    
+    echo -e "  ${GREEN}✓ Services launched in separate terminal windows${NC}"
 else
-    echo -e "  ${DIM}⚠ Skipping (no cached sudo)${NC}"
-fi
-
-# ─────────────────────────────────────────────────────────────
-step "Setting up Python environment"
-# ─────────────────────────────────────────────────────────────
-if [ ! -d "$PROJECT_DIR/venv" ]; then
-    python3 -m venv "$PROJECT_DIR/venv"
-    echo -e "  ${GREEN}✓ venv created${NC}"
-fi
-"$PROJECT_DIR/venv/bin/pip" install -q -r "$PROJECT_DIR/requirements.txt" 2>/dev/null
-echo -e "  ${GREEN}✓ Dependencies synced${NC}"
-
-# ─────────────────────────────────────────────────────────────
-step "Validating environment"
-# ─────────────────────────────────────────────────────────────
-# .env
-if [ ! -f "$PROJECT_DIR/.env" ]; then
-    if [ -f "$PROJECT_DIR/.env.example" ]; then
-        cp "$PROJECT_DIR/.env.example" "$PROJECT_DIR/.env"
-        echo -e "  ${YELLOW}⚠ Created .env from .env.example — edit with real values${NC}"
-    else
-        echo -e "  ${DIM}⚠ No .env file — using defaults${NC}"
+    step "Orchestrating Tmux Services"
+    
+    # Create session
+    tmux new-session -d -s "$SESSION_NAME" -n "GRID" -x 200 -y 50
+    
+    # Window 1: GRID LAYOUT (2x2)
+    # Pane 1: Monitor
+    tmux send-keys -t "$SESSION_NAME:GRID.0" "cd '$PROJECT_DIR' && source venv/bin/activate && python3 monitor.py" Enter
+    # Pane 2: App Logs
+    tmux split-window -h -t "$SESSION_NAME:GRID.0"
+    tmux send-keys -t "$SESSION_NAME:GRID.1" "echo -e '${BOLD}${CYAN}━━━ App Log Stream ━━━${NC}' && tail -f server.log" Enter
+    # Pane 3: Monitor Logs
+    tmux split-window -v -t "$SESSION_NAME:GRID.0"
+    tmux send-keys -t "$SESSION_NAME:GRID.2" "echo -e '${BOLD}${YELLOW}━━━ Monitor Log Stream ━━━${NC}' && tail -f monitor.log" Enter
+    # Pane 4: Interactive Shell
+    tmux split-window -v -t "$SESSION_NAME:GRID.1"
+    tmux send-keys -t "$SESSION_NAME:GRID.3" "echo -e '${BOLD}${MAGENTA}━━━ Interactive Shell ━━━${NC}' && clear" Enter
+    
+    # Window 2: DASHBOARD
+    tmux new-window -t "$SESSION_NAME" -n "DASHBOARD"
+    tmux send-keys -t "$SESSION_NAME:DASHBOARD" "cd '$PROJECT_DIR' && source venv/bin/activate && python3 log_viewer.py" Enter
+    
+    # Window 3: INGESTION DAEMON
+    tmux new-window -t "$SESSION_NAME" -n "INGESTION"
+    tmux send-keys -t "$SESSION_NAME:INGESTION" "cd '$PROJECT_DIR' && source venv/bin/activate && python3 scan_ingestion.py" Enter
+    
+    # Window 4: MOBILE (If exists)
+    if [ -d "$PROJECT_DIR/QrMobile" ]; then
+        tmux new-window -t "$SESSION_NAME" -n "MOBILE"
+        tmux send-keys -t "$SESSION_NAME:MOBILE" "cd '$PROJECT_DIR/QrMobile' && npx expo start" Enter
     fi
-else
-    echo -e "  ${GREEN}✓ .env present${NC}"
+    
+    # Visual styling for tmux
+    tmux set-option -t "$SESSION_NAME" mouse on
+    tmux set-option -t "$SESSION_NAME" status-style "bg=black,fg=cyan"
+    tmux set-option -t "$SESSION_NAME" status-left "#[fg=black,bg=cyan,bold] ARCH #[bg=black,fg=cyan] "
+    tmux set-option -t "$SESSION_NAME" status-right "#[fg=cyan,bold] %H:%M #[fg=white,dim]│ #[fg=cyan]$LAN_IP "
+    tmux set-window-option -t "$SESSION_NAME" window-status-current-style "fg=white,bold,bg=blue"
+    
+    tmux select-window -t "$SESSION_NAME:GRID"
+    echo -e "  ${GREEN}✓ Services launched in tmux session: ${BOLD}$SESSION_NAME${NC}"
 fi
 
-# Syntax check
-if ! "$PROJECT_DIR/venv/bin/python" -c "
-import ast, sys
-try:
-    ast.parse(open('$PROJECT_DIR/app.py').read())
-except SyntaxError as e:
-    print(f'  SYNTAX ERROR line {e.lineno}: {e.msg}')
-    sys.exit(1)
-" 2>/dev/null; then
-    echo -e "  ${RED}✗ Syntax error in app.py — aborting.${NC}"
-    exit 1
-fi
-echo -e "  ${GREEN}✓ Syntax OK${NC}"
-
-# Import check
-IMPORT_OUT=$("$PROJECT_DIR/venv/bin/python" -c "from app import app; print('OK')" 2>&1)
-if [ "$IMPORT_OUT" != "OK" ] && ! echo "$IMPORT_OUT" | grep -q "OK"; then
-    echo -e "  ${RED}✗ Import error:${NC}"
-    echo "$IMPORT_OUT" | tail -3
-    exit 1
-fi
-echo -e "  ${GREEN}✓ Imports OK${NC}"
-
-# ─────────────────────────────────────────────────────────────
-step "Checking Ollama AI service"
-# ─────────────────────────────────────────────────────────────
-if command -v ollama >/dev/null 2>&1; then
-    if curl -sf http://localhost:11434/api/tags >/dev/null 2>&1; then
-        OLLAMA_MODELS=$(curl -sf http://localhost:11434/api/tags | python3 -c "import sys,json; print(', '.join(m['name'] for m in json.load(sys.stdin).get('models',[])))" 2>/dev/null)
-        echo -e "  ${GREEN}✓ Ollama running — models: ${OLLAMA_MODELS}${NC}"
-    else
-        echo -e "  ${YELLOW}⚠ Ollama installed but not running — starting...${NC}"
-        nohup ollama serve >/dev/null 2>&1 &
-        sleep 3
-        if curl -sf http://localhost:11434/api/tags >/dev/null 2>&1; then
-            echo -e "  ${GREEN}✓ Ollama started successfully${NC}"
-        else
-            echo -e "  ${RED}✗ Could not start Ollama — AI chat will be disabled${NC}"
-        fi
-    fi
-    # Ensure base model is pulled
-    if ! ollama list 2>/dev/null | grep -q "llama3.2"; then
-        echo -e "  ${YELLOW}⚠ Pulling llama3.2 base model (2GB, one-time download)...${NC}"
-        ollama pull llama3.2
-    fi
-    # Build CPU-optimized mine-assistant model from Modelfile
-    if ! ollama list 2>/dev/null | grep -q "mine-assistant"; then
-        echo -e "  ${YELLOW}⚠ Building mine-assistant model (CPU-optimized for this system)...${NC}"
-        ollama create mine-assistant -f "$PROJECT_DIR/Modelfile.mine"
-        echo -e "  ${GREEN}✓ mine-assistant model built${NC}"
-    else
-        echo -e "  ${GREEN}✓ mine-assistant model ready${NC}"
-    fi
-else
-    echo -e "  ${DIM}⚠ Ollama not installed — AI chat disabled. Install: curl -fsSL https://ollama.com/install.sh | sh${NC}"
-fi
-
-# ─────────────────────────────────────────────────────────────
-step "Launching services in tmux"
-# ─────────────────────────────────────────────────────────────
-#
-# Tmux layout — 3 windows for clean separation:
-#
-#  Window 0 "server"  — Flask app (main output)
-#  Window 1 "monitor" — Health check + auto-restart + live logs
-#  Window 2 "tools"   — Log viewer dashboard (Grafana-style)
-#
-
-tmux new-session -d -s "$SESSION_NAME" -n "server" -x 200 -y 50
-
-# ── Window 0: Server ──────────────────────────────────────────
-# Top pane: Flask app, Bottom pane: live log tail
-tmux send-keys -t "$SESSION_NAME:server" \
-    "cd '$PROJECT_DIR' && source venv/bin/activate && echo -e '\\033[1;34m━━━ Flask Server ━━━\\033[0m' && python3 app.py 2>&1 | tee server.log" Enter
-tmux split-window -v -t "$SESSION_NAME:server" -p 30
-tmux send-keys -t "$SESSION_NAME:server.1" \
-    "sleep 2 && echo -e '\\033[1;36m━━━ Live Server Logs ━━━\\033[0m' && tail -f '$PROJECT_DIR/server.log'" Enter
-
-# ── Window 1: Monitor ────────────────────────────────────────
-tmux new-window -t "$SESSION_NAME" -n "monitor"
-tmux send-keys -t "$SESSION_NAME:monitor" \
-    "cd '$PROJECT_DIR' && source venv/bin/activate && echo -e '\\033[1;33m━━━ Health Monitor (auto-restart) ━━━\\033[0m' && python3 monitor.py" Enter
-
-# ── Window 2: Log Viewer Dashboard ───────────────────────────
-tmux new-window -t "$SESSION_NAME" -n "dashboard"
-tmux send-keys -t "$SESSION_NAME:dashboard" \
-    "cd '$PROJECT_DIR' && source venv/bin/activate && echo -e '\\033[1;35m━━━ Grafana-Style Dashboard ━━━\\033[0m' && python3 log_viewer.py" Enter
-
-# ── Tmux settings ────────────────────────────────────────────
-tmux set-option -t "$SESSION_NAME" mouse on
-tmux set-option -t "$SESSION_NAME" status on
-tmux set-option -t "$SESSION_NAME" status-style "bg=colour236,fg=colour248"
-tmux set-option -t "$SESSION_NAME" status-left "#[fg=colour82,bold] MINE SYSTEM #[fg=colour248]│ "
-tmux set-option -t "$SESSION_NAME" status-left-length 20
-tmux set-option -t "$SESSION_NAME" status-right "#[fg=colour248]│ #[fg=colour117]$LAN_IP:$APP_PORT #[fg=colour248]│ #[fg=colour222]%H:%M "
-tmux set-option -t "$SESSION_NAME" status-right-length 40
-tmux set-window-option -t "$SESSION_NAME" window-status-format " #I:#W "
-tmux set-window-option -t "$SESSION_NAME" window-status-current-format "#[fg=colour82,bold] #I:#W "
-tmux set-option -t "$SESSION_NAME" pane-border-style "fg=colour240"
-tmux set-option -t "$SESSION_NAME" pane-active-border-style "fg=colour82"
-
-# Focus back on server window
-tmux select-window -t "$SESSION_NAME:server"
-tmux select-pane -t "$SESSION_NAME:server.0"
-
-echo -e "  ${GREEN}✓ 3 windows launched: server, monitor, dashboard${NC}"
-
-# ─────────────────────────────────────────────────────────────
-step "Waiting for server on :${APP_PORT}"
-# ─────────────────────────────────────────────────────────────
-SERVER_UP=0
-for i in $(seq 1 25); do
-    HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" "http://localhost:${APP_PORT}" 2>/dev/null || echo "000")
-    if echo "$HTTP_CODE" | grep -qE "^(200|302)"; then
-        echo -e "  ${GREEN}✓ Server responding (HTTP ${HTTP_CODE})${NC}"
-        SERVER_UP=1
+# --- 7. HEALTH CHECK & BROWSER ---
+step "Waiting for API Readiness"
+READY=0
+for i in $(seq 1 30); do
+    if curl -sf "http://localhost:$APP_PORT" >/dev/null 2>&1; then
+        READY=1
         break
     fi
-    printf "  %s waiting... (%d/25)\r" "$([ $((i % 2)) -eq 0 ] && echo '◐' || echo '◑')" "$i"
+    printf "  ${DIM}Waiting... (%d/30)${NC}\r" "$i"
     sleep 1
 done
 echo ""
 
-if [ $SERVER_UP -eq 0 ]; then
-    echo -e "  ${RED}✗ Server failed to start within 25s${NC}"
-    echo -e "  ${DIM}Check: tmux attach -t $SESSION_NAME${NC}"
-fi
-
-# ─────────────────────────────────────────────────────────────
-step "Opening browser"
-# ─────────────────────────────────────────────────────────────
-if [ $SERVER_UP -eq 1 ]; then
-    OPEN_URL="http://localhost:${APP_PORT}"
-    if command -v xdg-open >/dev/null 2>&1; then
-        xdg-open "$OPEN_URL" 2>/dev/null &
-        echo -e "  ${GREEN}✓ Opened $OPEN_URL${NC}"
-    elif command -v open >/dev/null 2>&1; then
-        open "$OPEN_URL" 2>/dev/null &
-        echo -e "  ${GREEN}✓ Opened $OPEN_URL${NC}"
-    else
-        echo -e "  ${DIM}⚠ No browser command found — open manually${NC}"
+if [ $READY -eq 1 ]; then
+    echo -e "  ${GREEN}✓ Server is ONLINE at http://localhost:$APP_PORT${NC}"
+    
+    if [ "$NO_BROWSER" = false ]; then
+        echo -e "  ${DIM}Opening browser...${NC}"
+        if python3 -m webbrowser -t "http://localhost:$APP_PORT" &>/dev/null; then
+            echo -e "  ${GREEN}✓ Browser opened${NC}"
+        elif command -v xdg-open >/dev/null 2>&1; then
+            xdg-open "http://localhost:$APP_PORT" &>/dev/null &
+            echo -e "  ${GREEN}✓ Browser opened${NC}"
+        elif command -v open >/dev/null 2>&1; then
+            open "http://localhost:$APP_PORT" &>/dev/null &
+            echo -e "  ${GREEN}✓ Browser opened${NC}"
+        else
+            echo -e "  ${YELLOW}⚠ Could not auto-open browser. Visit: http://localhost:$APP_PORT${NC}"
+        fi
     fi
 else
-    echo -e "  ${DIM}⚠ Skipped (server not ready)${NC}"
+    echo -e "  ${RED}✗ Server timeout. Check logs.${NC}"
 fi
 
-# ─────────────────────────────────────────────────────────────
-# Summary banner
-# ─────────────────────────────────────────────────────────────
-echo -e ""
-echo -e "${BOLD}${GREEN}╔══════════════════════════════════════════════════════════════╗${NC}"
-echo -e "${BOLD}${GREEN}║  ✓  ALL SERVICES DEPLOYED                                   ║${NC}"
+echo -e "\n${BOLD}${GREEN}╔══════════════════════════════════════════════════════════════╗${NC}"
+echo -e "${BOLD}${GREEN}║  ✓  DEPLOYMENT COMPLETE                                     ║${NC}"
 echo -e "${BOLD}${GREEN}╚══════════════════════════════════════════════════════════════╝${NC}"
-echo -e ""
-echo -e "  ${BOLD}Local:${NC}    http://localhost:${APP_PORT}"
-echo -e "  ${BOLD}Network:${NC}  http://${LAN_IP}:${APP_PORT}"
-echo -e "  ${BOLD}Login:${NC}    admin"
-echo -e ""
-echo -e "  ${DIM}Tmux windows:${NC}"
-echo -e "    ${CYAN}0:server${NC}    — Flask app + live log tail"
-echo -e "    ${CYAN}1:monitor${NC}   — Health monitor (auto-restart)"
-echo -e "    ${CYAN}2:dashboard${NC} — Grafana-style log viewer"
-echo -e ""
-echo -e "  ${DIM}Shortcuts:${NC}"
-echo -e "    ${CYAN}Ctrl+B 0/1/2${NC}  Switch window    ${CYAN}Ctrl+B D${NC}  Detach"
-echo -e "    ${CYAN}tmux attach -t $SESSION_NAME${NC}    Re-attach"
-echo -e ""
 
-# ─────────────────────────────────────────────────────────────
-# Attach to tmux
-# ─────────────────────────────────────────────────────────────
-sleep 1
-tmux attach -t "$SESSION_NAME"
+if [ "$USE_TERMINAL" = true ]; then
+    echo -e "\n  ${BOLD}Services running in separate terminal windows${NC}"
+    echo -e "  ${DIM}Close terminal windows to stop services${NC}"
+else
+    echo -e "\n  ${BOLD}Shortcuts:${NC}"
+    echo -e "    ${CYAN}Ctrl+B 0${NC} : Grid View (Monitor + Logs)"
+    echo -e "    ${CYAN}Ctrl+B 1${NC} : Live Dashboard (Grafana-style)"
+    echo -e "    ${CYAN}Ctrl+B 2${NC} : Ingestion Logs"
+    echo -e "    ${CYAN}Ctrl+B D${NC} : Detach from session"
+    echo -e "\n  ${DIM}To re-attach later:${NC} ${BOLD}tmux attach -t $SESSION_NAME${NC}"
+    echo -e "  ${DIM}To rebuild data:${NC}    ${BOLD}./deploy-full-server.sh --seed${NC}\n"
+    
+    sleep 1
+    tmux attach -t "$SESSION_NAME"
+fi

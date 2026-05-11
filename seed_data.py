@@ -114,32 +114,27 @@ def create_employees(count=NUM_EMPLOYEES):
     print(f"Creating {count} employees...")
 
     for i in range(count):
-        # Generate unique employee ID
         while True:
-            emp_id = f"EMP{fake.unique.random_number(digits=5):05d}"
-            if emp_id not in used_ids:
-                used_ids.add(emp_id)
+            emp_code = f"EMP{fake.unique.random_number(digits=5):05d}"
+            if emp_code not in used_ids:
+                used_ids.add(emp_code)
                 break
 
         first_name = random.choice(SA_FIRST_NAMES)
-        last_name = random.choice(SA_SURNAMES)
-        name = f"{first_name} {last_name}"
+        surname = random.choice(SA_SURNAMES)
 
-        # Weighted status - mostly active
         status = random.choices(
             ["Active", "Inactive", "On Leave"],
             weights=[85, 10, 5]
         )[0]
 
         employee = Employee(
-            employee_id=emp_id,
-            name=name,
-            position=random.choice(POSITIONS),
-            department=random.choice(DEPARTMENTS),
-            phone=fake.phone_number()[:20],
-            email=fake.email(),
-            hire_date=fake.date_between(start_date="-5y", end_date="today"),
-            status=status
+            emp_code=emp_code,
+            first_name=first_name,
+            surname=surname,
+            id_number=fake.unique.numerify(text="############"),  # 12-digit SA ID
+            job_title=random.choice(POSITIONS),
+            status=status,
         )
 
         db_session.add(employee)
@@ -150,10 +145,9 @@ def create_employees(count=NUM_EMPLOYEES):
 
     db_session.commit()
 
-    # Generate QR codes for all employees
     print("Generating QR codes for employees...")
     for emp in employees:
-        emp.qr_code = generate_qr_hash("EMP", emp.id, emp.employee_id)
+        emp.qr_code = generate_qr_hash("EMP", emp.id, emp.emp_code)
 
     db_session.commit()
     print(f"✓ Created {len(employees)} employees")
@@ -169,11 +163,10 @@ def create_vehicles(count=NUM_VEHICLES):
     print(f"Creating {count} vehicles...")
 
     for i in range(count):
-        # Generate unique registration
         while True:
-            reg = fake.license_plate().replace(" ", "").upper()[:50]
-            if reg not in used_regs and len(reg) >= 5:
-                used_regs.add(reg)
+            fleet_id = fake.unique.license_plate().replace(" ", "").upper()[:50]
+            if fleet_id not in used_regs and len(fleet_id) >= 5:
+                used_regs.add(fleet_id)
                 break
 
         status = random.choices(
@@ -181,13 +174,17 @@ def create_vehicles(count=NUM_VEHICLES):
             weights=[80, 10, 10]
         )[0]
 
+        reg_expiry = None
+        if status != "Maintenance":
+            try:
+                reg_expiry = datetime.combine(fake.date_between(start_date="-6M", end_date="+6M"), datetime.min.time())
+            except:
+                pass
+
         vehicle = Vehicle(
-            registration=reg,
-            type=random.choice(VEHICLE_TYPES),
-            model=random.choice(VEHICLE_MODELS),
-            capacity=str(random.choice(["10 Ton", "20 Ton", "50 Ton", "100 Ton", "5 Passengers", "20 Passengers"])),
+            fleet_id=fleet_id,
+            registration_expiry=reg_expiry,
             status=status,
-            last_maintenance=fake.date_between(start_date="-6M", end_date="today") if status != "Maintenance" else None
         )
 
         db_session.add(vehicle)
@@ -195,9 +192,8 @@ def create_vehicles(count=NUM_VEHICLES):
 
     db_session.commit()
 
-    # Generate QR codes
     for veh in vehicles:
-        veh.qr_code = generate_qr_hash("VEH", veh.id, veh.registration)
+        veh.qr_code = generate_qr_hash("VEH", veh.id, veh.fleet_id)
 
     db_session.commit()
     print(f"✓ Created {len(vehicles)} vehicles")
@@ -269,11 +265,11 @@ def create_gate_logs(count=NUM_GATE_LOGS, employees=None, vehicles=None, visitor
     # Prepare entity lists with their types
     if employees:
         for emp in employees:
-            all_entities.append(("employee", emp.id, emp.name, emp.qr_code, emp.employee_id))
+            all_entities.append(("employee", emp.id, f"{emp.first_name} {emp.surname}", emp.qr_code, emp.emp_code))
 
     if vehicles:
         for veh in vehicles:
-            all_entities.append(("vehicle", veh.id, veh.registration, veh.qr_code, veh.registration))
+            all_entities.append(("vehicle", veh.id, veh.fleet_id, veh.qr_code, veh.fleet_id))
 
     if visitors:
         for vis in visitors:
@@ -366,7 +362,7 @@ def main():
     args = parser.parse_args()
 
     print("=" * 55)
-    print("   Mine Management System - Database Seeder")
+    print("   Arch-System - Database Seeder")
     print("=" * 55)
 
     # Initialize database

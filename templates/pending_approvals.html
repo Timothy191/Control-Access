@@ -3,9 +3,9 @@
 {% block title %}Pending Approvals{% endblock %}
 
 {% block breadcrumb %}
-<i class="fas fa-home"></i>
+<i class="ti ti-home"></i>
 <a href="{{ url_for('dashboard') }}">Dashboard</a>
-<i class="fas fa-chevron-right"></i>
+<i class="ti ti-chevron-right"></i>
 <span>Pending Approvals</span>
 {% endblock %}
 
@@ -182,9 +182,9 @@
 </style>
 <div class="approvals-section">
     <div class="page-header">
-        <h1><i class="fas fa-clipboard-list"></i> Pending Approvals</h1>
+        <h1><i class="ti ti-clipboard-list"></i> Pending Approvals</h1>
         <div class="stats-badge">
-            <i class="fas fa-bell"></i>
+            <i class="ti ti-bell"></i>
             <span id="pendingCount">{{ approvals|length }}</span> Pending
         </div>
     </div>
@@ -223,7 +223,7 @@
                     {% if qr.get('format', 'none') != 'none' %}
                     <div class="qr-decoded-info">
                         <div class="qr-field">
-                            <label><i class="fas fa-qrcode"></i> Scanned Info</label>
+                            <label><i class="ti ti-qrcode"></i> Scanned Info</label>
                             <span class="qr-format-badge">{{ qr.get('format', 'unknown') }}</span>
                         </div>
                         {% if qr.get('employee_id') %}
@@ -268,29 +268,29 @@
                     <div class="target-selection">
                         <label class="checkbox-label">
                             <input type="radio" name="target_{{ approval.id }}" value="employees" class="target-radio" data-id="{{ approval.id }}" checked>
-                            <span><i class="fas fa-user"></i> Employees</span>
+                            <span><i class="ti ti-user"></i> Employees</span>
                         </label>
                         <label class="checkbox-label">
                             <input type="radio" name="target_{{ approval.id }}" value="fleet" class="target-radio" data-id="{{ approval.id }}">
-                            <span><i class="fas fa-truck"></i> Fleet</span>
+                            <span><i class="ti ti-truck"></i> Fleet</span>
                         </label>
                     </div>
                     <button class="btn btn-success approve-btn" data-id="{{ approval.id }}">
-                        <i class="fas fa-check"></i> Approve
+                        <i class="ti ti-check"></i> Approve
                     </button>
                     <button class="btn btn-danger reject-btn" data-id="{{ approval.id }}">
-                        <i class="fas fa-times"></i> Reject
+                        <i class="ti ti-x"></i> Reject
                     </button>
                     {% endif %}
                     <button class="btn btn-secondary view-btn" data-id="{{ approval.id }}">
-                        <i class="fas fa-eye"></i> View Details
+                        <i class="ti ti-eye"></i> View Details
                     </button>
                 </div>
             </div>
             {% endfor %}
         {% else %}
             <div class="empty-state">
-                <i class="fas fa-check-circle"></i>
+                <i class="ti ti-check-circle"></i>
                 <h3>No Pending Approvals</h3>
                 <p>All requests have been processed</p>
             </div>
@@ -318,31 +318,31 @@
 <div id="commentModal" class="modal">
     <div class="modal-content">
         <div class="modal-header">
-            <h3><i class="fas fa-check-circle"></i> Approve Request</h3>
+            <h3><i class="ti ti-check-circle"></i> Approve Request</h3>
             <span class="close">&times;</span>
         </div>
         <div class="modal-body">
             <form id="commentForm">
                 <!-- Target Table Selection -->
                 <div class="form-section">
-                    <h4><i class="fas fa-database"></i> Target Database</h4>
+                    <h4><i class="ti ti-database"></i> Target Database</h4>
                     <div class="target-selection">
                         <label class="checkbox-label">
                             <input type="radio" name="target_table" value="employees" id="targetEmployees" checked>
-                            <span><i class="fas fa-user"></i> Employees</span>
+                            <span><i class="ti ti-user"></i> Employees</span>
                         </label>
                         <label class="checkbox-label">
                             <input type="radio" name="target_table" value="fleet" id="targetFleet">
-                            <span><i class="fas fa-truck"></i> Fleet</span>
+                            <span><i class="ti ti-truck"></i> Fleet</span>
                         </label>
                     </div>
                 </div>
                 
                 <!-- Scanned Details (Auto-saved from QR scan) -->
                 <div class="form-section" id="scannedDetailsSection">
-                    <h4><i class="fas fa-id-card"></i> Scanned Details</h4>
+                    <h4><i class="ti ti-id-badge"></i> Scanned Details</h4>
                     <p style="color: var(--gray); font-size: 12px; margin-bottom: 10px;">
-                        <i class="fas fa-info-circle"></i> Data from QR scan will be saved automatically
+                        <i class="ti ti-info-circle"></i> Data from QR scan will be saved automatically
                     </p>
                     
                     <!-- Employee Fields (read-only) -->
@@ -395,7 +395,7 @@
                 
                 <!-- Comments -->
                 <div class="form-section">
-                    <h4><i class="fas fa-comment"></i> Comments</h4>
+                    <h4><i class="ti ti-message-circle"></i> Comments</h4>
                     <div class="form-group">
                         <textarea id="commentText" name="comment" rows="3" placeholder="Enter approval comments..."></textarea>
                     </div>
@@ -404,7 +404,7 @@
         </div>
         <div class="modal-footer">
             <button type="button" class="btn btn-secondary close-modal">Cancel</button>
-            <button type="button" class="btn btn-success submit-comment"><i class="fas fa-check"></i> Approve & Add</button>
+            <button type="button" class="btn btn-success submit-comment"><i class="ti ti-check"></i> Approve & Add</button>
         </div>
     </div>
 </div>

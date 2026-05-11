@@ -1,0 +1,155 @@
+{
+  "profile_name": "Mine Management C66 Scanner",
+  "profile_description": "Configuration for C66 Chainway scanner integration with Mine Management System",
+  "version": "1.0",
+  "created": "2026-05-07",
+  "target_system": "Mine Management System v2.1.0",
+  "endpoints": {
+    "primary": {
+      "url": "http://your-server:8080/api/c66",
+      "method": "POST",
+      "description": "Dedicated C66 endpoint - no API key required"
+    },
+    "alternative": {
+      "url": "http://your-server:8080/api/scan_alt", 
+      "method": "POST",
+      "description": "Alternative endpoint - flexible data format"
+    },
+    "fallback": {
+      "url": "http://your-server:8080/api/scan_qr",
+      "method": "POST",
+      "headers": {
+        "X-API-Key": "your-secret-hardware-key"
+      },
+      "description": "Main endpoint - requires API key"
+    }
+  },
+  "infowedge_settings": {
+    "basic": {
+      "profile_name": "Mine Management C66",
+      "enabled": true,
+      "auto_start": true,
+      "background_mode": true
+    },
+    "input": {
+      "scanner_device": "C66 Built-in Scanner",
+      "input_source": "Barcode Scanner",
+      "decoder_types": [
+        "QR Code",
+        "Code 128",
+        "Code 39",
+        "EAN-13",
+        "UPC-A",
+        "DataMatrix",
+        "PDF417"
+      ]
+    },
+    "output": {
+      "output_type": "IP Output",
+      "ip_settings": {
+        "target_url": "http://your-server:8080/api/c66",
+        "port": 8080,
+        "protocol": "HTTP",
+        "method": "POST",
+        "content_type": "application/json",
+        "timeout": 5000,
+        "retry_attempts": 3,
+        "retry_delay": 1000
+      },
+      "data_format": {
+        "format": "JSON",
+        "field_mapping": {
+          "barcodeData": "{{barcode}}",
+          "barcodeType": "{{barcodeFormat}}",
+          "timestamp": "{{timestamp}}",
+          "device": "{{deviceID}}",
+          "scanner": "C66"
+        }
+      }
+    },
+    "advanced": {
+      "keystroke_output": false,
+      "intent_output": false,
+      "ip_output": true,
+      "buffer_scans": true,
+      "buffer_size": 100,
+      "auto_send_buffer": true,
+      "send_on_connect": true,
+      "heartbeat_interval": 30000,
+      "connection_timeout": 10000
+    }
+  },
+  "c66_specific": {
+    "device_settings": {
+      "scanner_model": "C66",
+      "firmware_version": "Latest",
+      "scan_mode": "Continuous",
+      "aim_mode": "Dot",
+      "illumination": "Auto",
+      "decode_timeout": 5000,
+      "good_scan_beep": true,
+      "error_beep": true,
+      "vibration": true
+    },
+    "network": {
+      "wifi_required": true,
+      "network_timeout": 10000,
+      "dns_servers": ["8.8.8.8", "8.8.4.4"],
+      "keep_alive": true
+    }
+  },
+  "testing": {
+    "test_data": {
+      "sample_qr": "EMP001-JOHN-DOE-2024",
+      "sample_barcode": "123456789012",
+      "expected_response": {
+        "success": true,
+        "message": "Access granted",
+        "entity_name": "John Doe",
+        "entity_type": "employee"
+      }
+    },
+    "validation_steps": [
+      "1. Configure InfoWedge with these settings",
+      "2. Test network connectivity to server",
+      "3. Scan a test QR code",
+      "4. Check server logs for scan receipt",
+      "5. Verify access control response"
+    ]
+  },
+  "troubleshooting": {
+    "common_issues": [
+      {
+        "problem": "No network connectivity",
+        "solution": "Check WiFi settings and server URL"
+      },
+      {
+        "problem": "403 Forbidden error",
+        "solution": "Ensure scanner IP is in local network range"
+      },
+      {
+        "problem": "No response from server",
+        "solution": "Check server is running on port 8080"
+      },
+      {
+        "problem": "Invalid data format",
+        "solution": "Verify JSON field mapping in InfoWedge"
+      }
+    ],
+    "log_locations": {
+      "infowedge": "/sdcard/Android/data/com.symbol.datawedge/files/logs/",
+      "server": "/path/to/mine-management-system/server.log"
+    }
+  },
+  "security": {
+    "api_key_required": false,
+    "ip_restrictions": [
+      "192.168.0.0/16",
+      "10.0.0.0/8", 
+      "172.16.0.0/12",
+      "127.0.0.0/8"
+    ],
+    "ssl_optional": false,
+    "authentication": "IP-based"
+  }
+}

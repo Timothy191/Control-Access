@@ -3,22 +3,22 @@
 {% block title %}Emergency Muster{% endblock %}
 
 {% block breadcrumb %}
-<i class="fas fa-home"></i>
+<i class="ti ti-home"></i>
 <a href="{{ url_for('dashboard') }}">Dashboard</a>
-<i class="fas fa-chevron-right"></i>
+<i class="ti ti-chevron-right"></i>
 <span>Emergency Muster</span>
 {% endblock %}
 
 {% block content %}
 <div class="muster-section">
     <div class="page-header">
-        <h1><i class="fas fa-exclamation-triangle" style="color:var(--danger)"></i> Emergency Muster Roll</h1>
+        <h1><i class="ti ti-alert-triangle" style="color:var(--danger)"></i> Emergency Muster Roll</h1>
         <div class="header-actions">
             <button class="btn btn-danger" onclick="window.print()">
-                <i class="fas fa-print"></i> Print Muster
+                <i class="ti ti-printer"></i> Print Muster
             </button>
             <button class="btn btn-primary" onclick="location.reload()">
-                <i class="fas fa-sync-alt"></i> Refresh
+                <i class="ti ti-refresh"></i> Refresh
             </button>
         </div>
     </div>
@@ -43,12 +43,12 @@
     </div>
 
     <div class="muster-timestamp">
-        <i class="fas fa-clock"></i> Muster generated: <strong id="musterTime"></strong>
+        <i class="ti ti-clock"></i> Muster generated: <strong id="musterTime"></strong>
     </div>
 
     <!-- Employees On-Site -->
     <div class="muster-group">
-        <h2><i class="fas fa-hard-hat"></i> Employees On-Site ({{ on_site.employees|length }})</h2>
+        <h2><i class="ti ti-hard-hat"></i> Employees On-Site ({{ on_site.employees|length }})</h2>
         <div class="table-container">
             <table class="data-table">
                 <thead>
@@ -75,7 +75,7 @@
                     <tr>
                         <td colspan="6">
                             <div class="empty-state">
-                                <i class="fas fa-check-circle"></i>
+                                <i class="ti ti-check-circle"></i>
                                 <p>No employees currently on-site</p>
                             </div>
                         </td>
@@ -88,7 +88,7 @@
 
     <!-- Visitors On-Site -->
     <div class="muster-group">
-        <h2><i class="fas fa-user-tie"></i> Visitors On-Site ({{ on_site.visitors|length }})</h2>
+        <h2><i class="ti ti-user-tie"></i> Visitors On-Site ({{ on_site.visitors|length }})</h2>
         <div class="table-container">
             <table class="data-table">
                 <thead>
@@ -111,7 +111,7 @@
                     <tr>
                         <td colspan="4">
                             <div class="empty-state">
-                                <i class="fas fa-check-circle"></i>
+                                <i class="ti ti-check-circle"></i>
                                 <p>No visitors currently on-site</p>
                             </div>
                         </td>
@@ -124,7 +124,7 @@
 
     <!-- Vehicles On-Site -->
     <div class="muster-group">
-        <h2><i class="fas fa-truck"></i> Vehicles On-Site ({{ on_site.vehicles|length }})</h2>
+        <h2><i class="ti ti-truck"></i> Vehicles On-Site ({{ on_site.vehicles|length }})</h2>
         <div class="table-container">
             <table class="data-table">
                 <thead>
@@ -147,7 +147,7 @@
                     <tr>
                         <td colspan="4">
                             <div class="empty-state">
-                                <i class="fas fa-check-circle"></i>
+                                <i class="ti ti-check-circle"></i>
                                 <p>No vehicles currently on-site</p>
                             </div>
                         </td>

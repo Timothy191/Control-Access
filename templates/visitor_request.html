@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}Request Visitor QR — Mine Management System{% endblock %}
+{% block title %}Request Visitor QR — Arch-System{% endblock %}
 
 {% block content %}
 <style>
@@ -243,14 +243,14 @@
 <div class="visitor-wrapper">
     <div class="visitor-card">
         <div class="visitor-logo">
-            <i class="fas fa-id-badge"></i>
+            <i class="ti ti-id-badge"></i>
         </div>
         <h2>Request Visitor QR</h2>
 
         {% if success %}
         <div class="success-container">
             <div class="success-badge">
-                <i class="fas fa-clock"></i> Pending Approval
+                <i class="ti ti-clock"></i> Pending Approval
             </div>
             <p style="color: var(--text-secondary); font-size: 0.9rem; margin-bottom: 0.5rem;">
                 Your visitor QR code has been generated. Please present this code at the gate once approved.
@@ -277,57 +277,57 @@
                 </div>
             </div>
             <button class="btn-print" onclick="window.print()">
-                <i class="fas fa-print"></i> Print QR Code
+                <i class="ti ti-printer"></i> Print QR Code
             </button>
         </div>
         {% else %}
             {% if error %}
             <div class="error-message">
-                <i class="fas fa-exclamation-triangle"></i>
+                <i class="ti ti-alert-triangle"></i>
                 {{ error }}
             </div>
             {% endif %}
 
-            <form method="POST" action="{{ url_for('visitor_request') }}">
+            <form method="POST" action="{{ url_for('visitor_request') }}" autocomplete="off">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <div class="form-group">
                     <label for="name">Visitor Name <span style="color:var(--red-primary)">*</span></label>
-                    <input type="text" id="name" name="name" required placeholder="Full name">
+                    <input type="text" id="name" name="name" required placeholder="Full name" autocomplete="off">
                 </div>
 
                 <div class="form-group">
                     <label for="company">Visitor Company</label>
-                    <input type="text" id="company" name="company" placeholder="Company name">
+                    <input type="text" id="company" name="company" placeholder="Company name" autocomplete="off">
                 </div>
 
                 <div class="form-group">
                     <label for="purpose">Reason</label>
-                    <textarea id="purpose" name="purpose" rows="2" placeholder="Purpose of visit"></textarea>
+                    <textarea id="purpose" name="purpose" rows="2" placeholder="Purpose of visit" autocomplete="off"></textarea>
                 </div>
 
                 <div class="form-group">
                     <label for="meeting_person">Meeting Person</label>
-                    <input type="text" id="meeting_person" name="meeting_person" placeholder="Person you are meeting">
+                    <input type="text" id="meeting_person" name="meeting_person" placeholder="Person you are meeting" autocomplete="off">
                 </div>
 
                 <div class="form-group">
                     <label for="pin">Department PIN *</label>
-                    <input type="password" id="pin" name="pin" required placeholder="Enter authorized PIN" maxlength="20">
+                    <input type="password" id="pin" name="pin" required placeholder="Enter authorized PIN" maxlength="20" autocomplete="new-password">
                     <small class="form-hint">Contact your HOD or admin for the PIN.</small>
                 </div>
 
                 <button type="submit" class="btn-submit">
-                    <i class="fas fa-qrcode"></i> Generate Visitor QR
+                    <i class="ti ti-qrcode"></i> Generate Visitor QR
                 </button>
             </form>
         {% endif %}
 
         <a href="{{ url_for('login') }}" class="btn-back">
-            <i class="fas fa-arrow-left"></i> Back to Login
+            <i class="ti ti-arrow-left"></i> Back to Login
         </a>
 
         <div class="visitor-footer">
-            Mine Management System — Visitor Access
+            Arch-System — Visitor Access
         </div>
     </div>
 </div>

@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <meta name="csrf-token" content="{{ csrf_token() }}">
-    <title>{% block title %}Mine Management System{% endblock %}</title>
+    <title>{% block title %}Arch-System{% endblock %}</title>
     <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -14,10 +14,14 @@
     <!-- WebGL Dashboard Charts (GPU-accelerated, 8KB) -->
     <script defer src="{{ url_for('static', filename='js/dashboard-gl.js') }}"></script>
     <!-- Socket.IO -->
-    <script defer src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+    <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+    <!-- Tabler Icons (6000+ SVG icons, MIT — replace Font Awesome) -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.9.0/dist/tabler-icons.min.css">
     <!-- Font Awesome (solid only — saves ~60KB vs all.min.css) -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/fontawesome.min.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/solid.min.css">
+    <!-- Chart.js for enhanced charts -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
     <!-- Main styles -->
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
     <style>
@@ -528,94 +532,151 @@
 }
 </style>
 </head>
+{# Heroicons Macro - Usage: {{ heroicon('home', '24/outline', 'hi-nav-icon') }} #}
+{% macro heroicon(name, style='24/outline', class='') %}
+{% set size = style.split('/')[0] %}
+<svg class="hi-{{ size }} {{ class }}" viewBox="0 0 {{ size }} {{ size }}" aria-hidden="true">
+    <use href="{{ url_for('static', filename='icons/heroicons/' + style + '/' + name + '.svg') }}"/>
+</svg>
+{% endmacro %}
+
 <body {% if request.endpoint == 'login' %}class="auth-page"{% endif %}>
     <!-- 3D Background Container -->
     <div id="bg-canvas-container" {% if request.endpoint == 'login' %}style="display:none"{% endif %}></div>
 
     <button class="menu-toggle" id="menuToggle" aria-label="Menu">
-        <i class="fas fa-bars"></i>
+        <i class="ti ti-menu-2"></i>
     </button>
 
     <div class="app">
         <aside class="sidebar" id="sidebar">
             <div class="sidebar-header">
                 <div class="logo">
-                    <img src="{{ url_for('static', filename='logo.png') }}" alt="Mine Management Logo" class="logo-img">
-                    <span>Mine Manager</span>
+                    <img src="{{ url_for('static', filename='logo.png') }}" alt="Arch-System Logo" class="logo-img">
+                    <span>Arch-System</span>
                 </div>
             </div>
             <nav class="sidebar-nav">
+                {# Dashboard - Always visible #}
                 <a href="{{ url_for('dashboard') }}" class="nav-item {% if request.endpoint == 'dashboard' %}active{% endif %}">
-                    <i class="fas fa-tachometer-alt"></i>
+                    <i class="ti ti-dashboard"></i>
                     <span>Dashboard</span>
                 </a>
-                <a href="{{ url_for('employees') }}" class="nav-item {% if request.endpoint == 'employees' %}active{% endif %}">
-                    <i class="fas fa-users"></i>
-                    <span>Employees</span>
-                </a>
-                <a href="{{ url_for('fleet') }}" class="nav-item {% if request.endpoint == 'fleet' %}active{% endif %}">
-                    <i class="fas fa-truck"></i>
-                    <span>Fleet</span>
-                </a>
-                <a href="{{ url_for('equipment') }}" class="nav-item {% if request.endpoint == 'equipment' %}active{% endif %}">
-                    <i class="fas fa-microchip"></i>
-                    <span>Equipment</span>
-                </a>
-                <a href="{{ url_for('visitors') }}" class="nav-item {% if request.endpoint == 'visitors' %}active{% endif %}">
-                    <i class="fas fa-id-card"></i>
-                    <span>Visitors</span>
-                </a>
-                <a href="{{ url_for('pending_approvals') }}" class="nav-item {% if request.endpoint == 'pending_approvals' %}active{% endif %}">
-                    <i class="fas fa-clipboard-list"></i>
-                    <span>Pending Approvals</span>
-                </a>
-                <a href="{{ url_for('qr_scanner') }}" class="nav-item {% if request.endpoint == 'qr_scanner' %}active{% endif %}">
-                    <i class="fas fa-qrcode"></i>
-                    <span>Gate Scanner</span>
-                </a>
-                <a href="{{ url_for('gate_logs') }}" class="nav-item {% if request.endpoint == 'gate_logs' %}active{% endif %}">
-                    <i class="fas fa-history"></i>
-                    <span>Gate Logs</span>
-                </a>
-                <a href="{{ url_for('emergency_muster') }}" class="nav-item {% if request.endpoint == 'emergency_muster' %}active{% endif %}">
-                    <i class="fas fa-exclamation-triangle"></i>
-                    <span>Muster</span>
-                </a>
-                <a href="{{ url_for('generate_qr_page') }}" class="nav-item {% if request.endpoint == 'generate_qr_page' %}active{% endif %}">
-                    <i class="fas fa-qrcode"></i>
-                    <span>Generate QR</span>
-                </a>
-                <a href="{{ url_for('ai_chat_page') }}" class="nav-item {% if request.endpoint == 'ai_chat_page' %}active{% endif %}">
-                    <i class="fas fa-robot"></i>
-                    <span>AI Assistant</span>
-                </a>
+
+                {# MANAGEMENT SECTION #}
+                {% set management_active = request.endpoint in ['employees', 'fleet', 'equipment', 'visitors'] %}
+                <div class="nav-section {% if management_active %}expanded{% endif %}" data-section="management">
+                    <div class="nav-section-header" onclick="toggleSection('management')">
+                        <i class="ti ti-chevron-right section-toggle"></i>
+                        <span>MANAGEMENT</span>
+                    </div>
+                    <div class="nav-section-content">
+                        <a href="{{ url_for('employees') }}" class="nav-item {% if request.endpoint == 'employees' %}active{% endif %}">
+                            <i class="ti ti-users"></i>
+                            <span>Employees</span>
+                        </a>
+                        <a href="{{ url_for('fleet') }}" class="nav-item {% if request.endpoint == 'fleet' %}active{% endif %}">
+                            <i class="ti ti-truck"></i>
+                            <span>Fleet</span>
+                        </a>
+                        <a href="{{ url_for('equipment') }}" class="nav-item {% if request.endpoint == 'equipment' %}active{% endif %}">
+                            <i class="ti ti-device-desktop-analytics"></i>
+                            <span>Equipment</span>
+                        </a>
+                        <a href="{{ url_for('visitors') }}" class="nav-item {% if request.endpoint == 'visitors' %}active{% endif %}">
+                            <i class="ti ti-id-badge"></i>
+                            <span>Visitors</span>
+                        </a>
+                    </div>
+                </div>
+
+                {# OPERATIONS SECTION #}
+                {% set operations_active = request.endpoint in ['qr_scanner', 'gate_logs', 'emergency_muster', 'pending_approvals'] %}
+                <div class="nav-section {% if operations_active %}expanded{% endif %}" data-section="operations">
+                    <div class="nav-section-header" onclick="toggleSection('operations')">
+                        <i class="ti ti-chevron-right section-toggle"></i>
+                        <span>OPERATIONS</span>
+                    </div>
+                    <div class="nav-section-content">
+                        <a href="{{ url_for('qr_scanner') }}" class="nav-item {% if request.endpoint == 'qr_scanner' %}active{% endif %}">
+                            <i class="ti ti-scan"></i>
+                            <span>Gate Scanner</span>
+                        </a>
+                        <a href="{{ url_for('gate_logs') }}" class="nav-item {% if request.endpoint == 'gate_logs' %}active{% endif %}">
+                            <i class="ti ti-history"></i>
+                            <span>Gate Logs</span>
+                        </a>
+                        <a href="{{ url_for('emergency_muster') }}" class="nav-item {% if request.endpoint == 'emergency_muster' %}active{% endif %}">
+                            <i class="ti ti-alert-triangle"></i>
+                            <span>Muster</span>
+                        </a>
+                        <a href="{{ url_for('pending_approvals') }}" class="nav-item {% if request.endpoint == 'pending_approvals' %}active{% endif %}">
+                            <i class="ti ti-clipboard-list"></i>
+                            <span>Pending</span>
+                        </a>
+                    </div>
+                </div>
+
+                {# TOOLS SECTION #}
+                {% set tools_active = request.endpoint in ['generate_qr_page', 'ai_chat_page'] %}
+                <div class="nav-section {% if tools_active %}expanded{% endif %}" data-section="tools">
+                    <div class="nav-section-header" onclick="toggleSection('tools')">
+                        <i class="ti ti-chevron-right section-toggle"></i>
+                        <span>TOOLS</span>
+                    </div>
+                    <div class="nav-section-content">
+                        <a href="{{ url_for('generate_qr_page') }}" class="nav-item {% if request.endpoint == 'generate_qr_page' %}active{% endif %}">
+                            <i class="ti ti-qrcode"></i>
+                            <span>Generate QR</span>
+                        </a>
+                        <a href="{{ url_for('ai_chat_page') }}" class="nav-item {% if request.endpoint == 'ai_chat_page' %}active{% endif %}">
+                            <i class="ti ti-brain"></i>
+                            <span>AI Assistant</span>
+                        </a>
+                    </div>
+                </div>
+
+                {# ADMIN SECTION - Admin only #}
                 {% if session.role == 'admin' %}
-                <a href="{{ url_for('monitoring') }}" class="nav-item {% if request.endpoint == 'monitoring' %}active{% endif %}">
-                    <i class="fas fa-chart-line"></i>
-                    <span>Monitoring</span>
-                </a>
-                <a href="{{ url_for('audit_logs') }}" class="nav-item {% if request.endpoint == 'audit_logs' %}active{% endif %}">
-                    <i class="fas fa-shield-alt"></i>
-                    <span>Audit Logs</span>
-                </a>
-                <a href="{{ url_for('manage_users') }}" class="nav-item {% if request.endpoint == 'manage_users' %}active{% endif %}">
-                    <i class="fas fa-users-cog"></i>
-                    <span>Users</span>
-                </a>
+                {% set admin_active = request.endpoint in ['monitoring', 'audit_logs', 'manage_users', 'gate_mappings'] %}
+                <div class="nav-section {% if admin_active %}expanded{% endif %}" data-section="admin">
+                    <div class="nav-section-header" onclick="toggleSection('admin')">
+                        <i class="ti ti-chevron-right section-toggle"></i>
+                        <span>ADMIN</span>
+                    </div>
+                    <div class="nav-section-content">
+                        <a href="{{ url_for('monitoring') }}" class="nav-item {% if request.endpoint == 'monitoring' %}active{% endif %}">
+                            <i class="ti ti-device-analytics"></i>
+                            <span>Monitoring</span>
+                        </a>
+                        <a href="{{ url_for('audit_logs') }}" class="nav-item {% if request.endpoint == 'audit_logs' %}active{% endif %}">
+                            <i class="ti ti-shield"></i>
+                            <span>Audit Logs</span>
+                        </a>
+                        <a href="{{ url_for('manage_users') }}" class="nav-item {% if request.endpoint == 'manage_users' %}active{% endif %}">
+                            <i class="ti ti-users-group"></i>
+                            <span>Users</span>
+                        </a>
+                        <a href="{{ url_for('gate_mappings') }}" class="nav-item {% if request.endpoint == 'gate_mappings' %}active{% endif %}">
+                            <i class="ti ti-map-pin"></i>
+                            <span>Gate Mappings</span>
+                        </a>
+                    </div>
+                </div>
                 {% endif %}
             </nav>
             <div class="sidebar-footer">
                 <div class="synced-clock-container" style="padding: 10px 15px; border-bottom: 1px solid rgba(255,255,255,0.1); font-size: 12px; color: #aaa;">
-                    <i class="fas fa-clock"></i>
+                    <i class="ti ti-clock"></i>
                     <span class="synced-clock">--:--:--</span>
                 </div>
                 <div class="user-info">
-                    <i class="fas fa-user-circle"></i>
+                    <i class="ti ti-user-circle"></i>
                     <span>{{ session.username }}</span>
                     <span class="role-badge">{{ session.role }}</span>
                 </div>
                 <a href="{{ url_for('logout') }}" class="logout-btn">
-                    <i class="fas fa-sign-out-alt"></i>
+                    <i class="ti ti-logout"></i>
                     <span>Logout</span>
                 </a>
             </div>
@@ -623,10 +684,10 @@
         <main class="main-content">
             <div class="breadcrumb">
                 {% block breadcrumb %}
-                <i class="fas fa-home"></i>
+                <i class="ti ti-home"></i>
                 <a href="{{ url_for('dashboard') }}">Dashboard</a>
                 {% if request.endpoint != 'dashboard' %}
-                    <i class="fas fa-chevron-right"></i>
+                    <i class="ti ti-chevron-right"></i>
                     <span>{% block page_name %}{% endblock %}</span>
                 {% endif %}
                 {% endblock %}
@@ -636,6 +697,21 @@
             </div>
         </main>
     </div>
+
+    <!-- Global Footer Banner -->
+    <footer class="global-footer-banner">
+        <div class="footer-banner-content">
+            <span class="powered-by-text">Powered by:</span>
+            <div class="logo-container">
+                <img src="{{ url_for('static', filename='Google-Antigravity-Lockup-Full-Color.png') }}" alt="Google" class="footer-logo">
+                <img src="{{ url_for('static', filename='claude-color.svg') }}" alt="Claude" class="footer-logo">
+                <img src="{{ url_for('static', filename='codex-color.svg') }}" alt="Codex" class="footer-logo">
+                <img src="{{ url_for('static', filename='deepseek-color.svg') }}" alt="DeepSeek" class="footer-logo">
+                <img src="{{ url_for('static', filename='gemma-color.svg') }}" alt="Gemma" class="footer-logo">
+                <img src="{{ url_for('static', filename='github.png') }}" alt="GitHub" class="footer-logo">
+            </div>
+        </div>
+    </footer>
 
     <script src="{{ url_for('static', filename='js/main.js') }}"></script>
     <!-- CSS-only animated background (replaces three.js — saves 603KB + continuous CPU/GPU) -->
@@ -685,18 +761,61 @@
             });
         }
 
+        // Collapsible Navigation Sections
+        function toggleSection(sectionName) {
+            const section = document.querySelector(`.nav-section[data-section="${sectionName}"]`);
+            if (section) {
+                section.classList.toggle('expanded');
+                section.classList.toggle('collapsed');
+                // Save state to localStorage
+                const isExpanded = section.classList.contains('expanded');
+                localStorage.setItem(`nav_section_${sectionName}`, isExpanded ? 'expanded' : 'collapsed');
+            }
+        }
+
+        // Restore section states from localStorage on page load
+        function restoreSectionStates() {
+            document.querySelectorAll('.nav-section').forEach(section => {
+                const sectionName = section.getAttribute('data-section');
+                const savedState = localStorage.getItem(`nav_section_${sectionName}`);
+                
+                // If there's a saved state, apply it
+                if (savedState) {
+                    section.classList.remove('expanded', 'collapsed');
+                    section.classList.add(savedState);
+                } else {
+                    // Default: collapse all except the one with active page
+                    if (!section.classList.contains('expanded')) {
+                        section.classList.add('collapsed');
+                    }
+                }
+            });
+        }
+
+        // Initialize section states when DOM is ready
+        document.addEventListener('DOMContentLoaded', restoreSectionStates);
+
         // Remove skeleton loaders
         document.addEventListener('DOMContentLoaded', () => {
             document.querySelectorAll('.skeleton').forEach(el => el.classList.remove('skeleton'));
         });
 
-        // WebSocket connection
-        const socket = io();
-        socket.on('connect', () => {
-            console.log('Connected to WebSocket');
-            socket.emit('request_stats');
+        // WebSocket connection - Ensure it's globally accessible
+        window.socket = io({
+            transports: ['websocket', 'polling'],
+            reconnectionAttempts: 5
         });
-        socket.on('stats_update', (data) => {
+
+        window.socket.on('connect', () => {
+            console.log('Connected to WebSocket');
+            window.socket.emit('request_stats');
+        });
+
+        window.socket.on('connect_error', (error) => {
+            console.error('Socket.IO Connection Error:', error);
+        });
+
+        window.socket.on('stats_update', (data) => {
             const emp = document.getElementById('employeesCount');
             if (emp && data.employees !== undefined) emp.textContent = data.employees;
             const fleet = document.getElementById('fleetCount');
@@ -706,17 +825,20 @@
             const pending = document.getElementById('pendingCount');
             if (pending && data.pending_approvals !== undefined) pending.textContent = data.pending_approvals;
         });
-        socket.on('visitor_checkin', (data) => {
+
+        window.socket.on('visitor_checkin', (data) => {
             const notification = document.createElement('div');
             notification.className = 'notification';
-            notification.innerHTML = `<i class="fas fa-bell"></i> New visitor: ${data.name} has checked in`;
+            notification.innerHTML = `<i class="ti ti-bell"></i> New visitor: ${data.name} has checked in`;
             document.body.appendChild(notification);
             setTimeout(() => notification.remove(), 3000);
         });
-        socket.on('gate_scan', (data) => {
+
+        window.socket.on('gate_scan', (data) => {
+            console.log('Received gate_scan event:', data);
             const notification = document.createElement('div');
             notification.className = 'notification';
-            notification.innerHTML = `<i class="fas fa-qrcode"></i> ${data.name} (${data.type}) scanned ${data.direction} - ${data.granted ? 'Granted' : 'Denied'}`;
+            notification.innerHTML = `<i class="ti ti-scan"></i> ${data.name} (${data.type}) scanned ${data.direction} - ${data.granted ? 'Granted' : 'Denied'}`;
             document.body.appendChild(notification);
             setTimeout(() => notification.remove(), 3000);
         });

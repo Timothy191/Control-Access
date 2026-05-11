@@ -4,9 +4,9 @@
 {% block page_name %}Monitoring{% endblock %}
 
 {% block breadcrumb %}
-<i class="fas fa-home"></i>
+<i class="ti ti-home"></i>
 <a href="{{ url_for('dashboard') }}">Dashboard</a>
-<i class="fas fa-chevron-right"></i>
+<i class="ti ti-chevron-right"></i>
 <span>System Monitoring</span>
 {% endblock %}
 
@@ -14,14 +14,14 @@
 <div class="monitoring-dashboard">
     <div class="monitoring-header">
         <div class="header-title">
-            <h1><i class="fas fa-chart-line"></i> System Monitoring</h1>
+            <h1><i class="ti ti-device-analytics"></i> System Monitoring</h1>
             <p class="live-status">
                 <span class="live-dot"></span> LIVE — Real-time system telemetry
             </p>
         </div>
         <div class="header-actions">
             <button id="refreshBtn" class="btn btn-secondary">
-                <i class="fas fa-sync-alt"></i> Refresh
+                <i class="ti ti-refresh"></i> Refresh
             </button>
             <span id="lastUpdate" class="last-update">Updated: --:--:--</span>
         </div>
@@ -31,7 +31,7 @@
     <div class="monitoring-grid">
         <div class="metric-card">
             <div class="metric-icon cpu">
-                <i class="fas fa-microchip"></i>
+                <i class="ti ti-device-desktop-analytics"></i>
             </div>
             <div class="metric-content">
                 <span class="metric-label">CPU Usage</span>
@@ -44,7 +44,7 @@
 
         <div class="metric-card">
             <div class="metric-icon memory">
-                <i class="fas fa-memory"></i>
+<i class="ti ti-memory"></i>
             </div>
             <div class="metric-content">
                 <span class="metric-label">Memory</span>
@@ -57,7 +57,7 @@
 
         <div class="metric-card">
             <div class="metric-icon disk">
-                <i class="fas fa-hdd"></i>
+                <i class="ti ti-device-harddisk"></i>
             </div>
             <div class="metric-content">
                 <span class="metric-label">Disk Usage</span>
@@ -70,7 +70,7 @@
 
         <div class="metric-card">
             <div class="metric-icon requests">
-                <i class="fas fa-network-wired"></i>
+                <i class="ti ti-network"></i>
             </div>
             <div class="metric-content">
                 <span class="metric-label">Requests/sec</span>
@@ -81,7 +81,7 @@
 
         <div class="metric-card">
             <div class="metric-icon uptime">
-                <i class="fas fa-clock"></i>
+                <i class="ti ti-clock"></i>
             </div>
             <div class="metric-content">
                 <span class="metric-label">System Uptime</span>
@@ -91,7 +91,7 @@
 
         <div class="metric-card">
             <div class="metric-icon scans">
-                <i class="fas fa-qrcode"></i>
+                <i class="ti ti-qrcode"></i>
             </div>
             <div class="metric-content">
                 <span class="metric-label">Today's Scans</span>
@@ -108,7 +108,7 @@
     <div class="charts-row">
         <div class="chart-card">
             <div class="chart-header">
-                <h3><i class="fas fa-microchip"></i> CPU Usage History</h3>
+                <h3><i class="ti ti-device-desktop-analytics"></i> CPU Usage History</h3>
                 <span class="chart-badge">60s</span>
             </div>
             <div class="chart-container">
@@ -118,7 +118,7 @@
 
         <div class="chart-card">
             <div class="chart-header">
-                <h3><i class="fas fa-memory"></i> Memory Usage History</h3>
+                <h3><i class="ti ti-device-sound"></i> Memory Usage History</h3>
                 <span class="chart-badge">60s</span>
             </div>
             <div class="chart-container">
@@ -128,7 +128,7 @@
 
         <div class="chart-card">
             <div class="chart-header">
-                <h3><i class="fas fa-tachometer-alt"></i> Request Rate</h3>
+                <h3><i class="ti ti-dashboard"></i> Request Rate</h3>
                 <span class="chart-badge">60s</span>
             </div>
             <div class="chart-container">
@@ -142,7 +142,7 @@
         <!-- Health Checks -->
         <div class="health-card">
             <div class="card-header">
-                <h3><i class="fas fa-heartbeat"></i> Health Checks</h3>
+                <h3><i class="ti ti-heartbeat"></i> Health Checks</h3>
                 <span id="healthStatus" class="status-badge">Checking...</span>
             </div>
             <div id="healthChecks" class="health-list">
@@ -155,7 +155,7 @@
         <!-- Network Scan Listener -->
         <div class="network-listener-card">
             <div class="card-header">
-                <h3><i class="fas fa-wifi"></i> Network Scanner</h3>
+                <h3><i class="ti ti-wifi"></i> Network Scanner</h3>
                 <span id="networkStatus" class="status-badge">Checking...</span>
             </div>
             <div class="network-listener-content">
@@ -175,10 +175,10 @@
                 </div>
                 <div class="network-actions">
                     <button id="startNetworkBtn" class="btn btn-sm btn-success" onclick="startNetworkListener()">
-                        <i class="fas fa-play"></i> Start
+                        <i class="ti ti-player-play"></i> Start
                     </button>
                     <button id="stopNetworkBtn" class="btn btn-sm btn-danger" onclick="stopNetworkListener()">
-                        <i class="fas fa-stop"></i> Stop
+                        <i class="ti ti-player-stop"></i> Stop
                     </button>
                 </div>
             </div>
@@ -187,7 +187,7 @@
         <!-- Scanner Config Download -->
         <div class="network-listener-card">
             <div class="card-header">
-                <h3><i class="fas fa-barcode"></i> Chainway C66 Scanner Setup</h3>
+                <h3><i class="ti ti-barcode"></i> Chainway C66 Scanner Setup</h3>
                 <span class="status-badge">DataWedge</span>
             </div>
             <div class="network-listener-content">
@@ -230,10 +230,10 @@
                 </div>
                 <div class="network-actions" style="margin-top: 12px;">
                     <a href="/api/app/download" class="btn btn-sm btn-primary">
-                        <i class="fas fa-download"></i> Download APK
+                        <i class="ti ti-download"></i> Download APK
                     </a>
                     <button class="btn btn-sm btn-secondary" onclick="fetchScannerConfig()">
-                        <i class="fas fa-sync-alt"></i> Refresh
+                        <i class="ti ti-refresh"></i> Refresh
                     </button>
                 </div>
             </div>
@@ -242,7 +242,7 @@
         <!-- Live Port Monitor -->
         <div class="port-monitor-card full-width">
             <div class="card-header">
-                <h3><i class="fas fa-th"></i> Live Port Monitor</h3>
+                <h3><i class="ti ti-layout-grid"></i> Live Port Monitor</h3>
                 <span class="live-indicator">
                     <span class="pulse-dot"></span> LIVE
                 </span>
@@ -307,13 +307,13 @@
         <!-- Scanner Discovery -->
         <div class="card">
             <div class="card-header">
-                <h3><i class="fas fa-satellite-dish"></i> Scanner Discovery</h3>
+                <h3><i class="ti ti-satellite"></i> Scanner Discovery</h3>
                 <div>
                     <button class="btn btn-sm btn-primary" onclick="testScannerDiscovery()">
-                        <i class="fas fa-broadcast-tower"></i> Test Discovery
+                        <i class="ti ti-antenna"></i> Test Discovery
                     </button>
                     <a href="/scanner-config" class="btn btn-sm btn-info">
-                        <i class="fas fa-cog"></i> Configure
+                        <i class="ti ti-settings"></i> Configure
                     </a>
                 </div>
             </div>
@@ -331,10 +331,10 @@
         <!-- Time Sync -->
         <div class="card">
             <div class="card-header">
-                <h3><i class="fas fa-clock"></i> Time Synchronization</h3>
+                <h3><i class="ti ti-clock"></i> Time Synchronization</h3>
                 <div>
                     <button class="btn btn-sm btn-primary" onclick="syncTime()">
-                        <i class="fas fa-sync-alt"></i> Sync Now
+                        <i class="ti ti-refresh"></i> Sync Now
                     </button>
                 </div>
             </div>
@@ -355,7 +355,7 @@
         <!-- Top Endpoints -->
         <div class="endpoints-card">
             <div class="card-header">
-                <h3><i class="fas fa-route"></i> Top Endpoints</h3>
+                <h3><i class="ti ti-route"></i> Top Endpoints</h3>
             </div>
             <div id="topEndpoints" class="endpoints-list">
                 <div class="endpoint-item loading">Loading...</div>
@@ -365,7 +365,7 @@
         <!-- Live Log Stream -->
         <div class="logs-card">
             <div class="card-header">
-                <h3><i class="fas fa-terminal"></i> Live Logs</h3>
+                <h3><i class="ti ti-terminal"></i> Live Logs</h3>
                 <div class="log-filters">
                     <button class="filter-btn active" data-filter="all">All</button>
                     <button class="filter-btn" data-filter="error">Errors</button>

@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}Login — Mine Management System{% endblock %}
+{% block title %}Login — Arch-System{% endblock %}
 
 {% block content %}
 <style>
@@ -183,13 +183,13 @@
     <div class="login-wrapper">
         <div class="login-card">
             <div class="login-logo">
-                <i class="fas fa-hard-hat"></i>
+                <i class="ti ti-hard-hat"></i>
             </div>
-            <h2>Mine Management</h2>
+            <h2>Arch-System</h2>
 
             {% if error %}
             <div class="error-message">
-                <i class="fas fa-exclamation-triangle"></i>
+                <i class="ti ti-alert-triangle"></i>
                 {{ error }}
             </div>
             {% endif %}
@@ -207,12 +207,12 @@
                 </div>
 
                 <button type="submit" class="btn-login" id="loginBtn">
-                    <i class="fas fa-sign-in-alt"></i> Login
+                    <i class="ti ti-login"></i> Login
                 </button>
             </form>
 
             <a href="{{ url_for('visitor_request') }}" style="display:block; text-align:center; margin-top:1.25rem; padding:0.65rem; border:1px solid var(--steel); border-radius:8px; color:var(--text-primary); text-decoration:none; font-size:0.9rem; font-weight:500; transition:all 0.2s ease; background:rgba(255,255,255,0.04);" onmouseover="this.style.borderColor='var(--red-primary)';this.style.color='var(--red-primary)'" onmouseout="this.style.borderColor='var(--steel)';this.style.color='var(--text-primary)'">
-                <i class="fas fa-id-badge"></i> Request QR — Visitor
+                <i class="ti ti-id-badge"></i> Request QR — Visitor
             </a>
 
             <div class="login-footer">
@@ -241,7 +241,7 @@
         if (loginForm && loginBtn) {
             loginForm.addEventListener('submit', function(e) {
                 if (loginBtn.disabled) return;
-                loginBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Logging in...';
+                loginBtn.innerHTML = '<i class="ti ti-loader"></i> Logging in...';
                 loginBtn.disabled = true;
             });
         }

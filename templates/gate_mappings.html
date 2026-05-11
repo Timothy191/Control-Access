@@ -1,0 +1,120 @@
+{% extends "base.html" %}
+
+{% block title %}Gate Mappings{% endblock %}
+{% block page_name %}Gate Mappings{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div class="card-header">
+        <h3><i class="ti ti-map-pin"></i> Device-to-Gate Mapping</h3>
+        <p>Map scanner device IPs to physical gate locations for better identification.</p>
+    </div>
+    <div class="card-body">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="alert alert-{{ category }}">{{ message }}</div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
+        <div class="grid-2">
+            <div>
+                <h4><i class="ti ti-circle-plus"></i> Add New Mapping</h4>
+                <form method="POST" action="{{ url_for('add_gate_mapping') }}">
+                    <div class="form-group">
+                        <label>IP Address</label>
+                        <input type="text" name="ip_address" class="form-control" placeholder="192.168.0.160" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Gate Name</label>
+                        <input type="text" name="gate_name" class="form-control" placeholder="Extension Gate 1" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Description (optional)</label>
+                        <input type="text" name="description" class="form-control" placeholder="Main entrance gate">
+                    </div>
+                    <button type="submit" class="btn btn-primary">Add Mapping</button>
+                </form>
+            </div>
+
+            <div>
+                <h4><i class="ti ti-alert-circle"></i> Unmapped Devices (Detected)</h4>
+                {% if unmapped %}
+                    <table class="table table-sm">
+                        <thead>
+                            <tr>
+                                <th>IP Address</th>
+                                <th>Scanner</th>
+                                <th>Action</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for device in unmapped %}
+                            <tr>
+                                <td><code>{{ device.ip }}</code></td>
+                                <td>{{ device.scanned_by[:30] }}...</td>
+                                <td>
+                                    <form method="POST" action="{{ url_for('add_gate_mapping') }}" style="display:inline">
+                                        <input type="hidden" name="ip_address" value="{{ device.ip }}">
+                                        <input type="text" name="gate_name" placeholder="Gate name" size="15" required>
+                                        <button type="submit" class="btn btn-sm btn-success">Map</button>
+                                    </form>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                {% else %}
+                    <p class="text-muted">No unmapped devices detected recently.</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card mt-3">
+    <div class="card-header">
+        <h4><i class="ti ti-list"></i> Current Mappings</h4>
+    </div>
+    <div class="card-body">
+        {% if mappings %}
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>IP Address</th>
+                        <th>Gate Name</th>
+                        <th>Description</th>
+                        <th>Status</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for mapping in mappings %}
+                    <tr class="{{ 'text-muted' if not mapping.is_active }}">
+                        <td><code>{{ mapping.ip_address }}</code></td>
+                        <td><strong>{{ mapping.gate_name }}</strong></td>
+                        <td>{{ mapping.location_description or '-' }}</td>
+                        <td>
+                            <span class="badge {{ 'badge-success' if mapping.is_active else 'badge-secondary' }}">
+                                {{ 'Active' if mapping.is_active else 'Inactive' }}
+                            </span>
+                        </td>
+                        <td>
+                            <a href="{{ url_for('toggle_gate_mapping', id=mapping.id) }}" class="btn btn-sm btn-outline">
+                                {{ 'Disable' if mapping.is_active else 'Enable' }}
+                            </a>
+                            <a href="{{ url_for('delete_gate_mapping', id=mapping.id) }}" class="btn btn-sm btn-danger" onclick="return confirm('Delete this mapping?')">
+                                <i class="ti ti-trash"></i>
+                            </a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        {% else %}
+            <p class="text-muted">No gate mappings configured yet.</p>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

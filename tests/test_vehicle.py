@@ -43,7 +43,7 @@ class TestVehicle:
 
     def test_delete_vehicle(self, authenticated_client, sample_vehicle):
         veh_id = sample_vehicle.id
-        response = authenticated_client.get(
+        response = authenticated_client.post(
             f"/delete_vehicle/{veh_id}", follow_redirects=True
         )
 

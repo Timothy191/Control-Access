@@ -1,39 +1,9 @@
 #!/usr/bin/env python3
 """
-Mine Management System — Grafana-Style Terminal Dashboard
+Arch-System — Grafana-Style Terminal Dashboard
 Monitors logs, HTTP traffic, Scans, and System Resources.
 Requires: rich, psutil, plotext (installed in venv)
 """
-
-import os
-import sys
-import time
-import re
-import subprocess
-import threading
-from collections import deque
-from datetime import datetime
-
-try:
-    from rich.console import Console
-    from rich.text import Text
-    from rich.live import Live
-    from rich.layout import Layout
-    from rich.panel import Panel
-    from rich.table import Table
-    from rich.align import Align
-    from rich import box
-    import psutil
-    import plotext as plt
-except ImportError:
-    print("Dependencies missing — run: pip install rich psutil plotext")
-    sys.exit(1)
-
-SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-SERVER_LOG  = os.path.join(SCRIPT_DIR, "server.log")
-MONITOR_LOG = os.path.join(SCRIPT_DIR, "monitor.log")
-
-console = Console()
 
 # ── Data History (for graphs) ────────────────────────────────────────────────
 HISTORY_LEN = 40
@@ -271,8 +241,8 @@ def main():
         header = Table.grid(expand=True)
         header.add_column(ratio=1); header.add_column(justify="center", ratio=1); header.add_column(justify="right", ratio=1)
         header.add_row(
-            Text("⛏  MINE MANAGEMENT SYSTEM", style="bold white"),
-            Text("GRAFANA TERMINAL DASHBOARD", style="bold bright_cyan"),
+            Text("⛏  ARCH-SYSTEM", style="bold white"),
+            Text("ARCH-SYSTEM DASHBOARD", style="bold bright_cyan"),
             Text(f"🕐 {ts}", style="dim white")
         )
         layout["header"].update(Panel(header, box=box.HEAVY, border_style="cyan"))

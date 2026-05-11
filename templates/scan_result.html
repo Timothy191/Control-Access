@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Scan Result — Arch-System</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body, html {
+            height: 100%; width: 100%;
+            overflow: hidden;
+            font-family: 'Segoe UI', system-ui, sans-serif;
+        }
+        .overlay {
+            position: fixed; inset: 0;
+            display: flex; flex-direction: column;
+            align-items: center; justify-content: center;
+            text-align: center;
+            color: #fff;
+            {% if success %}background: #006400;{% else %}background: #8b0000;{% endif %}
+            animation: fadeIn 0.25s ease;
+        }
+        .icon { font-size: 10rem; line-height: 1; margin-bottom: 1.5rem; animation: popIn 0.35s cubic-bezier(0.175,0.885,0.32,1.275); }
+        .status { font-size: 4rem; font-weight: 900; letter-spacing: 8px; text-transform: uppercase; margin-bottom: 1rem; }
+        .name   { font-size: 2.5rem; font-weight: 600; margin-bottom: 0.5rem; }
+        .detail { font-size: 1.2rem; opacity: 0.75; }
+        .reason { margin-top: 1.5rem; font-size: 1.4rem; font-weight: 600; background: rgba(0,0,0,0.25); padding: 0.75rem 2rem; border-radius: 10px; }
+        .bar    { position: fixed; bottom: 0; left: 0; height: 6px; background: rgba(255,255,255,0.4); animation: drain {{ reset_ms }}ms linear forwards; }
+        .footer { position: fixed; bottom: 1.5rem; font-size: 0.75rem; opacity: 0.35; letter-spacing: 2px; text-transform: uppercase; }
+        @keyframes popIn  { from { transform: scale(0.2); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes drain  { from { width: 100%; } to { width: 0; } }
+    </style>
+</head>
+<body>
+<div class="overlay">
+    <div class="icon">{{ '✅' if success else '❌' }}</div>
+    <div class="status">{{ 'APPROVED' if success else 'DENIED' }}</div>
+    <div class="name">{{ name or 'UNKNOWN' }}</div>
+    <div class="detail">{{ (entity_type or 'SCAN')|upper }}{% if direction %} · {{ direction }}{% endif %}</div>
+    {% if not success and denial_reason %}
+    <div class="reason">{{ denial_reason }}</div>
+    {% endif %}
+    <div class="bar"></div>
+    <div class="footer">Arch-System Gate Access Control</div>
+</div>
+<script>
+    if (navigator.vibrate) {
+        {% if success %}navigator.vibrate([80,40,80]);{% else %}navigator.vibrate(600);{% endif %}
+    }
+    // Auto redirect back to kiosk if opened from there
+    const ref = document.referrer || '';
+    setTimeout(() => {
+        if (ref.includes('/kiosk') || ref.includes('/scan')) {
+            history.back();
+        }
+        // else just stay — user opened via phone camera
+    }, {{ reset_ms }});
+</script>
+</body>
+</html>

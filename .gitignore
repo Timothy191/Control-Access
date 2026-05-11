@@ -3,6 +3,13 @@
 .env.local
 .env.production
 
+# Credentials / secrets
+credentials.json
+*.pem
+*.key
+id_rsa*
+id_ed25519*
+
 # Python
 __pycache__/
 *.py[cod]

@@ -2,7 +2,7 @@
 # Tuned for Intel i5-7500 (3 cores / 16GB RAM / no GPU)
 # Build: ollama create mine-assistant-fast -f Modelfile.mine-fast
 
-FROM llama3.2:1b
+FROM llama3.2:1b-instruct-q4_K_M
 
 # CPU optimization — leave 1 core free for Flask/SQLite
 PARAMETER num_thread 2

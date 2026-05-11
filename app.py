@@ -8,11 +8,12 @@ from flask import (
     jsonify,
     send_file,
     Response,
+    flash,
 )
 from flask_socketio import SocketIO, emit
 from flask_cors import CORS
 from database import init_db, db_session, engine, Base
-from models import User, Employee, Vehicle, Visitor, Approval, GateLog, Device, Equipment, SiteSetting, AuditLog
+from models import User, Employee, Vehicle, Visitor, Approval, GateLog, Device, Equipment, SiteSetting, AuditLog, GateMapping
 from datetime import datetime, timedelta, timezone
 from functools import wraps
 
@@ -75,6 +76,7 @@ app.secret_key = os.environ.get("SECRET_KEY") or os.urandom(24).hex()
 app.permanent_session_lifetime = timedelta(minutes=30)
 app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
 app.config["SESSION_COOKIE_HTTPONLY"] = True
+app.config["SESSION_COOKIE_SECURE"] = True  # Requires HTTPS
 app.config["WTF_CSRF_TIME_LIMIT"] = 3600  # 1 hour CSRF token validity
 app.config["SEND_FILE_MAX_AGE_DEFAULT"] = 43200  # 12 hour static asset cache
 
@@ -89,7 +91,9 @@ csrf = CSRFProtect(app)
 
 @app.before_request
 def csrf_protect_non_api():
-    """Apply CSRF check only to non-API POST/PUT/DELETE requests."""
+    """Apply CSRF check only to non-API POST/PUT/PATCH/DELETE requests."""
+    if app.config.get("TESTING"):
+        return
     if request.method in ("POST", "PUT", "PATCH", "DELETE"):
         if not request.path.startswith('/api/'):
             csrf.protect()
@@ -98,15 +102,40 @@ def csrf_protect_non_api():
 def handle_csrf_error(e):
     return render_template("login.html", error="Session expired. Please try again."), 400
 
+@app.after_request
+def add_security_headers(response):
+    """Add security headers to all responses."""
+    # Content-Security-Policy (allow inline for CDN-loaded scripts)
+    csp = "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net https://cdn.socket.io https://cdnjs.cloudflare.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net https://cdnjs.cloudflare.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://cdn.socket.io"
+    response.headers['Content-Security-Policy'] = csp
+    response.headers['X-Frame-Options'] = 'DENY'
+    response.headers['X-Content-Type-Options'] = 'nosniff'
+    response.headers['Strict-Transport-Security'] = 'max-age=31536000; includeSubDomains'
+    return response
+
 # Rate Limiting
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 limiter = Limiter(get_remote_address, app=app, default_limits=[], storage_uri="memory://")
 
 # Enable CORS for API endpoints (required for mobile scanner access)
-CORS(app, resources={r"/api/*": {"origins": "*", "methods": ["GET", "POST", "OPTIONS"], "allow_headers": ["Content-Type", "X-API-Key", "X-CSRFToken"]}})
+# CORS configuration - restricted to production origins in production
+# For development/debug allow localhost, production should be explicit
+_cors_origins = os.environ.get("CORS_ORIGINS", "*")  # Set CORS_ORIGINS env var to restrict
+CORS(app, resources={r"/api/*": {"origins": _cors_origins.split(",") if _cors_origins != "*" else "*", "methods": ["GET", "POST", "OPTIONS"], "allow_headers": ["Content-Type", "X-API-Key", "X-CSRFToken"], "supports_credentials": True}})
 
 socketio = SocketIO(app, cors_allowed_origins="*")
+
+# Custom Jinja2 filters
+@app.template_filter('from_json')
+def from_json_filter(value):
+    """Parse JSON string to Python object."""
+    if not value:
+        return {}
+    try:
+        return json.loads(value)
+    except (json.JSONDecodeError, ValueError):
+        return {}
 
 # Initialize database
 init_db()
@@ -128,27 +157,50 @@ def json_500(error):
 OLLAMA_BASE_URL = os.environ.get("OLLAMA_URL", "http://localhost:11434")
 OLLAMA_MODEL = os.environ.get("OLLAMA_MODEL", "mine-assistant-fast")
 OLLAMA_MODEL_FULL = os.environ.get("OLLAMA_MODEL_FULL", "mine-assistant")
+OLLAMA_CLOUD_URL = os.environ.get("OLLAMA_CLOUD_URL", "https://cloud.ollama.ai/api")
+OLLAMA_CLOUD_API_KEY = os.environ.get("OLLAMA_CLOUD_API_KEY", "")
+OLLAMA_USE_CLOUD = os.environ.get("OLLAMA_USE_CLOUD", "false").lower() == "true"
+_ollama_provider = "local"  # "local", "cloud", or "offline"
 _ollama_available = False
 _ollama_checked = False
 
+__version__ = "2.1.0"
+
 
 def _check_ollama():
-    """Check if Ollama is reachable and the model is available."""
-    global _ollama_available, _ollama_checked
+    """Check Ollama availability — tries cloud first if enabled, then local."""
+    global _ollama_available, _ollama_checked, _ollama_provider
     if _ollama_checked:
         return _ollama_available
     _ollama_checked = True
+
+    if OLLAMA_USE_CLOUD and OLLAMA_CLOUD_API_KEY:
+        try:
+            resp = requests.get(
+                f"{OLLAMA_CLOUD_URL}/tags",
+                headers={"Authorization": f"Bearer {OLLAMA_CLOUD_API_KEY}"},
+                timeout=10,
+            )
+            if resp.status_code == 200:
+                _ollama_provider = "cloud"
+                _ollama_available = True
+                print(f"Ollama Cloud AI initialized: model={OLLAMA_MODEL}")
+                return True
+        except Exception as e:
+            print(f"WARNING: Ollama Cloud not reachable ({type(e).__name__}: {e}). Trying local...")
+
     try:
         resp = requests.get(f"{OLLAMA_BASE_URL}/api/tags", timeout=5)
         if resp.status_code == 200:
             _models = [m["name"] for m in resp.json().get("models", [])]
             if any(OLLAMA_MODEL in m for m in _models):
+                _ollama_provider = "local"
                 _ollama_available = True
-                print(f"Ollama AI initialized: model={OLLAMA_MODEL}, url={OLLAMA_BASE_URL}")
+                print(f"Ollama local AI initialized: model={OLLAMA_MODEL}, url={OLLAMA_BASE_URL}")
             else:
                 print(f"WARNING: Ollama running but model '{OLLAMA_MODEL}' not found. Available: {_models}")
     except Exception as _ollama_err:
-        print(f"WARNING: Ollama not reachable ({type(_ollama_err).__name__}: {_ollama_err}). Will retry on first AI request.")
+        print(f"WARNING: Ollama not reachable ({type(_ollama_err).__name__}: {_ollama_err}). AI is offline.")
     return _ollama_available
 
 
@@ -629,6 +681,96 @@ def delete_user(id):
     return redirect(url_for("manage_users"))
 
 
+# ------------------- Gate Mapping Management -------------------
+@app.route("/admin/gate_mappings")
+@login_required
+@role_required(["admin"])
+def gate_mappings():
+    """Manage gate mappings - map scanner IPs to physical gate names."""
+    mappings = db_session.query(GateMapping).order_by(GateMapping.gate_name).all()
+    
+    # Get unique IPs from recent gate logs that aren't mapped yet
+    recent_ips = db_session.query(GateLog.ip_address, GateLog.scanned_by).filter(
+        GateLog.ip_address.isnot(None),
+        GateLog.scanned_at >= datetime.utcnow().replace(day=1)  # This month
+    ).distinct().all()
+    
+    # Filter out already mapped IPs
+    mapped_ips = {m.ip_address for m in mappings}
+    unmapped = []
+    for ip, scanned_by in recent_ips:
+        if ip and ip not in mapped_ips:
+            unmapped.append({"ip": ip, "scanned_by": scanned_by})
+    
+    return render_template("gate_mappings.html", mappings=mappings, unmapped=unmapped)
+
+
+@app.route("/admin/gate_mappings/add", methods=["POST"])
+@login_required
+@role_required(["admin"])
+def add_gate_mapping():
+    """Add a new gate mapping."""
+    ip_address = request.form.get("ip_address", "").strip()
+    gate_name = request.form.get("gate_name", "").strip()
+    description = request.form.get("description", "").strip()
+    
+    if not ip_address or not gate_name:
+        flash("IP address and gate name are required", "error")
+        return redirect(url_for("gate_mappings"))
+    
+    # Check if IP already mapped
+    existing = db_session.query(GateMapping).filter_by(ip_address=ip_address).first()
+    if existing:
+        existing.gate_name = gate_name
+        existing.location_description = description
+        existing.is_active = True
+        db_session.commit()
+        log_audit("update", "gate_mapping", existing.id, f"Updated gate mapping: {ip_address} -> {gate_name}")
+        flash(f"Updated mapping for {ip_address}", "success")
+    else:
+        mapping = GateMapping(
+            ip_address=ip_address,
+            gate_name=gate_name,
+            location_description=description
+        )
+        db_session.add(mapping)
+        db_session.commit()
+        log_audit("create", "gate_mapping", mapping.id, f"Created gate mapping: {ip_address} -> {gate_name}")
+        flash(f"Added mapping: {ip_address} -> {gate_name}", "success")
+    
+    return redirect(url_for("gate_mappings"))
+
+
+@app.route("/admin/gate_mappings/delete/<int:id>")
+@login_required
+@role_required(["admin"])
+def delete_gate_mapping(id):
+    """Delete a gate mapping."""
+    mapping = db_session.query(GateMapping).filter_by(id=id).first()
+    if mapping:
+        ip = mapping.ip_address
+        db_session.delete(mapping)
+        db_session.commit()
+        log_audit("delete", "gate_mapping", id, f"Deleted gate mapping for {ip}")
+        flash(f"Deleted mapping for {ip}", "success")
+    return redirect(url_for("gate_mappings"))
+
+
+@app.route("/admin/gate_mappings/toggle/<int:id>")
+@login_required
+@role_required(["admin"])
+def toggle_gate_mapping(id):
+    """Toggle active/inactive status of a gate mapping."""
+    mapping = db_session.query(GateMapping).filter_by(id=id).first()
+    if mapping:
+        mapping.is_active = not mapping.is_active
+        db_session.commit()
+        status = "enabled" if mapping.is_active else "disabled"
+        log_audit("update", "gate_mapping", id, f"{status.capitalize()} gate mapping for {mapping.ip_address}")
+        flash(f"Mapping {status} for {mapping.ip_address}", "success")
+    return redirect(url_for("gate_mappings"))
+
+
 # ------------------- Visitor QR Request (Public) -------------------
 @app.route("/visitor_request", methods=["GET", "POST"])
 def visitor_request():
@@ -756,7 +898,7 @@ def dashboard():
         "total_warning": alert_row.expiring_medical + alert_row.expiring_induction,
     }
 
-    return render_template("dashboard.html", stats=stats, alerts=alerts)
+    return render_template("dashboard.html", stats=stats, alerts=alerts, version=__version__)
 
 
 _dashboard_history_cache = {"data": None, "ts": 0}
@@ -859,9 +1001,10 @@ def ai_status():
         _check_ollama()
     return jsonify({
         "available": _ollama_available,
+        "provider": _ollama_provider,
         "model": OLLAMA_MODEL,
         "model_full": OLLAMA_MODEL_FULL,
-        "url": OLLAMA_BASE_URL,
+        "url": OLLAMA_CLOUD_URL if _ollama_provider == "cloud" else OLLAMA_BASE_URL,
     })
 
 
@@ -1122,7 +1265,7 @@ def get_infowedge_config():
     
     # Create config content (simple text file with instructions)
     config_content = f"""# InfoWedge Configuration
-# Auto-generated for Mine Management System
+# Auto-generated for Arch-System
 
 [Network]
 Server IP: {server_ip}
@@ -2409,11 +2552,15 @@ def decode_qr_data(raw_data):
             parsed = json.loads(data)
             if isinstance(parsed, dict):
                 result["format"] = "json"
+                # Employee fields
                 result["employee_id"] = parsed.get("employee_id") or parsed.get("emp_code") or parsed.get("id")
                 result["name"] = parsed.get("name") or parsed.get("full_name")
                 result["position"] = parsed.get("position") or parsed.get("job") or parsed.get("job_title")
                 result["department"] = parsed.get("department") or parsed.get("coy") or parsed.get("company")
                 result["area"] = parsed.get("area")
+                # Vehicle fields
+                result["fleet_id"] = parsed.get("fleet_id") or parsed.get("vehicle_id") or parsed.get("fleet") or parsed.get("registration")
+                result["vehicle_type"] = parsed.get("vehicle_type") or parsed.get("type") or parsed.get("model")
                 return result
         except (json.JSONDecodeError, ValueError):
             pass
@@ -2425,10 +2572,14 @@ def decode_qr_data(raw_data):
             params = parse_qs(query_str, keep_blank_values=True)
             if params:
                 result["format"] = "url_query"
+                # Employee fields
                 result["employee_id"] = (params.get("id") or params.get("emp_code") or params.get("employee_id") or [None])[0]
                 result["name"] = (params.get("name") or params.get("full_name") or [None])[0]
                 result["position"] = (params.get("position") or params.get("job") or [None])[0]
                 result["department"] = (params.get("department") or params.get("company") or params.get("coy") or [None])[0]
+                # Vehicle fields
+                result["fleet_id"] = (params.get("fleet_id") or params.get("vehicle_id") or params.get("fleet") or params.get("registration") or [None])[0]
+                result["vehicle_type"] = (params.get("vehicle_type") or params.get("type") or params.get("model") or [None])[0]
                 return result
         except Exception:
             pass
@@ -2457,6 +2608,8 @@ def decode_qr_data(raw_data):
         "position": r'(?:Job(?:\s*Title)?|Position|Occupation)[:\s]+([^\|\n]+)',
         "department": r'(?:Coy|Company|Dept|Department)[:\s]+([^\|\n]+)',
         "area": r'(?:Area|Section|Zone)[:\s]+([^\|\n]+)',
+        "fleet_id": r'(?:Fleet(?:\s*ID)?|Vehicle\s*ID|Registration)[:\s]+([^\|\n]+)',
+        "vehicle_type": r'(?:Vehicle\s*Type|Type|Model)[:\s]+([^\|\n]+)',
     }
     kv_found = False
     for key, pattern in kv_patterns.items():
@@ -2468,27 +2621,47 @@ def decode_qr_data(raw_data):
         result["format"] = "key_value"
         return result
 
-    # 5. Pipe-delimited (e.g. "123|John Doe|Miner|Acme Corp")
+    # 5. Pipe-delimited (e.g. "123|John Doe|Miner|Acme Corp" or "TRUCK001|Volvo|Dump Truck")
     if "|" in data:
         parts = [p.strip() for p in data.split("|") if p.strip()]
         if len(parts) >= 2:
             result["format"] = "pipe"
-            result["employee_id"] = parts[0] if parts[0].replace("-", "").replace("_", "").isalnum() else None
-            result["name"] = parts[1] if len(parts) > 1 else None
-            result["position"] = parts[2] if len(parts) > 2 else None
-            result["department"] = parts[3] if len(parts) > 3 else None
-            result["area"] = parts[4] if len(parts) > 4 else None
+            # Check if first part looks like a vehicle ID (letters/numbers mix, often starts with letters)
+            first_part = parts[0]
+            is_vehicle_id = bool(re.match(r'^[A-Z]{2,}\d+', first_part, re.IGNORECASE)) or \
+                           any(x in first_part.upper() for x in ['TRUCK', 'LDV', 'DUMP', 'EXCAVATOR'])
+            
+            if is_vehicle_id:
+                result["fleet_id"] = first_part
+                result["vehicle_type"] = parts[1] if len(parts) > 1 else None
+            else:
+                # Assume employee format
+                result["employee_id"] = first_part if first_part.replace("-", "").replace("_", "").isalnum() else None
+                result["name"] = parts[1] if len(parts) > 1 else None
+                result["position"] = parts[2] if len(parts) > 2 else None
+                result["department"] = parts[3] if len(parts) > 3 else None
+                result["area"] = parts[4] if len(parts) > 4 else None
             return result
 
-    # 6. CSV (e.g. "123,John Doe,Miner,Acme Corp")
+    # 6. CSV (e.g. "123,John Doe,Miner,Acme Corp" or "TRUCK001,Volvo,2020")
     if "," in data and "\n" not in data:
         parts = [p.strip().strip('"') for p in data.split(",") if p.strip()]
         if len(parts) >= 2:
             result["format"] = "csv"
-            result["employee_id"] = parts[0] if parts[0].replace("-", "").replace("_", "").isalnum() else None
-            result["name"] = parts[1] if len(parts) > 1 else None
-            result["position"] = parts[2] if len(parts) > 2 else None
-            result["department"] = parts[3] if len(parts) > 3 else None
+            first_part = parts[0]
+            # Check if looks like vehicle ID
+            is_vehicle_id = bool(re.match(r'^[A-Z]{2,}\d+', first_part, re.IGNORECASE)) or \
+                           any(x in first_part.upper() for x in ['TRUCK', 'LDV', 'DUMP', 'EXCAVATOR'])
+            
+            if is_vehicle_id:
+                result["fleet_id"] = first_part
+                result["vehicle_type"] = parts[1] if len(parts) > 1 else None
+            else:
+                # Assume employee format
+                result["employee_id"] = first_part if first_part.replace("-", "").replace("_", "").isalnum() else None
+                result["name"] = parts[1] if len(parts) > 1 else None
+                result["position"] = parts[2] if len(parts) > 2 else None
+                result["department"] = parts[3] if len(parts) > 3 else None
             return result
 
     # 7. Plain text fallback — treat entire string as an ID or name
@@ -2500,11 +2673,65 @@ def decode_qr_data(raw_data):
     return result
 
 
+def _get_gate_name_from_ip(ip_address, scanned_by, default_gate_location=None):
+    """Look up gate name from IP address in gate_mappings table.
+    
+    Args:
+        ip_address: The IP address of the scanner
+        scanned_by: The scanner identifier string (e.g., "infowedge:192.168.0.160:9100")
+        default_gate_location: Fallback gate location if no mapping found
+    
+    Returns:
+        Gate name string (e.g., "Extension Gate 1") or default/fallback
+    """
+    if not ip_address and not scanned_by:
+        return default_gate_location or "Main Gate"
+    
+    # Try to extract IP from scanned_by if ip_address is empty
+    lookup_ip = ip_address
+    if not lookup_ip and scanned_by:
+        # Extract IP from formats like "infowedge:192.168.0.160:9100"
+        import re
+        ip_match = re.search(r'(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})', scanned_by)
+        if ip_match:
+            lookup_ip = ip_match.group(1)
+    
+    if not lookup_ip:
+        return default_gate_location or "Main Gate"
+    
+    # Look up in gate_mappings table
+    try:
+        mapping = db_session.query(GateMapping).filter(
+            GateMapping.ip_address == lookup_ip,
+            GateMapping.is_active == True
+        ).first()
+        
+        if mapping:
+            return mapping.gate_name
+    except Exception as e:
+        # If table doesn't exist yet or other error, return default
+        pass
+    
+    return default_gate_location or f"Gate-{lookup_ip}"
+
+
 def _process_qr_scan(qr_hash, direction, gate_location, scanned_by, ip_address, user_agent):
     """Process a QR code scan and return entity info and access decision."""
     # Normalize input - ensure consistent format
     if qr_hash:
         qr_hash = qr_hash.strip()
+        
+        # Handle full URL scans by extracting the hash part
+        # Handles formats like: http://192.168.0.217:8080/scan/ABC123
+        if "://" in qr_hash and "/scan/" in qr_hash:
+            qr_hash = qr_hash.split("/scan/")[-1].split("?")[0]
+        elif "://" in qr_hash and "/s/" in qr_hash:
+            qr_hash = qr_hash.split("/s/")[-1].split("?")[0]
+        # Also handle cases where it might be just the path /scan/ABC123
+        elif qr_hash.startswith("/scan/"):
+            qr_hash = qr_hash.replace("/scan/", "")
+        elif qr_hash.startswith("/s/"):
+            qr_hash = qr_hash.replace("/s/", "")
 
     entity = None
     entity_type = None
@@ -2942,46 +3169,133 @@ def _process_qr_scan(qr_hash, direction, gate_location, scanned_by, ip_address, 
             },
         )
 
-    # HANDLE EMPTY OR UNKNOWN QR CODES - Create placeholder for fleet/employee assignment
+    # HANDLE EMPTY OR UNKNOWN QR CODES - Try to extract and create records from parsed data
     if not entity and not denial_reason:
-        # For empty QR codes or unknown QR codes, create a placeholder employee record
-        # This allows admins to later assign the physical QR code to this placeholder
-        placeholder_id = f"PLACEHOLDER{_utcnow().strftime('%Y%m%d%H%M%S%f')[:-3]}"
-        placeholder_name = "Unassigned QR" if not qr_hash or qr_hash.strip() == "" else f"Unassigned-{qr_hash[:15]}"
+        # Parse QR data to try to extract structured information
+        parsed_data = decode_qr_data(qr_hash) if qr_hash else {}
         
-        # Parse placeholder name into first_name and surname
-        placeholder_parts = placeholder_name.split(None, 1)
-        placeholder_first = placeholder_parts[0] if placeholder_parts else 'Unassigned'
-        placeholder_surname = placeholder_parts[1] if len(placeholder_parts) > 1 else 'QR'
+        # Try to create employee from parsed data
+        employee_id = parsed_data.get('employee_id') or parsed_data.get('id')
+        name = parsed_data.get('name')
+        position = parsed_data.get('position') or parsed_data.get('job_title') or parsed_data.get('job')
+        department = parsed_data.get('department') or parsed_data.get('coy') or parsed_data.get('company')
         
-        new_placeholder = Employee(
-            emp_code=placeholder_id,
-            first_name=placeholder_first,
-            surname=placeholder_surname,
-            id_number=placeholder_id,
-            job_title="Pending Assignment",
-            status="Pending",  # Mark as pending so admins know to assign it
-            qr_code=qr_hash if qr_hash else placeholder_id,  # Use placeholder ID if QR is empty
-            medical_expiry=None,
-            induction_expiry=None
-        )
-        db_session.add(new_placeholder)
-        db_session.flush()
+        if employee_id and name:
+            # Check if employee already exists by emp_code
+            existing = db_session.query(Employee).filter_by(emp_code=str(employee_id)).first()
+            if not existing:
+                # Parse name into first_name and surname
+                name_parts = name.split(None, 1)
+                first_name = name_parts[0] if name_parts else name
+                surname = name_parts[1] if len(name_parts) > 1 else ''
+                
+                new_employee = Employee(
+                    emp_code=str(employee_id),
+                    first_name=first_name,
+                    surname=surname,
+                    job_title=position or 'Unknown',
+                    status="Pending",  # Mark as pending until verified
+                    qr_code=qr_hash,
+                    id_number=str(employee_id),
+                )
+                db_session.add(new_employee)
+                db_session.flush()
+                
+                entity = new_employee
+                entity_type = "employee"
+                entity_id = new_employee.id
+                entity_name = f"{new_employee.first_name} {new_employee.surname}".strip()
+                access_granted = False  # Still deny until properly verified
+                denial_reason = f"New employee created from QR: {name} ({employee_id}) - Pending verification"
+                
+                print(f"AUTO-CREATED EMPLOYEE: {entity_name} ({employee_id}) from QR scan - pending verification")
+            else:
+                # Employee exists, update QR and activate
+                existing.qr_code = qr_hash
+                existing.status = "Active"
+                entity = existing
+                entity_type = "employee"
+                entity_id = existing.id
+                entity_name = f"{existing.first_name} {existing.surname}".strip()
+                access_granted = True
+                denial_reason = None
+                
+        # Try to create vehicle from parsed data (if not employee data found)
+        elif not entity:
+            fleet_id = parsed_data.get('fleet_id') or parsed_data.get('vehicle_id') or parsed_data.get('registration')
+            if fleet_id:
+                existing_vehicle = db_session.query(Vehicle).filter_by(fleet_id=str(fleet_id)).first()
+                if not existing_vehicle:
+                    new_vehicle = Vehicle(
+                        fleet_id=str(fleet_id),
+                        status="Pending",
+                        qr_code=qr_hash,
+                    )
+                    db_session.add(new_vehicle)
+                    db_session.flush()
+                    
+                    entity = new_vehicle
+                    entity_type = "vehicle"
+                    entity_id = new_vehicle.id
+                    entity_name = str(fleet_id)
+                    access_granted = False
+                    denial_reason = f"New vehicle created from QR: {fleet_id} - Pending verification"
+                    
+                    print(f"AUTO-CREATED VEHICLE: {fleet_id} from QR scan - pending verification")
+                else:
+                    # Vehicle exists, update QR and activate
+                    existing_vehicle.qr_code = qr_hash
+                    existing_vehicle.status = "Active"
+                    entity = existing_vehicle
+                    entity_type = "vehicle"
+                    entity_id = existing_vehicle.id
+                    entity_name = str(fleet_id)
+                    access_granted = True
+                    denial_reason = None
         
-        entity = new_placeholder
-        entity_type = "employee"
-        entity_id = new_placeholder.id
-        entity_name = f"{new_placeholder.first_name} {new_placeholder.surname}".strip()
-        access_granted = False  # Deny access until properly assigned
-        denial_reason = "QR not assigned - Placeholder created for fleet/employee"
-        
-        print(f"PLACEHOLDER CREATED: {placeholder_id} for QR '{qr_hash[:30] if qr_hash else 'EMPTY'}' - awaiting assignment")
+        # Create placeholder if we couldn't extract meaningful data
+        if not entity:
+            placeholder_id = f"PLACEHOLDER{_utcnow().strftime('%Y%m%d%H%M%S%f')[:-3]}"
+            placeholder_name = "Unassigned QR" if not qr_hash or qr_hash.strip() == "" else f"Unassigned-{qr_hash[:15]}"
+            
+            placeholder_parts = placeholder_name.split(None, 1)
+            placeholder_first = placeholder_parts[0] if placeholder_parts else 'Unassigned'
+            placeholder_surname = placeholder_parts[1] if len(placeholder_parts) > 1 else 'QR'
+            
+            new_placeholder = Employee(
+                emp_code=placeholder_id,
+                first_name=placeholder_first,
+                surname=placeholder_surname,
+                id_number=placeholder_id,
+                job_title="Pending Assignment",
+                status="Pending",
+                qr_code=qr_hash if qr_hash else placeholder_id,
+                medical_expiry=None,
+                induction_expiry=None
+            )
+            db_session.add(new_placeholder)
+            db_session.flush()
+            
+            entity = new_placeholder
+            entity_type = "employee"
+            entity_id = new_placeholder.id
+            entity_name = f"{new_placeholder.first_name} {new_placeholder.surname}".strip()
+            access_granted = False
+            denial_reason = "QR not assigned - Placeholder created"
+            
+            print(f"PLACEHOLDER CREATED: {placeholder_id} for QR '{qr_hash[:30] if qr_hash else 'EMPTY'}'")
     
     # NOT IN SYSTEM - set denial reason if no entity found (fallback)
     if not entity and not denial_reason:
         denial_reason = "Not registered in system"
         entity_name = entity_name or "Unknown"
 
+    # Parse QR data for storage
+    parsed_qr = decode_qr_data(qr_hash) if qr_hash else {"format": "none", "raw_data": None}
+    
+    # Look up gate name from IP mapping, fallback to provided gate_location
+    resolved_gate_location = _get_gate_name_from_ip(ip_address, scanned_by, gate_location)
+    
     gate_log = GateLog(
         access_type=entity_type,
         entity_id=entity_id,
@@ -2990,10 +3304,11 @@ def _process_qr_scan(qr_hash, direction, gate_location, scanned_by, ip_address, 
         qr_data=qr_hash,
         access_granted=access_granted,
         denial_reason=denial_reason,
-        gate_location=gate_location,
+        gate_location=resolved_gate_location,
         scanned_by=scanned_by,
         ip_address=ip_address,
         user_agent=user_agent,
+        parsed_qr_data=json.dumps(parsed_qr) if parsed_qr else None,
         employee_id=entity_id if entity_type == "employee" else None,
         vehicle_id=entity_id if entity_type == "vehicle" else None,
         visitor_id=entity_id if entity_type == "visitor" else None,
@@ -3010,7 +3325,7 @@ def _process_qr_scan(qr_hash, direction, gate_location, scanned_by, ip_address, 
             "direction": direction,
             "granted": access_granted,
             "reason": denial_reason,
-            "gate": gate_location,
+            "gate": resolved_gate_location,
             "time": datetime.now().strftime("%H:%M:%S"),
         },
     )
@@ -3021,7 +3336,37 @@ def _process_qr_scan(qr_hash, direction, gate_location, scanned_by, ip_address, 
         "entity_name": entity_name,
         "access_granted": access_granted,
         "denial_reason": denial_reason,
+        "parsed_qr": parsed_qr,
     }
+
+
+@app.route("/kiosk")
+def kiosk_scanner():
+    """Full-screen kiosk page for C66 keyboard emulator and InfoWedge browser mode.
+    Open this URL on the C66's browser / WebView — it captures all barcode input
+    and shows a forced full-screen GREEN/RED overlay.
+    """
+    return render_template("kiosk_scanner.html")
+
+
+@app.route("/scan/<qr_hash>")
+@app.route("/s/<qr_hash>")
+def universal_scan(qr_hash):
+    """Visual feedback for any camera-based scanner (phone, 3rd-party app)."""
+    ip_address = request.remote_addr
+    user_agent = request.headers.get("User-Agent", "WebBrowser")
+
+    result = _process_qr_scan(qr_hash, "AUTO", "Web Scanner", "web_browser", ip_address, user_agent)
+
+    return render_template(
+        "scan_result.html",
+        success=result["access_granted"],
+        name=result["entity_name"],
+        entity_type=result["entity_type"],
+        denial_reason=result["denial_reason"],
+        direction=result.get("direction", "IN"),
+        reset_ms=4000,
+    )
 
 
 @app.route("/api/scan_qr", methods=["POST"])
@@ -3062,7 +3407,7 @@ def scan_qr_code():
         if pending:
             found_in = "pending"
 
-    print(f"SCAN LOG: {{ code: '{qr_hash}', foundIn: '{found_in}', granted: {result['access_granted']}, entity: '{result['entity_name']}' }}")
+    print(f"SCAN LOG: {{ 'code': '{qr_hash}', 'foundIn': '{found_in}', 'granted': {result['access_granted']}, 'entity': '{result['entity_name']}', 'direction': '{direction}', 'type': '{result['entity_type']}' }}", flush=True)
 
     # Determine status for scanner display
     is_pending = (not result["access_granted"] and found_in == "pending")
@@ -3079,6 +3424,8 @@ def scan_qr_code():
             "open_gate": result["access_granted"],
             "status": scan_status,
             "denial_reason": result["denial_reason"],
+            "parsed_data": result.get("parsed_qr"),
+            "is_unknown": result["entity_name"] == "Unknown" or "Unassigned" in str(result["entity_name"]),
         }
     )
 
@@ -3117,6 +3464,8 @@ def scan_qr_alt():
         "direction": direction,
         "status": "approved" if result["access_granted"] else "denied",
         "denial_reason": result["denial_reason"],
+        "parsed_data": result.get("parsed_qr"),
+        "is_unknown": result["entity_name"] == "Unknown" or "Unassigned" in str(result["entity_name"]),
     })
 
 
@@ -3177,6 +3526,8 @@ def c66_ingest():
         "entity_type": result.get("entity_type", ""),
         "status": "approved" if result["access_granted"] else "denied",
         "denial_reason": result.get("denial_reason"),
+        "parsed_data": result.get("parsed_qr"),
+        "is_unknown": result.get("entity_name") == "Unknown" or "Unassigned" in str(result.get("entity_name", "")),
     })
 
 
@@ -3294,6 +3645,9 @@ def verify_qr_mobile():
     ip_address = request.remote_addr
     user_agent = request.headers.get("User-Agent", "")
 
+    # Parse QR data for extraction
+    parsed_qr = decode_qr_data(qr_hash) if qr_hash else {"format": "none", "raw_data": None}
+    
     # Replicate scan_qr_code logic
     entity = None
     entity_type = None
@@ -3399,6 +3753,7 @@ def verify_qr_mobile():
         scanned_by=scanned_by,
         ip_address=ip_address,
         user_agent=user_agent,
+        parsed_qr_data=json.dumps(parsed_qr) if parsed_qr else None,
         employee_id=entity_id if entity_type == "employee" else None,
         vehicle_id=entity_id if entity_type == "vehicle" else None,
         visitor_id=entity_id if entity_type == "visitor" else None,
@@ -3431,6 +3786,8 @@ def verify_qr_mobile():
         {
             "valid": access_granted,
             "message": "Access granted" if access_granted else denial_reason,
+            "is_unknown": entity_name == "Unknown" or "Unassigned" in str(entity_name),
+            "parsed_data": parsed_qr,
             "data": {
                 "entity_type": entity_type,
                 "entity_name": entity_name,
@@ -3849,6 +4206,18 @@ def export_equipment_pdf():
     )
 
 
+def _get_base_url():
+    """Get the base URL for the system, preferring the configured SiteSetting."""
+    setting = db_session.query(SiteSetting).filter_by(key="system_base_url").first()
+    if setting and setting.value:
+        return setting.value.rstrip('/')
+    
+    # Fallback to current request or local IP
+    try:
+        return request.host_url.rstrip('/')
+    except:
+        return "http://192.168.0.217:8080"
+
 @app.route("/export/equipment/qr-zip")
 @login_required
 @role_required(["admin", "manager"])
@@ -3865,9 +4234,10 @@ def export_equipment_qr_zip():
     with zipfile.ZipFile(zip_buffer, "w") as zf:
         for item in items:
             # Generate QR code if missing or use radio_id as fallback
-            qr_content = item.qr_code or item.radio_id
+            qr_hash = item.qr_code or item.radio_id
+            qr_url = f"{_get_base_url()}/s/{qr_hash}"
             qr = qrcode.QRCode(version=1, box_size=10, border=5)
-            qr.add_data(qr_content)
+            qr.add_data(qr_url)
             qr.make(fit=True)
             img = qr.make_image(fill_color="black", back_color="white")
             
@@ -3900,8 +4270,9 @@ def export_employees_qr_zip():
 
     with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zip_file:
         for emp in employees:
+            qr_url = f"{_get_base_url()}/s/{emp.qr_code}"
             qr = qrcode.QRCode(version=4, box_size=20, border=4)
-            qr.add_data(emp.qr_code)
+            qr.add_data(qr_url)
             qr.make(fit=True)
             img = qr.make_image(fill_color="black", back_color="white")
 
@@ -3937,8 +4308,9 @@ def export_fleet_qr_zip():
 
     with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zip_file:
         for vehicle in vehicles:
+            qr_url = f"{_get_base_url()}/s/{vehicle.qr_code}"
             qr = qrcode.QRCode(version=4, box_size=20, border=4)
-            qr.add_data(vehicle.qr_code)
+            qr.add_data(qr_url)
             qr.make(fit=True)
             qr_img = qr.make_image(fill_color="black", back_color="white").convert("RGB")
 
@@ -4032,7 +4404,7 @@ class HeaderFooterCanvas:
         # Company name and subtitle
         canvas.setFont("Helvetica-Bold", 16)
         canvas.setFillColor(colors.HexColor("#e10600"))
-        canvas.drawString(text_x, doc.pagesize[1] - 35, "Mine Management System")
+        canvas.drawString(text_x, doc.pagesize[1] - 35, "Arch-System")
 
         canvas.setFont("Helvetica", 10)
         canvas.setFillColor(colors.HexColor("#666666"))
@@ -4067,7 +4439,7 @@ class HeaderFooterCanvas:
         # Disclaimer
         canvas.setFont("Helvetica", 8)
         canvas.setFillColor(colors.HexColor("#999999"))
-        disclaimer = "Confidential - Mine Management System - Generated Report"
+        disclaimer = "Confidential - Arch-System - Generated Report"
         canvas.drawCentredString(doc.pagesize[0] / 2, 22, disclaimer)
 
         # Timestamp on right
@@ -4735,31 +5107,46 @@ def get_system_context():
         .count(),
     }
     return (
-        f"You are a helpful assistant for a mine management system. "
+        f"You are a helpful assistant for an Arch-System site management platform. "
         f"The current user is {session.get('username')} with role {session.get('role')}. "
         f"Current system stats: Employees={stats['employees']}, Vehicles={stats['vehicles']}, "
         f"Active Visitors={stats['visitors']}, Pending Approvals={stats['pending_approvals']}. "
-        f"Answer questions concisely and help with mine operations."
+        f"Answer questions concisely and help with site operations."
     )
 
 
 def _ollama_generate(prompt, system_ctx, stream=False, use_full=False):
-    """Call Ollama local AI. Returns full text or streaming response.
+    """Call Ollama AI — routes to cloud or local based on provider.
     use_full=True selects the 3B model for complex analysis."""
     model = OLLAMA_MODEL_FULL if use_full else OLLAMA_MODEL
-    payload = {
-        "model": model,
-        "prompt": prompt,
-        "system": system_ctx,
-        "stream": stream,
-        "keep_alive": "10m",
-    }
-    resp = requests.post(
-        f"{OLLAMA_BASE_URL}/api/generate",
-        json=payload,
-        stream=stream,
-        timeout=120,
-    )
+
+    if _ollama_provider == "cloud":
+        payload = {
+            "model": model,
+            "messages": [{"role": "system", "content": system_ctx}, {"role": "user", "content": prompt}],
+            "stream": stream,
+        }
+        resp = requests.post(
+            f"{OLLAMA_CLOUD_URL}/chat",
+            headers={"Authorization": f"Bearer {OLLAMA_CLOUD_API_KEY}", "Content-Type": "application/json"},
+            json=payload,
+            stream=stream,
+            timeout=120,
+        )
+    else:
+        payload = {
+            "model": model,
+            "prompt": prompt,
+            "system": system_ctx,
+            "stream": stream,
+            "keep_alive": "10m",
+        }
+        resp = requests.post(
+            f"{OLLAMA_BASE_URL}/api/generate",
+            json=payload,
+            stream=stream,
+            timeout=120,
+        )
     resp.raise_for_status()
     return resp
 
@@ -4785,6 +5172,8 @@ def ai_chat():
     try:
         resp = _ollama_generate(user_prompt, get_system_context(), stream=False)
         result = resp.json()
+        if _ollama_provider == "cloud":
+            return jsonify({"response": result.get("message", {}).get("content", "")})
         return jsonify({"response": result.get("response", "")})
     except requests.exceptions.ConnectionError:
         return jsonify({"error": "Cannot reach Ollama. Is it running? (ollama serve)"}), 503
@@ -4820,7 +5209,10 @@ def ai_chat_stream():
             for line in resp.iter_lines():
                 if line:
                     chunk = json.loads(line)
-                    text = chunk.get("response", "")
+                    if _ollama_provider == "cloud":
+                        text = chunk.get("message", {}).get("content", "")
+                    else:
+                        text = chunk.get("response", "")
                     if text:
                         yield f"data: {text}\n\n"
                     if chunk.get("done"):
@@ -5902,7 +6294,7 @@ if __name__ == "__main__":
     NC = "\033[0m"  # No Color
 
     print("=" * 55)
-    print("   Mine Management System - Starting")
+    print("   Arch-System - Starting")
     print("=" * 55)
     print(f"  Port: {main_port}    Scanner: {scanner_port}")
     print("-" * 55)

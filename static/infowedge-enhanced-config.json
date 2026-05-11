@@ -1,0 +1,349 @@
+{
+  "profile_name": "Mine Management Enhanced",
+  "profile_description": "Fine-tuned C66 configuration with advanced fallback and tunnel support",
+  "version": "3.0",
+  "created": "2026-05-07",
+  "target_system": "Mine Management System v2.1.0",
+  "connection_strategy": {
+    "primary": {
+      "type": "direct_http",
+      "url": "http://192.168.0.217:8080/api/c66",
+      "timeout": 5000,
+      "retry_attempts": 3,
+      "priority": 1,
+      "health_check_interval": 10000
+    },
+    "fallback_1": {
+      "type": "alternative_endpoint",
+      "url": "http://192.168.0.217:8080/api/scan_alt",
+      "timeout": 7000,
+      "retry_attempts": 5,
+      "priority": 2,
+      "trigger_on": ["primary_timeout", "primary_error", "connection_lost"]
+    },
+    "fallback_2": {
+      "type": "tunnel_proxy",
+      "url": "http://192.168.0.217:8080/api/c66",
+      "tunnel_config": {
+        "type": "http_tunnel",
+        "backup_server": "http://192.168.0.217:8081",
+        "tunnel_port": 8082,
+        "encryption": "none"
+      },
+      "timeout": 10000,
+      "retry_attempts": 7,
+      "priority": 3,
+      "trigger_on": ["fallback_1_failed", "network_partition"]
+    },
+    "fallback_3": {
+      "type": "mesh_network",
+      "url": "http://192.168.0.217:8080/api/c66",
+      "mesh_nodes": [
+        "192.168.0.217:8080",
+        "192.168.0.217:8081",
+        "192.168.0.217:8082"
+      ],
+      "timeout": 15000,
+      "retry_attempts": 10,
+      "priority": 4,
+      "trigger_on": ["all_direct_failed", "emergency_mode"]
+    }
+  },
+  "fine_tuning": {
+    "connection_optimization": {
+      "adaptive_timeout": true,
+      "base_timeout": 5000,
+      "max_timeout": 15000,
+      "timeout_increment": 1000,
+      "connection_quality_threshold": 0.8,
+      "auto_adjust_retries": true
+    },
+    "buffer_management": {
+      "smart_buffering": true,
+      "base_buffer_size": 200,
+      "max_buffer_size": 1000,
+      "compression_enabled": true,
+      "priority_scans": true,
+      "buffer_flush_triggers": [
+        "connection_restored",
+        "buffer_full_threshold",
+        "time_interval",
+        "emergency_flush"
+      ],
+      "buffer_full_threshold": 0.8,
+      "time_interval_flush": 30000
+    },
+    "health_monitoring": {
+      "continuous_ping": true,
+      "ping_interval": 5000,
+      "latency_tracking": true,
+      "packet_loss_tracking": true,
+      "connection_quality_scoring": true,
+      "auto_failover": true,
+      "health_score_threshold": 0.7
+    },
+    "performance_optimization": {
+      "concurrent_connections": true,
+      "max_concurrent": 3,
+      "connection_pooling": true,
+      "keep_alive": true,
+      "keep_alive_interval": 10000,
+      "compression": "gzip",
+      "batch_scans": true,
+      "batch_size": 10,
+      "batch_timeout": 2000
+    }
+  },
+  "infowedge_settings": {
+    "basic": {
+      "profile_name": "Mine Management Enhanced",
+      "enabled": true,
+      "auto_start": true,
+      "background_mode": true,
+      "crash_recovery": true,
+      "auto_restart": true
+    },
+    "input": {
+      "scanner_device": "C66 Built-in Scanner",
+      "input_source": "Barcode Scanner",
+      "decoder_types": [
+        "QR Code",
+        "Code 128",
+        "Code 39",
+        "EAN-13",
+        "UPC-A",
+        "DataMatrix",
+        "PDF417",
+        "Code 93",
+        "ITF-14"
+      ],
+      "scan_mode": "Continuous",
+      "aim_mode": "Dot",
+      "illumination": "Auto",
+      "decode_timeout": 3000,
+      "scan_sensitivity": "medium",
+      "multi_scan_timeout": 1000
+    },
+    "output": {
+      "output_type": "IP Output",
+      "ip_settings": {
+        "primary_url": "http://192.168.0.217:8080/api/c66",
+        "fallback_urls": [
+          "http://192.168.0.217:8080/api/scan_alt",
+          "http://192.168.0.217:8081/api/c66",
+          "http://192.168.0.217:8082/api/c66"
+        ],
+        "port": 8080,
+        "protocol": "HTTP",
+        "method": "POST",
+        "content_type": "application/json",
+        "compression": "gzip",
+        "timeout": 5000,
+        "retry_attempts": 3,
+        "retry_delay": 1000,
+        "exponential_backoff": true,
+        "max_backoff": 16000,
+        "connection_check_interval": 5000,
+        "failover_enabled": true,
+        "failover_timeout": 3000,
+        "tunnel_mode": {
+          "enabled": true,
+          "backup_tunnel": "http://192.168.0.217:8081",
+          "tunnel_protocol": "HTTP",
+          "auto_switch": true
+        }
+      },
+      "data_format": {
+        "format": "JSON",
+        "compression": "gzip",
+        "field_mapping": {
+          "barcodeData": "{{barcode}}",
+          "barcodeType": "{{barcodeFormat}}",
+          "timestamp": "{{timestamp}}",
+          "device": "{{deviceID}}",
+          "scanner": "C66-Enhanced",
+          "connection_mode": "{{connectionType}}",
+          "pc_target": "192.168.0.217",
+          "fallback_used": "{{fallbackEndpoint}}",
+          "retry_count": "{{retryCount}}",
+          "health_score": "{{connectionHealth}}"
+        }
+      }
+    },
+    "advanced": {
+      "keystroke_output": false,
+      "intent_output": false,
+      "ip_output": true,
+      "buffer_scans": true,
+      "buffer_size": 500,
+      "auto_send_buffer": true,
+      "send_on_connect": true,
+      "heartbeat_interval": 10000,
+      "connection_timeout": 5000,
+      "failover_timeout": 3000,
+      "crash_detection": true,
+      "auto_recovery": true,
+      "performance_monitoring": true,
+      "log_level": "INFO"
+    }
+  },
+  "fallback_mechanism": {
+    "cascade_logic": {
+      "primary_failure_detection": {
+        "timeout_exceeded": true,
+        "connection_refused": true,
+        "dns_failure": true,
+        "network_unreachable": true,
+        "http_error_codes": [500, 502, 503, 504]
+      },
+      "automatic_switching": {
+        "enabled": true,
+        "switch_delay": 1000,
+        "switch_back_delay": 5000,
+        "max_switches_per_minute": 10,
+        "switch_cooldown": 30000
+      },
+      "fallback_prioritization": {
+        "speed_priority": true,
+        "reliability_priority": true,
+        "latency_priority": true,
+        "success_rate_priority": true
+      }
+    },
+    "tunnel_support": {
+      "http_tunnel": {
+        "enabled": true,
+        "backup_servers": [
+          {
+            "url": "http://192.168.0.217:8081/api/c66",
+            "priority": 1,
+            "weight": 1
+          },
+          {
+            "url": "http://192.168.0.217:8082/api/c66",
+            "priority": 2,
+            "weight": 2
+          }
+        ],
+        "load_balancing": true,
+        "health_checks": true,
+        "auto_failover": true
+      },
+      "mesh_network": {
+        "enabled": true,
+        "nodes": [
+          "192.168.0.217:8080",
+          "192.168.0.217:8081",
+          "192.168.0.217:8082"
+        ],
+        "discovery": true,
+        "auto_routing": true,
+        "fault_tolerance": 1
+      }
+    },
+    "recovery_procedures": {
+      "connection_lost": {
+        "action": "switch_to_fallback",
+        "buffer_remaining_scans": true,
+        "retry_primary": true,
+        "max_retry_attempts": 3
+      },
+      "all_endpoints_failed": {
+        "action": "enable_emergency_mode",
+        "buffer_all_scans": true,
+        "local_storage_backup": true,
+        "notification_alert": true
+      },
+      "partial_failure": {
+        "action": "degrade_gracefully",
+        "reduce_buffer_size": true,
+        "increase_timeouts": true,
+        "enable_compression": true
+      }
+    }
+  },
+  "testing": {
+    "comprehensive_test_suite": {
+      "primary_endpoint": {
+        "url": "http://192.168.0.217:8080/api/c66",
+        "test_scenarios": [
+          "normal_operation",
+          "high_load",
+          "timeout_handling",
+          "error_recovery"
+        ]
+      },
+      "fallback_endpoints": {
+        "test_all_fallbacks": true,
+        "simulate_failures": true,
+        "test_switching_logic": true,
+        "validate_tunnel_routing": true
+      },
+      "stress_testing": {
+        "concurrent_scans": true,
+        "max_concurrent": 50,
+        "duration": 300000,
+        "monitor_performance": true
+      }
+    },
+    "validation_steps": [
+      "1. Test primary endpoint under normal conditions",
+      "2. Simulate primary failure and verify fallback activation",
+      "3. Test all fallback endpoints individually",
+      "4. Test tunnel/mesh routing if configured",
+      "5. Perform stress testing with concurrent scans",
+      "6. Validate buffer management and recovery",
+      "7. Test auto-switching logic and timing",
+      "8. Verify emergency mode procedures"
+    ]
+  },
+  "troubleshooting": {
+    "advanced_diagnostics": {
+      "connection_quality_metrics": true,
+      "performance_benchmarks": true,
+      "error_pattern_analysis": true,
+      "automated_recovery_logs": true
+    },
+    "common_issues": [
+      {
+        "problem": "Fallback not triggering",
+        "solution": "Check failure detection thresholds and switch delays"
+      },
+      {
+        "problem": "Tunnel connection failing",
+        "solution": "Verify backup server availability and tunnel configuration"
+      },
+      {
+        "problem": "Buffer overflow during extended outage",
+        "solution": "Increase buffer size or enable compression"
+      },
+      {
+        "problem": "Excessive switching between endpoints",
+        "solution": "Adjust health check intervals and failure thresholds"
+      }
+    ],
+    "log_locations": {
+      "infowedge": "/sdcard/Android/data/com.symbol.datawedge/files/logs/",
+      "connection": "/sdcard/Android/data/com.symbol.datawedge/files/connection.log",
+      "performance": "/sdcard/Android/data/com.symbol.datawedge/files/performance.log",
+      "fallback": "/sdcard/Android/data/com.symbol.datawedge/files/fallback.log",
+      "pc_server": "/home/tim/Desktop/01.mine-management-system/server.log"
+    }
+  },
+  "setup_instructions": {
+    "enhanced_setup": [
+      "1. Download enhanced configuration from web interface",
+      "2. Import into InfoWedge with advanced options",
+      "3. Configure primary endpoint with fine-tuning",
+      "4. Set up fallback endpoints and tunnel support",
+      "5. Enable health monitoring and auto-recovery",
+      "6. Test all failure scenarios and switching logic"
+    ],
+    "tunnel_setup": [
+      "1. Configure backup tunnel server if available",
+      "2. Set up HTTP tunnel routing in InfoWedge",
+      "3. Test tunnel connectivity and failover",
+      "4. Verify load balancing across tunnel nodes"
+    ]
+  }
+}

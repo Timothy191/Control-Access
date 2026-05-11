@@ -3,22 +3,22 @@
 {% block title %}Visitor Management{% endblock %}
 
 {% block breadcrumb %}
-<i class="fas fa-home"></i>
+<i class="ti ti-home"></i>
 <a href="{{ url_for('dashboard') }}">Dashboard</a>
-<i class="fas fa-chevron-right"></i>
+<i class="ti ti-chevron-right"></i>
 <span>Visitors</span>
 {% endblock %}
 
 {% block content %}
 <div class="visitors-section">
     <div class="page-header">
-        <h1><i class="fas fa-id-card"></i> Visitor Management</h1>
+        <h1><i class="ti ti-id-badge"></i> Visitor Management</h1>
         <div class="header-actions">
             <a href="{{ url_for('export_visitors_pdf', status=request.args.get('status', ''), date_from=request.args.get('date_from', ''), date_to=request.args.get('date_to', '')) }}" class="btn btn-primary">
-                <i class="fas fa-file-pdf"></i> PDF
+                <i class="ti ti-file-type-pdf"></i> PDF
             </a>
             <button class="btn btn-primary" id="checkinBtn">
-                <i class="fas fa-sign-in-alt"></i> Check-in Visitor
+                <i class="ti ti-logout"></i> Check-in Visitor
             </button>
         </div>
     </div>
@@ -27,10 +27,10 @@
     <div class="pin-management-card">
         <form method="POST" action="{{ url_for('update_visitor_pin') }}" class="pin-form">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-            <span class="pin-label"><i class="fas fa-key"></i> Visitor Request PIN:</span>
+            <span class="pin-label"><i class="ti ti-key"></i> Visitor Request PIN:</span>
             <input type="text" name="new_pin" value="{{ current_pin }}" class="pin-input" maxlength="20" required title="Visitor Request PIN">
             <button type="submit" class="btn btn-sm btn-primary" onclick="return confirm('Update the visitor request PIN?')">
-                <i class="fas fa-save"></i> Update
+                <i class="ti ti-device-floppy"></i> Update
             </button>
         </form>
     </div>
@@ -57,10 +57,10 @@
         </div>
         <div class="filter-group filter-actions">
             <button type="submit" class="btn btn-primary">
-                <i class="fas fa-filter"></i> Apply
+                <i class="ti ti-filter"></i> Apply
             </button>
             <a href="{{ url_for('visitors') }}" class="btn btn-secondary">
-                <i class="fas fa-times"></i> Clear
+                <i class="ti ti-x"></i> Clear
             </a>
         </div>
     </form>
@@ -113,18 +113,18 @@
                             <span class="status-badge success">Generated</span>
                             {% else %}
                             <a href="{{ url_for('generate_qr_code', entity_type='visitor', entity_id=visitor.id) }}" class="btn btn-sm btn-primary">
-                                <i class="fas fa-qrcode"></i>
+                                <i class="ti ti-qrcode"></i>
                             </a>
                             {% endif %}
                         </td>
                         <td class="actions">
                             {% if visitor.status == 'Checked In' %}
                             <button class="btn-icon success checkout-btn" data-id="{{ visitor.id }}" title="Check Out">
-                                <i class="fas fa-sign-out-alt"></i>
+                                <i class="ti ti-logout"></i>
                             </button>
                             {% endif %}
                             <button class="btn-icon view-btn" data-id="{{ visitor.id }}" title="View Details">
-                                <i class="fas fa-eye"></i>
+                                <i class="ti ti-eye"></i>
                             </button>
                         </td>
                     </tr>
@@ -132,7 +132,7 @@
                     <tr>
                         <td colspan="8">
                             <div class="empty-state">
-                                <i class="fas fa-user-friends"></i>
+                                <i class="ti ti-users"></i>
                                 <p>No visitors in database</p>
                             </div>
                         </td>
@@ -163,9 +163,9 @@
                         <td>{{ log.entity_name or '-' }}</td>
                         <td>
                             {% if log.direction == 'IN' %}
-                            <span class="status-badge success"><i class="fas fa-arrow-right"></i> IN</span>
+                            <span class="status-badge success"><i class="ti ti-arrow-right"></i> IN</span>
                             {% else %}
-                            <span class="status-badge warning"><i class="fas fa-arrow-left"></i> OUT</span>
+                            <span class="status-badge warning"><i class="ti ti-arrow-left"></i> OUT</span>
                             {% endif %}
                         </td>
                         <td>{{ log.gate_location or '-' }}</td>
@@ -183,7 +183,7 @@
                     <tr>
                         <td colspan="6">
                             <div class="empty-state">
-                                <i class="fas fa-history"></i>
+                                <i class="ti ti-history"></i>
                                 <p>No visitor gate logs</p>
                             </div>
                         </td>
@@ -220,13 +220,13 @@
                             <form method="POST" action="{{ url_for('approve_visitor', visitor_id=visitor.id) }}" style="display:inline">
                                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                                 <button type="submit" class="btn btn-sm btn-success" title="Approve" onclick="return confirm('Approve this visitor?')">
-                                    <i class="fas fa-check"></i> Approve
+                                    <i class="ti ti-check"></i> Approve
                                 </button>
                             </form>
                             <form method="POST" action="{{ url_for('reject_visitor', visitor_id=visitor.id) }}" style="display:inline">
                                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                                 <button type="submit" class="btn btn-sm btn-danger" title="Reject" onclick="return confirm('Reject this visitor?')">
-                                    <i class="fas fa-times"></i> Reject
+                                    <i class="ti ti-x"></i> Reject
                                 </button>
                             </form>
                         </td>
@@ -235,7 +235,7 @@
                     <tr>
                         <td colspan="6">
                             <div class="empty-state">
-                                <i class="fas fa-clock"></i>
+                                <i class="ti ti-clock"></i>
                                 <p>No pending visitor requests</p>
                             </div>
                         </td>

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Database Operations Orchestrator
-Automated tasks for the Mine Management System database
+Automated tasks for the Arch-System database
 """
 
 import sqlite3

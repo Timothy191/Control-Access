@@ -3,7 +3,7 @@
 {% block title %}Dashboard{% endblock %}
 
 {% block breadcrumb %}
-<i class="fas fa-home"></i>
+<i class="ti ti-home"></i>
 <a href="{{ url_for('dashboard') }}">Dashboard</a>
 {% endblock %}
 
@@ -11,13 +11,13 @@
 <div class="dashboard">
     <div class="dashboard-header">
         <div class="header-title">
-            <h1><i class="fas fa-tachometer-alt"></i> Control Panel</h1>
+            <h1><i class="ti ti-dashboard"></i> Control Panel</h1>
             <p class="live-status">
                 <span class="live-dot"></span> LIVE — Real‑time telemetry
             </p>
         </div>
         <div class="user-badge">
-            <i class="fas fa-user-circle"></i>
+            <i class="ti ti-user-circle"></i>
             <span>{{ session.username }}</span>
             <span class="role-badge">{{ session.role }}</span>
         </div>
@@ -26,23 +26,23 @@
     <div class="stats-grid">
         <div class="stat-card" data-tooltip="Total active employees on site" data-stat-employees="{{ stats.employees }}">
             <div class="stat-icon blue">
-                <i class="fas fa-users"></i>
+                <i class="ti ti-users"></i>
             </div>
             <div class="stat-info">
                 <h3 id="employeesCount" class="counter-value">0</h3>
                 <p>Total Employees</p>
                 <span class="stat-trend positive">
-                    <i class="fas fa-arrow-up"></i> Active workforce
+                    <i class="ti ti-trending-up"></i> Active workforce
                 </span>
             </div>
             <div class="stat-sparkline">
                 <canvas id="sparkEmployees" width="80" height="30"></canvas>
             </div>
         </div>
-        
+
         <div class="stat-card" data-tooltip="Operational vehicles in fleet" data-stat-vehicles="{{ stats.vehicles }}">
             <div class="stat-icon green">
-                <i class="fas fa-truck"></i>
+                <i class="ti ti-truck"></i>
             </div>
             <div class="stat-info">
                 <h3 id="fleetCount" class="counter-value">0</h3>
@@ -53,10 +53,10 @@
                 <canvas id="sparkFleet" width="80" height="30"></canvas>
             </div>
         </div>
-        
+
         <div class="stat-card" data-tooltip="Currently checked-in visitors" data-stat-visitors="{{ stats.visitors }}">
             <div class="stat-icon orange">
-                <i class="fas fa-id-card"></i>
+                <i class="ti ti-id-badge"></i>
             </div>
             <div class="stat-info">
                 <h3 id="visitorsCount" class="counter-value">0</h3>
@@ -70,7 +70,7 @@
 
         <div class="stat-card" data-tooltip="Total equipment and radio IDs" data-stat-equipment="{{ stats.equipment }}">
             <div class="stat-icon blue">
-                <i class="fas fa-microchip"></i>
+                <i class="ti ti-device-desktop-analytics"></i>
             </div>
             <div class="stat-info">
                 <h3 id="equipmentCount" class="counter-value">0</h3>
@@ -81,10 +81,10 @@
                 <canvas id="sparkEquipment" width="80" height="30"></canvas>
             </div>
         </div>
-        
+
         <div class="stat-card" data-tooltip="Requests awaiting approval" data-stat-pending="{{ stats.pending_approvals }}">
             <div class="stat-icon red">
-                <i class="fas fa-clock"></i>
+                <i class="ti ti-clock"></i>
             </div>
             <div class="stat-info">
                 <h3 id="pendingCount" class="counter-value">0</h3>
@@ -105,15 +105,15 @@
     <div class="alerts-panel">
         {% if alerts.total_critical > 0 %}
         <div class="alert alert-critical">
-            <div class="alert-icon"><i class="fas fa-exclamation-circle"></i></div>
+            <div class="alert-icon"><i class="ti ti-alert-circle"></i></div>
             <div class="alert-content">
                 <strong>EXPIRED Certifications</strong> — Gate access blocked for affected employees
                 <div class="alert-details">
                     {% if alerts.expired_medical > 0 %}
-                    <span class="alert-item"><i class="fas fa-heartbeat"></i> {{ alerts.expired_medical }} expired medical</span>
+                    <span class="alert-item"><i class="ti ti-heartbeat"></i> {{ alerts.expired_medical }} expired medical</span>
                     {% endif %}
                     {% if alerts.expired_induction > 0 %}
-                    <span class="alert-item"><i class="fas fa-graduation-cap"></i> {{ alerts.expired_induction }} expired induction</span>
+                    <span class="alert-item"><i class="ti ti-school"></i> {{ alerts.expired_induction }} expired induction</span>
                     {% endif %}
                 </div>
             </div>
@@ -122,15 +122,15 @@
         {% endif %}
         {% if alerts.total_warning > 0 %}
         <div class="alert alert-warning">
-            <div class="alert-icon"><i class="fas fa-exclamation-triangle"></i></div>
+            <div class="alert-icon"><i class="ti ti-alert-triangle"></i></div>
             <div class="alert-content">
                 <strong>Expiring within 30 days</strong> — Renew to avoid gate denials
                 <div class="alert-details">
                     {% if alerts.expiring_medical > 0 %}
-                    <span class="alert-item"><i class="fas fa-heartbeat"></i> {{ alerts.expiring_medical }} medical expiring</span>
+                    <span class="alert-item"><i class="ti ti-heartbeat"></i> {{ alerts.expiring_medical }} medical expiring</span>
                     {% endif %}
                     {% if alerts.expiring_induction > 0 %}
-                    <span class="alert-item"><i class="fas fa-graduation-cap"></i> {{ alerts.expiring_induction }} induction expiring</span>
+                    <span class="alert-item"><i class="ti ti-school"></i> {{ alerts.expiring_induction }} induction expiring</span>
                     {% endif %}
                 </div>
             </div>
@@ -142,15 +142,15 @@
 
     <div class="card recent-activity">
         <div class="card-header">
-            <h3><i class="fas fa-history"></i> Recent Activity</h3>
+            <h3><i class="ti ti-history"></i> Recent Activity</h3>
             <span class="live-indicator"><span class="live-dot"></span> Live</span>
         </div>
         <div class="card-body">
             <div id="recentActivityLoader" class="activity-loader">
-                <i class="fas fa-spinner fa-spin"></i> Loading...
+                <i class="ti ti-loader"></i> Loading...
             </div>
             <div id="recentActivityEmpty" class="activity-empty" style="display:none;">
-                <i class="fas fa-qrcode"></i> No scans recorded today
+                <i class="ti ti-qrcode"></i> No scans recorded today
             </div>
             <table id="recentActivityTable" class="activity-table" style="display:none;">
                 <thead>
@@ -169,11 +169,10 @@
         </div>
     </div>
 
-    <!-- Gate Scan Activity Chart (WebGL) -->
     <div class="card gate-chart">
         <div class="card-header">
-            <h3><i class="fas fa-chart-bar"></i> Gate Scans — Last 24 Hours</h3>
-            <span class="badge badge-gpu"><i class="fas fa-microchip"></i> WebGL</span>
+            <h3><i class="ti ti-chart-bar"></i> Gate Scans — Last 24 Hours</h3>
+            <span class="badge badge-gpu"><i class="ti ti-device-desktop-analytics"></i> Chart.js</span>
         </div>
         <div class="card-body" style="position:relative; padding: 0;">
             <canvas id="gateBarChart" width="800" height="180" style="width:100%; height:180px;"></canvas>
@@ -181,10 +180,9 @@
     </div>
 
     <div class="dashboard-grid">
-        <!-- On-Site Gauge -->
         <div class="card on-site-gauge">
             <div class="card-header">
-                <h3><i class="fas fa-map-marker-alt"></i> On Site Now</h3>
+                <h3><i class="ti ti-map-pin"></i> On Site Now</h3>
             </div>
             <div class="card-body" style="display:flex; align-items:center; justify-content:center;">
                 <canvas id="onSiteGauge" width="200" height="120"></canvas>
@@ -193,29 +191,29 @@
 
         <div class="card quick-actions">
             <div class="card-header">
-                <h3><i class="fas fa-bolt"></i> Quick Actions</h3>
+                <h3><i class="ti ti-bolt"></i> Quick Actions</h3>
             </div>
             <div class="card-body">
                 <div class="action-buttons">
                     <a href="{{ url_for('employees') }}" class="btn btn-primary">
-                        <i class="fas fa-user-plus"></i> Add Employee
+                        <i class="ti ti-user-plus"></i> Add Employee
                     </a>
                     <a href="{{ url_for('fleet') }}" class="btn btn-primary">
-                        <i class="fas fa-truck"></i> Add Vehicle
+                        <i class="ti ti-truck"></i> Add Vehicle
                     </a>
                     <a href="{{ url_for('visitors') }}" class="btn btn-primary">
-                        <i class="fas fa-id-card"></i> Check-in Visitor
+                        <i class="ti ti-id-badge"></i> Check-in Visitor
                     </a>
                     <a href="{{ url_for('pending_approvals') }}" class="btn btn-primary">
-                        <i class="fas fa-check-circle"></i> Review Approvals
+                        <i class="ti ti-check-circle"></i> Review Approvals
                     </a>
                 </div>
             </div>
         </div>
-        
+
         <div class="card system-status">
             <div class="card-header">
-                <h3><i class="fas fa-info-circle"></i> System Status</h3>
+                <h3><i class="ti ti-info-circle"></i> System Status</h3>
             </div>
             <div class="card-body">
                 <div class="status-item">
@@ -231,8 +229,7 @@
                     <span id="rendererBadge" class="status-badge">—</span>
                 </div>
                 <div class="status-item">
-                    <span>System Version</span>
-                    <span>2.1.0</span>
+                    <span>{{ version }}</span>
                 </div>
                 <div class="status-item">
                     <span>Live Mode</span>
@@ -251,30 +248,30 @@
 
         <div class="card export-reports">
             <div class="card-header">
-                <h3><i class="fas fa-download"></i> Export Reports</h3>
+                <h3><i class="ti ti-download"></i> Export Reports</h3>
             </div>
             <div class="card-body">
                 <div class="action-buttons">
                     <a href="{{ url_for('export_employees_excel') }}" class="btn btn-secondary">
-                        <i class="fas fa-users"></i> Employees (Excel)
+                        <i class="ti ti-users"></i> Employees (Excel)
                     </a>
                     <a href="{{ url_for('export_employees_pdf') }}" class="btn btn-secondary">
-                        <i class="fas fa-file-pdf"></i> Employees (PDF)
+                        <i class="ti ti-file-type-pdf"></i> Employees (PDF)
                     </a>
                     <a href="{{ url_for('export_visitors_excel') }}" class="btn btn-secondary">
-                        <i class="fas fa-id-card"></i> Visitors (Excel)
+                        <i class="ti ti-id-badge"></i> Visitors (Excel)
                     </a>
                     <a href="{{ url_for('export_visitors_pdf') }}" class="btn btn-secondary">
-                        <i class="fas fa-file-pdf"></i> Visitors (PDF)
+                        <i class="ti ti-file-type-pdf"></i> Visitors (PDF)
                     </a>
                     <a href="{{ url_for('export_fleet_excel') }}" class="btn btn-secondary">
-                        <i class="fas fa-truck"></i> Fleet (Excel)
+                        <i class="ti ti-truck"></i> Fleet (Excel)
                     </a>
                     <a href="{{ url_for('export_gate_logs_excel') }}" class="btn btn-secondary">
-                        <i class="fas fa-qrcode"></i> Gate Logs (Excel)
+                        <i class="ti ti-qrcode"></i> Gate Logs (Excel)
                     </a>
                     <a href="{{ url_for('export_gate_logs_pdf') }}" class="btn btn-secondary">
-                        <i class="fas fa-file-pdf"></i> Gate Logs (PDF)
+                        <i class="ti ti-file-type-pdf"></i> Gate Logs (PDF)
                     </a>
                 </div>
             </div>
@@ -283,7 +280,6 @@
 </div>
 
 <script>
-    // Helper to animate numbers
     function animateNumber(element, finalValue, duration = 800) {
         if (!element) return;
         const start = 0;
@@ -300,34 +296,31 @@
         requestAnimationFrame(update);
     }
 
-    // Read stats from data attributes
     const employeesCard = document.querySelector('[data-stat-employees]');
     const vehiclesCard = document.querySelector('[data-stat-vehicles]');
     const visitorsCard = document.querySelector('[data-stat-visitors]');
     const equipmentCard = document.querySelector('[data-stat-equipment]');
     const pendingCard = document.querySelector('[data-stat-pending]');
-    
+
     const employeesCount = parseInt(employeesCard?.getAttribute('data-stat-employees') || 0);
     const fleetCount = parseInt(vehiclesCard?.getAttribute('data-stat-vehicles') || 0);
     const visitorsCount = parseInt(visitorsCard?.getAttribute('data-stat-visitors') || 0);
     const equipmentCount = parseInt(equipmentCard?.getAttribute('data-stat-equipment') || 0);
     const pendingCount = parseInt(pendingCard?.getAttribute('data-stat-pending') || 0);
 
-    // Animate counters after DOM loads
     document.addEventListener('DOMContentLoaded', function() {
         const empElem = document.getElementById('employeesCount');
         const fleetElem = document.getElementById('fleetCount');
         const visitorElem = document.getElementById('visitorsCount');
         const equipmentElem = document.getElementById('equipmentCount');
         const pendingElem = document.getElementById('pendingCount');
-        
+
         if (empElem) animateNumber(empElem, employeesCount, 800);
         if (fleetElem) animateNumber(fleetElem, fleetCount, 800);
         if (visitorElem) animateNumber(visitorElem, visitorsCount, 800);
         if (equipmentElem) animateNumber(equipmentElem, equipmentCount, 800);
         if (pendingElem) animateNumber(pendingElem, pendingCount, 800);
-        
-        // Progress ring for approvals
+
         const target = 20;
         const percent = Math.min(100, Math.round((pendingCount / target) * 100));
         const circumference = 2 * Math.PI * 28;
@@ -341,13 +334,11 @@
         if (percentSpan) percentSpan.textContent = percent + '%';
     });
 
-    // Load real 7-day sparkline data + gate chart from API
     async function loadDashboardCharts() {
         try {
             const resp = await fetch('/api/dashboard/stats_history');
             const data = await resp.json();
 
-            // WebGL sparklines (falls back to Canvas2D if no WebGL2)
             if (typeof glSparkline === 'function') {
                 glSparkline('sparkEmployees', data.sparklines.employees, '#e10600');
                 glSparkline('sparkFleet', data.sparklines.fleet, '#e10600');
@@ -355,26 +346,22 @@
                 glSparkline('sparkEquipment', data.sparklines.equipment, '#2196f3');
             }
 
-            // Gate scan bar chart (WebGL)
             if (typeof glBarChart === 'function') {
                 glBarChart('gateBarChart', data.gate_hours.labels, data.gate_hours.values, '#e10600');
+            } else if (typeof Chart !== 'undefined') {
+                renderGateChartJS(data.gate_hours.labels, data.gate_hours.values);
             }
 
-            // On-site gauge
             if (typeof drawOnSiteGauge === 'function') {
                 drawOnSiteGauge('onSiteGauge', data.on_site, data.capacity || 500);
             }
 
-            // Renderer badge
             const rBadge = document.getElementById('rendererBadge');
             if (rBadge) {
-                const testCanvas = document.createElement('canvas');
-                const hasWebGL = !!testCanvas.getContext('webgl2');
-                rBadge.textContent = hasWebGL ? 'WebGL2 GPU' : 'Canvas2D';
-                rBadge.classList.add(hasWebGL ? 'success' : '');
+                rBadge.textContent = typeof Chart !== 'undefined' ? 'Chart.js v4' : 'Canvas2D';
+                rBadge.classList.add('success');
             }
         } catch (e) {
-            // Fallback static sparklines
             const fallback = [10, 12, 14, 13, 15, 16, 18];
             if (typeof glSparkline === 'function') {
                 glSparkline('sparkEmployees', fallback, '#e10600');
@@ -385,7 +372,52 @@
         }
     }
 
-    // AI status check
+    function renderGateChartJS(labels, values) {
+        const ctx = document.getElementById('gateBarChart');
+        if (!ctx) return;
+        new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: labels,
+                datasets: [{
+                    label: 'Gate Scans',
+                    data: values,
+                    backgroundColor: 'rgba(225, 6, 0, 0.7)',
+                    borderColor: '#e10600',
+                    borderWidth: 1,
+                    borderRadius: 4,
+                    borderSkipped: false,
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        backgroundColor: 'rgba(20,20,20,0.95)',
+                        titleColor: '#fff',
+                        bodyColor: '#a0a0a0',
+                        borderColor: '#2a2a2a',
+                        borderWidth: 1,
+                        padding: 10,
+                        cornerRadius: 8,
+                    }
+                },
+                scales: {
+                    x: {
+                        grid: { color: 'rgba(255,255,255,0.05)' },
+                        ticks: { color: '#a0a0a0', font: { size: 10 } }
+                    },
+                    y: {
+                        grid: { color: 'rgba(255,255,255,0.05)' },
+                        ticks: { color: '#a0a0a0' }
+                    }
+                }
+            }
+        });
+    }
+
     async function checkAIStatus() {
         const badge = document.getElementById('aiStatus');
         if (!badge) return;
@@ -400,13 +432,11 @@
         }
     }
 
-    // Initialize charts after DOM loads
     document.addEventListener('DOMContentLoaded', function() {
         loadDashboardCharts();
         checkAIStatus();
     });
 
-    // Real-time timestamp
     function updateTimestamp() {
         const now = new Date();
         const timeStr = now.toLocaleTimeString();
@@ -416,7 +446,6 @@
     updateTimestamp();
     setInterval(updateTimestamp, 1000);
 
-    // Recent Activity
     async function loadRecentActivity() {
         try {
             const response = await fetch('/api/recent_activity');
@@ -469,7 +498,7 @@
 
         const row = document.createElement('tr');
         row.className = log.granted ? 'activity-granted' : 'activity-denied';
-        row.style.backgroundColor = log.granted ? 'rgba(0, 200, 0, 0.1)' : 'rgba(255, 0, 0, 0.1)';
+        row.style.backgroundColor = log.granted ? 'rgba(0, 200, 83, 0.1)' : 'rgba(255, 0, 0, 0.1)';
         row.innerHTML = `
             <td>${log.time}</td>
             <td>${escapeHtml(log.name)}</td>
@@ -492,8 +521,8 @@
     }
 
     function setupSocketActivity() {
-        if (typeof socket !== 'undefined' && socket) {
-            socket.on('gate_scan', function(data) {
+        if (window.socket) {
+            window.socket.on('gate_scan', function(data) {
                 addRecentActivity(data);
             });
         }
@@ -501,10 +530,19 @@
 
     document.addEventListener('DOMContentLoaded', function() {
         loadRecentActivity();
-        if (typeof socket !== 'undefined') {
+        if (window.socket) {
             setupSocketActivity();
         } else {
-            setTimeout(setupSocketActivity, 1000);
+            // Fallback for race conditions
+            let retry = 0;
+            const checkSocket = setInterval(() => {
+                retry++;
+                if (window.socket) {
+                    setupSocketActivity();
+                    clearInterval(checkSocket);
+                }
+                if (retry > 10) clearInterval(checkSocket);
+            }, 500);
         }
     });
 
