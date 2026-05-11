@@ -1,0 +1,31 @@
+[Unit]
+Description=Mine Management System
+After=network.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=www-data
+Group=www-data
+WorkingDirectory=/opt/mine-management
+EnvironmentFile=/opt/mine-management/.env
+ExecStart=/opt/mine-management/venv/bin/gunicorn -c gunicorn.conf.py "app:app"
+ExecReload=/bin/kill -HUP $MAINPID
+KillMode=mixed
+TimeoutStopSec=30
+Restart=always
+RestartSec=5
+
+# Security hardening
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ReadWritePaths=/opt/mine-management
+
+# Logging goes to journald — view with: journalctl -u mine-management -f
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=mine-management
+
+[Install]
+WantedBy=multi-user.target

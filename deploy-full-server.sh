@@ -143,9 +143,6 @@ fi
 echo -en "  ${DIM}Installing requirements...${NC}"
 "$VENV_DIR/bin/pip" install -q --upgrade pip
 "$VENV_DIR/bin/pip" install -q -r "$PROJECT_DIR/requirements.txt" rich psutil plotext 2>/dev/null
-if [ -f "$PROJECT_DIR/test_requirements.txt" ]; then
-    "$VENV_DIR/bin/pip" install -q -r "$PROJECT_DIR/test_requirements.txt" 2>/dev/null
-fi
 echo -e " ${GREEN}✓ DONE${NC}"
 
 if [ -d "$PROJECT_DIR/QrMobile" ] && [ ! -d "$PROJECT_DIR/QrMobile/node_modules" ]; then
@@ -214,17 +211,17 @@ if [ "$USE_TERMINAL" = true ]; then
         --working-directory="$PROJECT_DIR" \
         -- bash -c "source venv/bin/activate && python3 log_viewer.py" 2>/dev/null &
     
-    # Terminal 2: Monitor
+    # Terminal 2: Main App (gunicorn)
     gnome-terminal \
-        --title="[2] Mine System - Monitor" \
+        --title="[2] Mine System - App Server" \
+        --working-directory="$PROJECT_DIR" \
+        -- bash -c "source venv/bin/activate && gunicorn -c gunicorn.conf.py app:app 2>&1 | tee server.log" 2>/dev/null &
+    
+    # Terminal 3: Monitor
+    gnome-terminal \
+        --title="[3] Mine System - Monitor" \
         --working-directory="$PROJECT_DIR" \
         -- bash -c "source venv/bin/activate && python3 monitor.py" 2>/dev/null &
-    
-    # Terminal 3: Scan Ingestion
-    gnome-terminal \
-        --title="[3] Mine System - Ingestion" \
-        --working-directory="$PROJECT_DIR" \
-        -- bash -c "source venv/bin/activate && python3 scan_ingestion.py" 2>/dev/null &
     
     # Terminal 4: Mobile (if exists)
     if [ -d "$PROJECT_DIR/QrMobile" ]; then
@@ -242,8 +239,8 @@ else
     tmux new-session -d -s "$SESSION_NAME" -n "GRID" -x 200 -y 50
     
     # Window 1: GRID LAYOUT (2x2)
-    # Pane 1: Monitor
-    tmux send-keys -t "$SESSION_NAME:GRID.0" "cd '$PROJECT_DIR' && source venv/bin/activate && python3 monitor.py" Enter
+    # Pane 1: App Server (gunicorn)
+    tmux send-keys -t "$SESSION_NAME:GRID.0" "cd '$PROJECT_DIR' && source venv/bin/activate && gunicorn -c gunicorn.conf.py app:app 2>&1 | tee server.log" Enter
     # Pane 2: App Logs
     tmux split-window -h -t "$SESSION_NAME:GRID.0"
     tmux send-keys -t "$SESSION_NAME:GRID.1" "echo -e '${BOLD}${CYAN}━━━ App Log Stream ━━━${NC}' && tail -f server.log" Enter
@@ -283,7 +280,7 @@ fi
 step "Waiting for API Readiness"
 READY=0
 for i in $(seq 1 30); do
-    if curl -sf "http://localhost:$APP_PORT" >/dev/null 2>&1; then
+    if curl -sf "http://localhost:$APP_PORT/healthz" >/dev/null 2>&1; then
         READY=1
         break
     fi

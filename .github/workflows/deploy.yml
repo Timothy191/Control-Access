@@ -39,17 +39,20 @@ jobs:
               ollama create mine-assistant -f Modelfile.mine 2>/dev/null || true
             fi
 
+            # Install gunicorn/eventlet if needed
+            pip install -q gunicorn eventlet
+
             # Restart services
-            pkill -f "python.*app.py" || true
+            pkill -f "gunicorn.*app:app" || pkill -f "python.*app.py" || true
             sleep 2
 
-            # Start app with optional cloud AI
-            nohup python3 app.py > server.log 2>&1 &
-            sleep 3
+            # Start app with gunicorn (production WSGI server)
+            nohup gunicorn -c gunicorn.conf.py "app:app" > server.log 2>&1 &
+            sleep 4
 
             # Health check with retry
-            for i in 1 2 3; do
-              curl -sf http://localhost:8080/ > /dev/null && echo "Deploy successful" && break
-              sleep 2
+            for i in 1 2 3 4 5; do
+              curl -sf http://localhost:8080/healthz > /dev/null && echo "Deploy successful" && break
+              sleep 3
             done
-            curl -sf http://localhost:8080/ > /dev/null || echo "Deploy failed - check server.log"
+            curl -sf http://localhost:8080/healthz > /dev/null || echo "Deploy failed - check server.log"

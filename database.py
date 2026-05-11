@@ -58,21 +58,36 @@ def init_db():
 
     admin = db_session.query(User).filter_by(username="admin").first()
     if not admin:
+        _admin_password = os.environ.get("ADMIN_PASSWORD", "")
+        if not _admin_password:
+            import secrets
+            _admin_password = secrets.token_urlsafe(16)
+            print(
+                f"\n{'='*60}\n"
+                f"  DEFAULT ADMIN PASSWORD (one-time, change immediately):\n"
+                f"  Username: admin\n"
+                f"  Password: {_admin_password}\n"
+                f"  Set ADMIN_PASSWORD in .env to control this value.\n"
+                f"{'='*60}\n"
+            )
         admin = User(username="admin", role="admin")
-        admin.set_password("admin")
+        admin.set_password(_admin_password)
         db_session.add(admin)
         db_session.commit()
-        print("Default admin user created (username: admin)")
+        print("Default admin user created")
 
     # Seed default visitor request PIN if it doesn't exist
     from models import SiteSetting
 
     pin = db_session.query(SiteSetting).filter_by(key="visitor_request_pin").first()
     if not pin:
-        pin = SiteSetting(key="visitor_request_pin", value="1234")
+        _default_pin = os.environ.get("VISITOR_PIN", "1234")
+        pin = SiteSetting(key="visitor_request_pin", value=_default_pin)
         db_session.add(pin)
         db_session.commit()
         print("Default visitor request PIN configured")
+        if _default_pin == "1234":
+            print("WARNING: Visitor PIN is set to default '1234'. Change it in Admin > Visitors.")
 
 
 @event.listens_for(engine, "close")

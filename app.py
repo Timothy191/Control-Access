@@ -16,6 +16,8 @@ from database import init_db, db_session, engine, Base
 from models import User, Employee, Vehicle, Visitor, Approval, GateLog, Device, Equipment, SiteSetting, AuditLog, GateMapping
 from datetime import datetime, timedelta, timezone
 from functools import wraps
+import logging
+import logging.handlers
 
 
 def _utcnow():
@@ -24,6 +26,7 @@ def _utcnow():
 
 import io
 import json
+import re
 import openpyxl
 import qrcode
 import barcode
@@ -71,12 +74,46 @@ try:
 except ImportError:
     pass  # python-dotenv not installed, use system environment variables
 
+# ------------------- Structured Logging -------------------
+_LOG_LEVEL = os.environ.get("LOG_LEVEL", "INFO").upper()
+_LOG_FILE = os.environ.get("LOG_FILE", "")
+
+logging.basicConfig(
+    level=getattr(logging, _LOG_LEVEL, logging.INFO),
+    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S",
+)
+logger = logging.getLogger("mine_system")
+
+if _LOG_FILE:
+    _handler = logging.handlers.RotatingFileHandler(
+        _LOG_FILE, maxBytes=10 * 1024 * 1024, backupCount=5
+    )
+    _handler.setFormatter(logging.Formatter(
+        "%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S",
+    ))
+    logger.addHandler(_handler)
+
+# ------------------- App Init -------------------
+_secret_key = os.environ.get("SECRET_KEY")
+_is_production = os.environ.get("FLASK_ENV", "production").lower() == "production"
+if not _secret_key:
+    if _is_production:
+        raise RuntimeError(
+            "SECRET_KEY environment variable is not set. "
+            "Generate one with: python -c \"import secrets; print(secrets.token_hex(32))\" "
+            "and add it to your .env file."
+        )
+    _secret_key = os.urandom(24).hex()
+    logger.warning("SECRET_KEY not set — using random key (sessions reset on restart). Set SECRET_KEY in .env")
+
 app = Flask(__name__)
-app.secret_key = os.environ.get("SECRET_KEY") or os.urandom(24).hex()
+app.secret_key = _secret_key
 app.permanent_session_lifetime = timedelta(minutes=30)
 app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
 app.config["SESSION_COOKIE_HTTPONLY"] = True
-app.config["SESSION_COOKIE_SECURE"] = True  # Requires HTTPS
+app.config["SESSION_COOKIE_SECURE"] = os.environ.get("HTTPS", "false").lower() == "true"
 app.config["WTF_CSRF_TIME_LIMIT"] = 3600  # 1 hour CSRF token validity
 app.config["SEND_FILE_MAX_AGE_DEFAULT"] = 43200  # 12 hour static asset cache
 
@@ -124,7 +161,7 @@ limiter = Limiter(get_remote_address, app=app, default_limits=[], storage_uri="m
 _cors_origins = os.environ.get("CORS_ORIGINS", "*")  # Set CORS_ORIGINS env var to restrict
 CORS(app, resources={r"/api/*": {"origins": _cors_origins.split(",") if _cors_origins != "*" else "*", "methods": ["GET", "POST", "OPTIONS"], "allow_headers": ["Content-Type", "X-API-Key", "X-CSRFToken"], "supports_credentials": True}})
 
-socketio = SocketIO(app, cors_allowed_origins="*")
+socketio = SocketIO(app, cors_allowed_origins=_cors_origins.split(",") if _cors_origins != "*" else "*")
 
 # Custom Jinja2 filters
 @app.template_filter('from_json')
@@ -433,13 +470,11 @@ def start_packet_sniffer():
                         # This is a simplified approach - checks for common QR formats
                         payload_str = payload.decode('utf-8', errors='ignore')
                         
-                        # Check for common patterns: EMP:, VEH:, VIS:, or plain alphanumeric
-                        import re
+                        # Only match structured QR prefixes — bare alphanumeric removed (caused false positives)
                         patterns = [
                             r'EMP[:\s]+([A-Z0-9]{4,20})',
                             r'VEH[:\s]+([A-Z0-9]{4,20})',
                             r'VIS[:\s]+([A-Z0-9]{4,20})',
-                            r'^([A-Z0-9]{6,20})$',
                         ]
                         
                         for pattern in patterns:
@@ -528,11 +563,12 @@ def require_api_key(f):
     @wraps(f)
     def decorated(*args, **kwargs):
         key = request.headers.get("X-API-Key")
-        valid_keys = [
-            os.environ.get("HARDWARE_API_KEY", "018fa069c0fbee297710c885133f8b75400ff563d223b6b38b59496d864e2d68"),
-            "ab22b3e234e5cc2f6a9377490da6be0c",  # Mobile app key
-            "your-secret-hardware-key",  # Test/development key
-        ]
+        _hardware_key = os.environ.get("HARDWARE_API_KEY", "")
+        _mobile_key = os.environ.get("MOBILE_API_KEY", "")
+        valid_keys = [k for k in [_hardware_key, _mobile_key] if k]
+        if not valid_keys:
+            logger.warning("HARDWARE_API_KEY not configured — API key auth is disabled. Set HARDWARE_API_KEY in .env")
+            return f(*args, **kwargs)
         if not key or key not in valid_keys:
             return jsonify({"error": "Invalid API key"}), 401
         return f(*args, **kwargs)
@@ -692,7 +728,7 @@ def gate_mappings():
     # Get unique IPs from recent gate logs that aren't mapped yet
     recent_ips = db_session.query(GateLog.ip_address, GateLog.scanned_by).filter(
         GateLog.ip_address.isnot(None),
-        GateLog.scanned_at >= datetime.utcnow().replace(day=1)  # This month
+        GateLog.scanned_at >= _utcnow().replace(day=1, hour=0, minute=0, second=0)  # This month
     ).distinct().all()
     
     # Filter out already mapped IPs
@@ -3430,10 +3466,21 @@ def scan_qr_code():
     )
 
 
+_LOCAL_PREFIXES = ('192.168.', '10.', '172.', '127.')
+
+
+def _is_local_ip(ip):
+    """Return True if the IP belongs to a RFC-1918 / loopback range."""
+    return any(ip.startswith(p) for p in _LOCAL_PREFIXES)
+
+
 @app.route("/api/scan_alt", methods=["POST"])
+@limiter.limit("120 per minute")
 def scan_qr_alt():
-    """Alternative QR scanner endpoint - no API key required, accepts JSON or plain text."""
+    """Alternative QR scanner endpoint - no API key required, local network only."""
     ip_address = request.remote_addr
+    if not _is_local_ip(ip_address):
+        return jsonify({"success": False, "message": "Local network only"}), 403
     user_agent = request.headers.get("User-Agent", "InfoWedge")
     content_type = request.content_type or ""
 
@@ -3549,8 +3596,9 @@ def message_endpoint():
 
 
 @app.route("/api/scan", methods=["POST"])
+@limiter.limit("120 per minute")
 def scan_http():
-    """Simple HTTP scan endpoint - supports JSON, form data, and plain text.
+    """Simple HTTP scan endpoint - supports JSON, form data, and plain text. Local network only.
     
     Allows scanners like InfoWedge to send scans via HTTP POST without configuration.
     Supports:
@@ -3560,6 +3608,9 @@ def scan_http():
     
     InfoWedge TCP/IP Output typically sends plain text.
     """
+    ip_address = request.remote_addr
+    if not _is_local_ip(ip_address):
+        return jsonify({"success": False, "message": "Local network only"}), 403
     qr_code = None
     content_type = request.headers.get("Content-Type", "")
     
@@ -3597,7 +3648,6 @@ def scan_http():
         direction = "IN"
         gate_location = "Main Gate"
     
-    ip_address = request.remote_addr
     _ensure_device_exists(ip_address)
     
     scanned_by = "info-wedge"
@@ -4215,8 +4265,15 @@ def _get_base_url():
     # Fallback to current request or local IP
     try:
         return request.host_url.rstrip('/')
-    except:
-        return "http://192.168.0.217:8080"
+    except Exception:
+        try:
+            s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            s.connect(('8.8.8.8', 80))
+            _ip = s.getsockname()[0]
+            s.close()
+            return f"http://{_ip}:8080"
+        except Exception:
+            return "http://localhost:8080"
 
 @app.route("/export/equipment/qr-zip")
 @login_required
@@ -4825,6 +4882,7 @@ def export_visitors_pdf():
 @app.route("/import/employees", methods=["POST"])
 @login_required
 @role_required(["admin", "manager"])
+@limiter.limit("10 per minute")
 def import_employees():
     """Import employees from Excel or CSV file."""
     if "file" not in request.files:
@@ -4960,6 +5018,7 @@ def import_employees():
 @app.route("/import/vehicles", methods=["POST"])
 @login_required
 @role_required(["admin", "manager"])
+@limiter.limit("10 per minute")
 def import_vehicles():
     """Import vehicles from Excel or CSV file."""
     if "file" not in request.files:
@@ -5153,6 +5212,7 @@ def _ollama_generate(prompt, system_ctx, stream=False, use_full=False):
 
 @app.route("/api/ai/chat", methods=["POST"])
 @login_required
+@limiter.limit("20 per minute")
 def ai_chat():
     """API endpoint for AI chat - returns full response (non-streaming fallback)."""
     global _ollama_checked
@@ -5183,6 +5243,7 @@ def ai_chat():
 
 @app.route("/api/ai/chat/stream", methods=["POST"])
 @login_required
+@limiter.limit("20 per minute")
 def ai_chat_stream():
     """Streaming endpoint for real-time AI chat responses via Ollama."""
     global _ollama_checked
@@ -5646,6 +5707,51 @@ def parse_log_line(line):
             result["status_code"] = int(http_match.group(3))
     
     return result
+
+
+# ------------------- Health Check -------------------
+@app.route("/healthz")
+def healthz():
+    """Lightweight health-check endpoint for load balancers and uptime monitors."""
+    try:
+        db_session.execute(__import__("sqlalchemy").text("SELECT 1"))
+        db_ok = True
+    except Exception:
+        db_ok = False
+    status = "ok" if db_ok else "degraded"
+    code = 200 if db_ok else 503
+    return jsonify({"status": status, "version": __version__, "db": "ok" if db_ok else "error"}), code
+
+
+# ------------------- Database Backup -------------------
+@app.route("/admin/backup/download")
+@login_required
+@role_required(["admin"])
+def backup_download():
+    """Download a live SQLite backup of the database."""
+    import shutil
+    import tempfile
+    from database import database_path
+    backup_tmp = tempfile.NamedTemporaryFile(suffix=".db", delete=False)
+    backup_tmp.close()
+    try:
+        import sqlite3
+        src_conn = sqlite3.connect(database_path)
+        dst_conn = sqlite3.connect(backup_tmp.name)
+        src_conn.backup(dst_conn)
+        src_conn.close()
+        dst_conn.close()
+        timestamp = _utcnow().strftime("%Y%m%d_%H%M%S")
+        log_audit("backup", "database", None, f"Database backup downloaded by {session.get('username')}")
+        return send_file(
+            backup_tmp.name,
+            as_attachment=True,
+            download_name=f"mine_management_backup_{timestamp}.db",
+            mimetype="application/octet-stream",
+        )
+    except Exception as e:
+        logger.error(f"Backup download failed: {e}")
+        return jsonify({"error": "Backup failed", "message": str(e)}), 500
 
 
 # ------------------- Teardown -------------------
@@ -6299,7 +6405,6 @@ if __name__ == "__main__":
     print(f"  Port: {main_port}    Scanner: {scanner_port}")
     print("-" * 55)
     print(f"  {BOLD}{GREEN}➜ Website: {CYAN}{server_url}{NC}")
-    print(f"  {BOLD}  Login:   admin / admin{NC}")
     print("-" * 55)
 
     # Start secondary scanner server on dynamic port
@@ -6329,6 +6434,6 @@ if __name__ == "__main__":
         debug=False,
         use_reloader=False,
         host="0.0.0.0",
-        port=8080,  # Main server on 8080
+        port=8080,
         allow_unsafe_werkzeug=True,
     )

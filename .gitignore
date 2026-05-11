@@ -64,12 +64,14 @@ htmlcov/
 .coverage
 coverage.xml
 
-# Backup/temp scripts
+# Backup/temp scripts and editor artifacts
 *.backup
 *.backup2
 *.before_edit
 *.current
 *.working
+*.bak
+*.bak2
 cookies.txt
 ba.txt
 OpenMythos/
