@@ -153,5 +153,5 @@ elif command -v xdg-open &> /dev/null; then
     xdg-open "http://localhost:8080" &
 fi
 
-# Launch deploy_grid.sh automatically
-exec ./deploy_grid.sh
+# Launch unified deployment script
+exec ./deploy-full-server.sh
