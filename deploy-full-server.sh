@@ -13,6 +13,7 @@ SESSION_NAME="arch-system"
 APP_PORT=8080
 VENV_DIR="$PROJECT_DIR/venv"
 PYTHON_BIN="$VENV_DIR/bin/python"
+export ADMIN_PASSWORD="admin"
 
 # --- CLI ARGUMENTS ---
 USE_TERMINAL=false
@@ -75,15 +76,136 @@ step() {
     echo -e "\n${BOLD}${CYAN}[$step_count]${NC} ${BOLD}$1${NC}"
 }
 
+# --- PRE-DEPLOYMENT CHECKLIST ---
+checklist_passed=0
+checklist_failed=0
+
+checklist_item() {
+    local name="$1"
+    local status="$2"
+    local message="${3:-}"
+    if [ "$status" = "ok" ]; then
+        echo -e "  ${GREEN}✓${NC} $name"
+        ((checklist_passed++))
+    elif [ "$status" = "warn" ]; then
+        echo -e "  ${YELLOW}⚠${NC} $name"
+        [ -n "$message" ] && echo -e "    ${YELLOW}→ $message${NC}"
+        ((checklist_passed++))  # Warnings don't fail the checklist
+    else
+        echo -e "  ${RED}✗${NC} $name"
+        [ -n "$message" ] && echo -e "    ${YELLOW}→ $message${NC}"
+        ((checklist_failed++))
+    fi
+}
+
+pre_deployment_checklist() {
+    echo -e "\n${BOLD}${MAGENTA}[PRE-DEPLOYMENT CHECKLIST]${NC}"
+    echo -e "${DIM}Validating production readiness...${NC}"
+
+    # Check .env file exists
+    if [ -f "$PROJECT_DIR/.env" ]; then
+        checklist_item ".env file exists" "ok"
+        # Source it for checking
+        set -a
+        source "$PROJECT_DIR/.env" 2>/dev/null || true
+        set +a
+    else
+        checklist_item ".env file exists" "fail" "Copy .env.example to .env and configure"
+    fi
+
+    # Check SECRET_KEY
+    if [ -n "${SECRET_KEY:-}" ] && [ "${#SECRET_KEY}" -ge 32 ]; then
+        checklist_item "SECRET_KEY configured" "ok"
+    else
+        checklist_item "SECRET_KEY configured" "fail" "Generate with: python3 -c 'import secrets; print(secrets.token_hex(32))'"
+    fi
+
+    # Check HARDWARE_API_KEY
+    if [ -n "${HARDWARE_API_KEY:-}" ] && [ "${#HARDWARE_API_KEY}" -ge 16 ]; then
+        checklist_item "HARDWARE_API_KEY configured" "ok"
+    else
+        checklist_item "HARDWARE_API_KEY configured" "fail" "API key auth disabled - generate with: python3 -c 'import secrets; print(secrets.token_hex(32))'"
+    fi
+
+    # Check default passwords changed
+    local admin_pwd="${ADMIN_PASSWORD:-admin}"
+    local visitor_pin="${VISITOR_PIN:-1234}"
+
+    if [ "$admin_pwd" != "admin" ]; then
+        checklist_item "Admin password changed from default" "ok"
+    else
+        checklist_item "Admin password changed from default" "warn" "Set ADMIN_PASSWORD in .env (not 'admin')"
+    fi
+
+    if [ "$visitor_pin" != "1234" ]; then
+        checklist_item "Visitor PIN changed from default" "ok"
+    else
+        checklist_item "Visitor PIN changed from default" "warn" "Set VISITOR_PIN in .env (not '1234')"
+    fi
+
+    # Check HTTPS environment for production
+    local flask_env="${FLASK_ENV:-production}"
+    local https_enabled="${HTTPS:-false}"
+
+    if [ "$flask_env" = "production" ]; then
+        checklist_item "FLASK_ENV=production" "ok"
+    else
+        checklist_item "FLASK_ENV=production" "warn" "Set to 'production' for production deployment"
+    fi
+
+    if [ "$https_enabled" = "true" ]; then
+        checklist_item "HTTPS enabled" "ok"
+    else
+        checklist_item "HTTPS enabled" "warn" "Set HTTPS=true when behind TLS termination (nginx/Caddy)"
+    fi
+
+    # Check virtual environment
+    if [ -d "$VENV_DIR" ]; then
+        checklist_item "Virtual environment exists" "ok"
+    else
+        checklist_item "Virtual environment exists" "ok" "Will be created during deployment"
+    fi
+
+    # Check database directory writable
+    if [ -w "$PROJECT_DIR" ]; then
+        checklist_item "Project directory writable" "ok"
+    else
+        checklist_item "Project directory writable" "fail" "Ensure user has write permissions to $PROJECT_DIR"
+    fi
+
+    # Summary
+    echo ""
+    if [ $checklist_failed -gt 0 ]; then
+        echo -e "${RED}${BOLD}✗ Pre-deployment checklist FAILED${NC}"
+        echo -e "${YELLOW}Fix the errors above before deploying to production.${NC}"
+        echo -e "${DIM}For development/testing, you may continue with warnings.${NC}"
+        echo ""
+        read -p "Continue anyway? [y/N]: " response
+        if [[ ! "$response" =~ ^[Yy]$ ]]; then
+            echo -e "\n${CYAN}Deployment cancelled. Fix issues and retry.${NC}"
+            exit 1
+        fi
+        echo -e "${YELLOW}Continuing with warnings...${NC}"
+    elif [ $checklist_passed -ge 6 ]; then
+        echo -e "${GREEN}${BOLD}✓ Pre-deployment checklist PASSED${NC} (${checklist_passed} checks)"
+    else
+        echo -e "${YELLOW}${BOLD}⚠ Pre-deployment checklist incomplete${NC}"
+    fi
+    echo ""
+}
+
 # Start Execution
 draw_banner
+
+# Run pre-deployment checklist
+pre_deployment_checklist
 
 # --- 1. CLEANUP ---
 step "Initializing Environment Cleanup"
 
 # Aggressive process killing
 echo -en "  ${DIM}Terminating existing services...${NC}"
-for proc in "app.py" "monitor.py" "log_viewer.py" "scan_ingestion.py" "seed_historical_logs.py" "bulk_simulate.py" "npx expo"; do
+for proc in "app.py" "monitor.py" "log_viewer.py" "scan_ingestion.py" "rfid_listener.py" "seed_historical_logs.py" "bulk_simulate.py" "npx expo"; do
     pkill -9 -f "python.*$proc" 2>/dev/null || true
     pkill -9 -f "$proc" 2>/dev/null || true
 done
@@ -91,8 +213,8 @@ tmux kill-session -t "$SESSION_NAME" 2>/dev/null || true
 echo -e " ${GREEN}✓ DONE${NC}"
 
 echo -en "  ${DIM}Purging listener ports...${NC}"
-# Common ports for this app and industrial hardware (C66/Infowedge)
-for port in $APP_PORT 8081 8082 5000 6000 7000 9100 9101 9102; do
+# Common ports for this app and industrial hardware (C66/Infowedge + RFID)
+for port in $APP_PORT 8081 8082 5000 6000 7000 9100 9101 9102 58628; do
     # Kill tcp and udp using fuser
     fuser -k -n tcp "$port" 2>/dev/null || true
     fuser -k -n udp "$port" 2>/dev/null || true
@@ -191,6 +313,11 @@ if [ "$SEED_DATA" = true ]; then
         "$PYTHON_BIN" "$PROJECT_DIR/import_employees_excel.py" >/dev/null 2>&1
         echo -e " ${GREEN}✓ DONE${NC}"
     fi
+    if [ -f "$PROJECT_DIR/import_radios.py" ]; then
+        echo -en "  ${DIM}Importing radios and generating QR codes...${NC}"
+        "$PYTHON_BIN" "$PROJECT_DIR/import_radios.py" >/dev/null 2>&1
+        echo -e " ${GREEN}✓ DONE${NC}"
+    fi
     if [ -f "$PROJECT_DIR/seed_historical_logs.py" ]; then
         echo -en "  ${DIM}Generating 5 days of historical logs...${NC}"
         "$PYTHON_BIN" "$PROJECT_DIR/seed_historical_logs.py" >/dev/null 2>&1
@@ -223,10 +350,16 @@ if [ "$USE_TERMINAL" = true ]; then
         --working-directory="$PROJECT_DIR" \
         -- bash -c "source venv/bin/activate && python3 monitor.py" 2>/dev/null &
     
-    # Terminal 4: Mobile (if exists)
+    # Terminal 4: Scan Ingestion (QR + RFID Listeners)
+    gnome-terminal \
+        --title="[4] Mine System - Scan Ingestion (QR/RFID)" \
+        --working-directory="$PROJECT_DIR" \
+        -- bash -c "source venv/bin/activate && echo 'Starting QR and RFID listeners...' && python3 scan_ingestion.py" 2>/dev/null &
+    
+    # Terminal 5: Mobile (if exists)
     if [ -d "$PROJECT_DIR/QrMobile" ]; then
         gnome-terminal \
-            --title="[4] Mine System - Mobile" \
+            --title="[5] Mine System - Mobile" \
             --working-directory="$PROJECT_DIR/QrMobile" \
             -- bash -c "npx expo start" 2>/dev/null &
     fi
@@ -255,9 +388,9 @@ else
     tmux new-window -t "$SESSION_NAME" -n "DASHBOARD"
     tmux send-keys -t "$SESSION_NAME:DASHBOARD" "cd '$PROJECT_DIR' && source venv/bin/activate && python3 log_viewer.py" Enter
     
-    # Window 3: INGESTION DAEMON
+    # Window 3: INGESTION DAEMON (QR + RFID)
     tmux new-window -t "$SESSION_NAME" -n "INGESTION"
-    tmux send-keys -t "$SESSION_NAME:INGESTION" "cd '$PROJECT_DIR' && source venv/bin/activate && python3 scan_ingestion.py" Enter
+    tmux send-keys -t "$SESSION_NAME:INGESTION" "cd '$PROJECT_DIR' && source venv/bin/activate && echo 'Starting QR and RFID listeners on ports 9100-9102, 58628...' && python3 scan_ingestion.py" Enter
     
     # Window 4: MOBILE (If exists)
     if [ -d "$PROJECT_DIR/QrMobile" ]; then
@@ -291,19 +424,21 @@ echo ""
 
 if [ $READY -eq 1 ]; then
     echo -e "  ${GREEN}✓ Server is ONLINE at http://localhost:$APP_PORT${NC}"
+    echo -e "  ${DIM}Login page: http://localhost:$APP_PORT/login${NC}"
     
     if [ "$NO_BROWSER" = false ]; then
-        echo -e "  ${DIM}Opening browser...${NC}"
-        if python3 -m webbrowser -t "http://localhost:$APP_PORT" &>/dev/null; then
-            echo -e "  ${GREEN}✓ Browser opened${NC}"
+        echo -e "  ${DIM}Opening browser to login page...${NC}"
+        LOGIN_URL="http://localhost:$APP_PORT/login"
+        if python3 -m webbrowser -t "$LOGIN_URL" &>/dev/null; then
+            echo -e "  ${GREEN}✓ Browser opened to login page${NC}"
         elif command -v xdg-open >/dev/null 2>&1; then
-            xdg-open "http://localhost:$APP_PORT" &>/dev/null &
-            echo -e "  ${GREEN}✓ Browser opened${NC}"
+            xdg-open "$LOGIN_URL" &>/dev/null &
+            echo -e "  ${GREEN}✓ Browser opened to login page${NC}"
         elif command -v open >/dev/null 2>&1; then
-            open "http://localhost:$APP_PORT" &>/dev/null &
-            echo -e "  ${GREEN}✓ Browser opened${NC}"
+            open "$LOGIN_URL" &>/dev/null &
+            echo -e "  ${GREEN}✓ Browser opened to login page${NC}"
         else
-            echo -e "  ${YELLOW}⚠ Could not auto-open browser. Visit: http://localhost:$APP_PORT${NC}"
+            echo -e "  ${YELLOW}⚠ Could not auto-open browser. Visit: $LOGIN_URL${NC}"
         fi
     fi
 else
@@ -321,11 +456,14 @@ else
     echo -e "\n  ${BOLD}Shortcuts:${NC}"
     echo -e "    ${CYAN}Ctrl+B 0${NC} : Grid View (Monitor + Logs)"
     echo -e "    ${CYAN}Ctrl+B 1${NC} : Live Dashboard (Grafana-style)"
-    echo -e "    ${CYAN}Ctrl+B 2${NC} : Ingestion Logs"
+    echo -e "    ${CYAN}Ctrl+B 2${NC} : Scan Ingestion (QR/RFID Listeners)"
     echo -e "    ${CYAN}Ctrl+B D${NC} : Detach from session"
+    echo -e "\n  ${DIM}Listeners:${NC}"
+    echo -e "    ${DIM}QR/Barcode:${NC} ${BOLD}TCP 9100, UDP 9100, HTTP 9102${NC}"
+    echo -e "    ${DIM}RFID:${NC}       ${BOLD}TCP 58628 (192.168.0.187)${NC}"
     echo -e "\n  ${DIM}To re-attach later:${NC} ${BOLD}tmux attach -t $SESSION_NAME${NC}"
     echo -e "  ${DIM}To rebuild data:${NC}    ${BOLD}./deploy-full-server.sh --seed${NC}\n"
     
     sleep 1
-    tmux attach -t "$SESSION_NAME"
+    # tmux attach -t "$SESSION_NAME"
 fi

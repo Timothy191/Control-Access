@@ -25,7 +25,7 @@ class TestImportEmployees:
             sess["role"] = "user"
 
         response = test_app.post("/import/employees")
-        assert response.status_code == 302
+        assert response.status_code == 403
 
     def test_import_employees_no_file(self, authenticated_client):
         """Import fails without file."""
@@ -208,7 +208,7 @@ class TestImportVehicles:
             sess["role"] = "user"
 
         response = test_app.post("/import/vehicles")
-        assert response.status_code == 302
+        assert response.status_code == 403
 
     def test_import_vehicles_csv(self, authenticated_client, db_cleanup):
         """Import vehicles from CSV."""
@@ -283,13 +283,13 @@ class TestDownloadTemplates:
             sess["role"] = "user"
 
         response = test_app.get("/download/template/employees")
-        assert response.status_code == 302
+        assert response.status_code == 403
 
     def test_download_employees_template(self, authenticated_client):
         """Download employees template."""
         response = authenticated_client.get("/download/template/employees")
         assert response.status_code == 200
-        assert response.content_type == "text/csv"
+        assert response.content_type.startswith("text/csv")
         
         # Check content
         content = response.data.decode()
@@ -302,7 +302,7 @@ class TestDownloadTemplates:
         """Download vehicles template."""
         response = authenticated_client.get("/download/template/vehicles")
         assert response.status_code == 200
-        assert response.content_type == "text/csv"
+        assert response.content_type.startswith("text/csv")
         
         content = response.data.decode()
         assert "fleet_id" in content

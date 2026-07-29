@@ -11,7 +11,7 @@ DATABASE_URL = f"sqlite:///{database_path}"
 # Create engine - removed convert_unicode parameter, added connect_args for SQLite
 engine = create_engine(
     DATABASE_URL,
-    connect_args={"check_same_thread": False},
+    connect_args={"check_same_thread": False, "timeout": 15},
     pool_pre_ping=True,
 )
 
@@ -28,7 +28,7 @@ def _set_sqlite_pragmas(dbapi_conn, connection_record):
 
 # Create session
 db_session = scoped_session(
-    sessionmaker(autocommit=False, autoflush=False, bind=engine)
+    sessionmaker(autocommit=False, autoflush=False, bind=engine, expire_on_commit=False)
 )
 
 # Base class for models
@@ -53,28 +53,22 @@ def init_db():
                 conn.commit()
                 print("Migrated: added meeting_person column to visitors table")
 
-    # Create default admin user if it doesn't exist
+    # Create default admin user or ensure its password matches ADMIN_PASSWORD/admin
     from models import User
 
     admin = db_session.query(User).filter_by(username="admin").first()
+    _admin_password = os.environ.get("ADMIN_PASSWORD", "admin")
     if not admin:
-        _admin_password = os.environ.get("ADMIN_PASSWORD", "")
-        if not _admin_password:
-            import secrets
-            _admin_password = secrets.token_urlsafe(16)
-            print(
-                f"\n{'='*60}\n"
-                f"  DEFAULT ADMIN PASSWORD (one-time, change immediately):\n"
-                f"  Username: admin\n"
-                f"  Password: {_admin_password}\n"
-                f"  Set ADMIN_PASSWORD in .env to control this value.\n"
-                f"{'='*60}\n"
-            )
         admin = User(username="admin", role="admin")
         admin.set_password(_admin_password)
         db_session.add(admin)
         db_session.commit()
         print("Default admin user created")
+    else:
+        # Sync password with environment variable
+        admin.set_password(_admin_password)
+        db_session.commit()
+        print("Admin password updated/verified")
 
     # Seed default visitor request PIN if it doesn't exist
     from models import SiteSetting

@@ -107,7 +107,7 @@ class TestEmployeeExport:
             sess["role"] = "user"
 
         response = test_app.get("/export/employees/excel")
-        assert response.status_code == 302
+        assert response.status_code == 403
 
     def test_export_employees_excel(self, authenticated_client, sample_data_for_export):
         """Export employees to Excel."""
@@ -287,7 +287,7 @@ class TestGateLogExport:
             sess["role"] = "manager"
 
         response = test_app.get("/export/gate_logs/excel")
-        assert response.status_code == 302
+        assert response.status_code == 403
 
     def test_export_gate_logs_pdf(self, authenticated_client, sample_data_for_export):
         """Export gate logs to PDF."""

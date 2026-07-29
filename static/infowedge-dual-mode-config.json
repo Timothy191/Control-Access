@@ -5,37 +5,37 @@
   "created": "2026-05-07",
   "target_system": "Mine Management System v2.1.0",
   "connection_modes": {
-    "usb_primary": {
+    "wifi_primary": {
       "enabled": true,
       "priority": 1,
-      "ip_address": "192.168.0.217",
-      "connection_type": "USB-RNDIS",
-      "endpoint": "http://192.168.0.217:8080/api/c66",
-      "fallback": "wifi_backup"
+      "ip_address": "192.168.0.50",
+      "connection_type": "WiFi",
+      "endpoint": "http://192.168.0.50:8080/api/c66",
+      "network_ssid": "Brakfontein",
+      "auto_connect": true,
+      "fallback": "usb_backup"
     },
-    "wifi_backup": {
+    "usb_backup": {
       "enabled": true,
       "priority": 2,
-      "ip_address": "192.168.0.217",
-      "connection_type": "WiFi",
-      "endpoint": "http://192.168.0.217:8080/api/c66",
-      "network_ssid": "YOUR_WIFI_SSID",
-      "auto_connect": true
+      "ip_address": "10.249.249.100",
+      "connection_type": "USB-RNDIS",
+      "endpoint": "http://10.249.249.100:8080/api/c66"
     }
   },
   "endpoints": {
-    "primary_usb": {
-      "url": "http://192.168.0.217:8080/api/c66",
+    "primary_wifi": {
+      "url": "http://192.168.0.50:8080/api/c66",
       "method": "POST",
-      "description": "USB connection - primary when plugged in"
+      "description": "WiFi connection - primary"
     },
-    "backup_wifi": {
-      "url": "http://192.168.0.217:8080/api/c66",
+    "backup_usb": {
+      "url": "http://10.249.249.100:8080/api/c66",
       "method": "POST",
-      "description": "WiFi connection - fallback when unplugged"
+      "description": "USB connection - fallback"
     },
     "alternative": {
-      "url": "http://192.168.0.217:8080/api/scan_alt",
+      "url": "http://192.168.0.50:8080/api/scan_alt",
       "method": "POST",
       "description": "Alternative endpoint for both modes"
     }
@@ -67,8 +67,8 @@
     "output": {
       "output_type": "IP Output",
       "ip_settings": {
-        "primary_url": "http://192.168.0.217:8080/api/c66",
-        "backup_url": "http://192.168.0.217:8080/api/c66",
+        "primary_url": "http://192.168.0.50:8080/api/c66",
+        "backup_url": "http://10.249.249.100:8080/api/c66",
         "port": 8080,
         "protocol": "HTTP",
         "method": "POST",
@@ -88,7 +88,9 @@
           "device": "{{deviceID}}",
           "scanner": "C66-Dual",
           "connection_mode": "{{connectionType}}",
-          "pc_target": "192.168.0.217"
+          "pc_target": "192.168.0.50",
+        "pc_lan_ip": "192.168.0.50",
+        "pc_usb_ip": "10.249.249.100"
         }
       }
     },
@@ -157,11 +159,11 @@
   "testing": {
     "dual_mode_test": {
       "usb_test": {
-        "url": "http://192.168.0.217:8080/api/c66",
+        "url": "http://10.249.249.100:8080/api/c66",
         "expected_connection": "USB-RNDIS"
       },
       "wifi_test": {
-        "url": "http://192.168.0.217:8080/api/c66",
+        "url": "http://192.168.0.50:8080/api/c66",
         "expected_connection": "WiFi"
       },
       "switch_test": {
@@ -204,22 +206,22 @@
     }
   },
   "setup_instructions": {
+    "wifi_setup": [
+      "1. C66 connected to WiFi SSID: Brakfontein",
+      "2. PC at 192.168.0.50:8080",
+      "3. InfoWedge sends scans to http://192.168.0.50:8080/api/c66",
+      "4. Working - confirmed"
+    ],
     "usb_setup": [
       "1. Connect C66 to PC via USB",
       "2. Enable USB tethering on C66",
-      "3. InfoWedge will auto-detect USB connection",
-      "4. Primary endpoint: http://192.168.0.217:8080/api/c66"
-    ],
-    "wifi_setup": [
-      "1. Connect C66 to same WiFi network as PC",
-      "2. Configure WiFi credentials in InfoWedge",
-      "3. InfoWedge will use WiFi when USB unavailable",
-      "4. Same endpoint: http://192.168.0.217:8080/api/c66"
+      "3. Endpoint: http://10.249.249.100:8080/api/c66",
+      "4. Fallback when WiFi unavailable"
     ],
     "auto_switching": [
-      "1. USB plugged in → Automatic USB mode",
-      "2. USB unplugged → Automatic WiFi mode",
-      "3. Both available → USB preferred, WiFi standby",
+      "1. WiFi available → Primary path (192.168.0.50)",
+      "2. WiFi lost → Failover to USB (10.249.249.100)",
+      "3. Both available → WiFi preferred",
       "4. Neither available → Buffer scans until connection"
     ]
   }

@@ -5,7 +5,7 @@
 ## Available Styles
 
 | Style | Path | Count | Use Case |
-|-------|------|-------|----------|
+| ------- | ------ | ------- | ---------- |
 | 24/outline | `24/outline/` | ~300 | Default UI icons (outlined) |
 | 24/solid | `24/solid/` | ~300 | Default UI icons (filled) |
 | 20/solid | `20/solid/` | ~300 | Smaller UI elements |
@@ -14,6 +14,7 @@
 ## Usage Methods
 
 ### Method 1: Jinja2 Macro (Recommended)
+
 ```html
 {# In any template that extends base.html #}
 {{ heroicon('home', '24/outline', 'hi-nav-icon') }}
@@ -22,6 +23,7 @@
 ```
 
 ### Method 2: Direct SVG Inline
+
 ```html
 <svg class="hi-24" viewBox="0 0 24 24">
     <use href="/static/icons/heroicons/24/outline/home.svg"/>
@@ -29,6 +31,7 @@
 ```
 
 ### Method 3: CSS Background Image
+
 ```css
 .icon-home {
     background-image: url('/static/icons/heroicons/24/outline/home.svg');
@@ -40,7 +43,7 @@
 ## CSS Helper Classes
 
 | Class | Size | Purpose |
-|-------|------|---------|
+| ------- | ------ | --------- |
 | `.hi-16` | 16×16px | Micro icons |
 | `.hi-20` | 20×20px | Small buttons |
 | `.hi-24` | 24×24px | Standard UI |
@@ -53,7 +56,7 @@
 ## Color Classes
 
 | Class | Color |
-|-------|-------|
+| ------- | ------- |
 | `.hi-primary` | Red (#e10600) |
 | `.hi-secondary` | Gray (#a0a0a0) |
 | `.hi-success` | Green (#00c853) |
@@ -92,6 +95,7 @@
 ## Works Alongside Tabler Icons
 
 Tabler Icons (via CDN) remain the primary icon system:
+
 ```html
 <i class="ti ti-dashboard"></i>  {# Tabler - still works #}
 {{ heroicon('home', '24/outline') }}  {# Heroicons - new option #}
@@ -100,6 +104,7 @@ Tabler Icons (via CDN) remain the primary icon system:
 ## Icon Search
 
 Browse all icons at [heroicons.com](https://heroicons.com/) or search locally:
+
 ```bash
 ls static/icons/heroicons/24/outline/ | grep "search-term"
 ```

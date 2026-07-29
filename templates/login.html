@@ -25,9 +25,9 @@
             position: relative;
             z-index: 100;
             width: 100%;
-            max-width: 440px;
+            max-width: 480px;
         }
-        .login-card {
+    .login-card {
             background: rgba(10,10,10,0.9);
             -webkit-backdrop-filter: blur(2px);
             backdrop-filter: blur(2px);
@@ -37,23 +37,58 @@
             box-shadow: 0 10px 30px rgba(0,0,0,0.5);
             transition: box-shadow 0.3s ease, transform 0.2s ease;
         }
-        .login-card:hover {
+    .login-card:hover {
             box-shadow: 0 0 0 1px var(--red-primary), 0 15px 35px rgba(0,0,0,0.5);
             transform: translateY(-2px);
         }
-        .login-logo {
+    .tab-nav {
+            display: flex;
+            gap: 0;
+            margin-bottom: 2rem;
+            border-bottom: 1px solid var(--steel);
+        }
+    .tab-btn {
+            flex: 1;
+            padding: 0.75rem 1rem;
+            background: transparent;
+            border: none;
+        color: var(--text-secondary);
+            font-family: var(--font-mono);
+            font-size: 0.85rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            border-bottom: 2px solid transparent;
+            margin-bottom: -1px;
+        }
+    .tab-btn:hover {
+            color: var(--text-primary);
+        }
+    .tab-btn.active {
+            color: var(--red-primary);
+            border-bottom-color: var(--red-primary);
+        }
+    .tab-panel {
+            display: none;
+        }
+    .tab-panel.active {
+            display: block;
+    }
+    .login-logo {
             text-align: center;
             margin-bottom: 1.5rem;
         }
-        .login-logo i {
+    .login-logo i {
             font-size: 4rem;
             color: var(--red-primary);
         }
-        .login-card h2 {
+    .login-card h2 {
             text-align: center;
-            font-size: 1.75rem;
+            font-size: 1.5rem;
             font-weight: 600;
-            margin-bottom: 2rem;
+            margin-bottom: 1.5rem;
             letter-spacing: 2px;
             text-transform: uppercase;
             font-family: var(--font-mono);
@@ -62,10 +97,10 @@
             -webkit-text-fill-color: transparent;
             background-clip: text;
         }
-        .form-group {
-            margin-bottom: 1.5rem;
+    .form-group {
+            margin-bottom: 1.25rem;
         }
-        label {
+    .form-group label {
             display: block;
             margin-bottom: 0.5rem;
             font-weight: 500;
@@ -74,7 +109,8 @@
             text-transform: uppercase;
             letter-spacing: 0.05em;
         }
-        input {
+    .form-group input,
+    .form-group textarea {
             width: 100%;
             background: var(--true-black);
             border: 1px solid var(--steel);
@@ -84,18 +120,27 @@
             font-family: var(--font-mono);
             font-size: 0.9rem;
             transition: all 0.2s ease;
+            resize: vertical;
         }
-        input:focus {
+    .form-group input:focus,
+    .form-group textarea:focus {
             border-color: var(--red-primary);
             outline: none;
             animation: pulseBorder 1.2s infinite;
         }
-        @keyframes pulseBorder {
+    @keyframes pulseBorder {
             0% { box-shadow: 0 0 0 0 rgba(225,6,0,0.4); }
             70% { box-shadow: 0 0 0 4px rgba(225,6,0,0); }
             100% { box-shadow: 0 0 0 0 rgba(225,6,0,0); }
         }
-        .btn-login {
+    .form-hint {
+            display: block;
+            margin-top: 0.35rem;
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+        }
+    .btn-login,
+    .btn-submit {
             position: relative;
             z-index: 100;
             width: 100%;
@@ -110,14 +155,22 @@
             transition: all 0.2s ease;
             margin-top: 0.5rem;
         }
-        .btn-login:hover {
+    .btn-login:hover,
+    .btn-submit:hover {
             background: #b80500;
             transform: scale(1.02);
         }
-        .btn-login:active {
+    .btn-login:active,
+    .btn-submit:active {
             transform: scale(0.98);
         }
-        .error-message {
+    .btn-login:disabled,
+    .btn-submit:disabled {
+            opacity: 0.7;
+            cursor: not-allowed;
+            transform: none;
+        }
+    .error-message {
             background: rgba(225, 6, 0, 0.15);
             border-left: 3px solid var(--red-primary);
             padding: 0.75rem 1rem;
@@ -129,7 +182,86 @@
             align-items: center;
             gap: 0.5rem;
         }
-        .login-footer {
+    .success-container {
+            text-align: center;
+        }
+    .success-container .qr-image {
+            margin: 1.5rem auto;
+            padding: 1rem;
+            background: white;
+            border-radius: 16px;
+            display: inline-block;
+        }
+    .success-container .qr-image img {
+            display: block;
+            max-width: 220px;
+        }
+    .success-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            background: rgba(255, 165, 0, 0.15);
+            border: 1px solid rgba(255, 165, 0, 0.4);
+            color: #ffa500;
+            padding: 0.5rem 1rem;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            margin-bottom: 1rem;
+        }
+    .visitor-details {
+            text-align: left;
+            background: rgba(255,255,255,0.03);
+            border: 1px solid var(--steel);
+            border-radius: 12px;
+            padding: 1rem 1.25rem;
+            margin-top: 1.25rem;
+            font-size: 0.85rem;
+        }
+    .visitor-details .detail-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 0.4rem 0;
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+        }
+    .visitor-details .detail-row:last-child {
+            border-bottom: none;
+        }
+    .visitor-details .detail-label {
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            font-size: 0.75rem;
+            letter-spacing: 0.05em;
+        }
+    .visitor-details .detail-value {
+            color: var(--text-primary);
+            font-family: var(--font-mono);
+        }
+    .btn-print {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            background: rgba(255,255,255,0.08);
+            border: 1px solid var(--steel);
+            border-radius: 8px;
+            padding: 0.5rem 1rem;
+            color: var(--text-primary);
+            cursor: pointer;
+            font-size: 0.85rem;
+            transition: all 0.2s ease;
+            margin-top: 1rem;
+        }
+    .btn-print:hover {
+            border-color: var(--red-primary);
+            color: var(--red-primary);
+        }
+    @media print {
+        body * { visibility: hidden; }
+        .success-container, .success-container * { visibility: visible; }
+        .success-container { position: absolute; top: 0; left: 0; }
+        .btn-print { display: none !important; }
+    }
+    .login-footer {
             text-align: center;
             margin-top: 2rem;
             padding-top: 1rem;
@@ -140,12 +272,12 @@
             justify-content: space-between;
             align-items: center;
         }
-        .system-status {
+    .system-status {
             display: flex;
             align-items: center;
             gap: 6px;
         }
-        .live-dot {
+    .live-dot {
             display: inline-block;
             width: 8px;
             height: 8px;
@@ -154,11 +286,11 @@
             box-shadow: 0 0 4px var(--red-glow);
             animation: pulse 1.5s infinite;
         }
-        @keyframes pulse {
+    @keyframes pulse {
             0% { opacity: 0.5; transform: scale(0.8); }
             100% { opacity: 1; transform: scale(1.2); }
         }
-        .default-credentials {
+    .default-credentials {
             margin-top: 0.5rem;
             font-size: 0.75rem;
             color: var(--text-secondary);
@@ -170,24 +302,34 @@
             border-radius: 20px;
             cursor: help;
         }
-        .default-credentials i {
+    .default-credentials i {
             color: var(--red-primary);
         }
-        .timestamp {
+    .timestamp {
             font-family: var(--font-mono);
             font-size: 0.7rem;
             color: var(--text-secondary);
         }
-    </style>
+</style>
 
-    <div class="login-wrapper">
-        <div class="login-card">
-            <div class="login-logo">
-                <i class="ti ti-hard-hat"></i>
-            </div>
-            <h2>Arch-System</h2>
+<div class="login-wrapper">
+    <div class="login-card">
+        <div class="login-logo">
+            <i class="ti ti-hard-hat"></i>
+        </div>
+        <h2>Arch-System</h2>
 
-            {% if error %}
+        <div class="tab-nav">
+            <button class="tab-btn active" data-tab="login-tab" type="button">
+                <i class="ti ti-login"></i> Login
+            </button>
+            <button class="tab-btn" data-tab="visitor-tab" type="button">
+                <i class="ti ti-id-badge"></i> Visitor Request
+            </button>
+        </div>
+
+        <div id="login-tab" class="tab-panel active">
+            {% if error and not visitor_error %}
             <div class="error-message">
                 <i class="ti ti-alert-triangle"></i>
                 {{ error }}
@@ -211,10 +353,6 @@
                 </button>
             </form>
 
-            <a href="{{ url_for('visitor_request') }}" style="display:block; text-align:center; margin-top:1.25rem; padding:0.65rem; border:1px solid var(--steel); border-radius:8px; color:var(--text-primary); text-decoration:none; font-size:0.9rem; font-weight:500; transition:all 0.2s ease; background:rgba(255,255,255,0.04);" onmouseover="this.style.borderColor='var(--red-primary)';this.style.color='var(--red-primary)'" onmouseout="this.style.borderColor='var(--steel)';this.style.color='var(--text-primary)'">
-                <i class="ti ti-id-badge"></i> Request QR — Visitor
-            </a>
-
             <div class="login-footer">
                 <div class="system-status">
                     <span class="live-dot"></span> System Online
@@ -222,28 +360,185 @@
                 <div class="timestamp" id="liveTimestamp">--:--:--</div>
             </div>
         </div>
+
+        <div id="visitor-tab" class="tab-panel">
+            {% if visitor_error %}
+            <div class="error-message" id="visitorError">
+                <i class="ti ti-alert-triangle"></i>
+                {{ visitor_error }}
+            </div>
+            {% endif %}
+
+            <form method="POST" action="{{ url_for('visitor_request') }}" id="visitorForm" autocomplete="off">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <div class="form-group">
+                    <label for="vname">Visitor Name <span style="color:var(--red-primary)">*</span></label>
+                    <input type="text" id="vname" name="name" required placeholder="Full name" autocomplete="off">
+                </div>
+
+                <div class="form-group">
+                    <label for="vcompany">Visitor Company</label>
+                    <input type="text" id="vcompany" name="company" placeholder="Company name" autocomplete="off">
+                </div>
+
+                <div class="form-group">
+                    <label for="vpurpose">Reason</label>
+                    <textarea id="vpurpose" name="purpose" rows="2" placeholder="Purpose of visit" autocomplete="off"></textarea>
+                </div>
+
+                <div class="form-group">
+                    <label for="vmeeting">Meeting Person</label>
+                    <input type="text" id="vmeeting" name="meeting_person" placeholder="Person you are meeting" autocomplete="off">
+                </div>
+
+                <div class="form-group">
+                    <label for="vpin">Department PIN <span style="color:var(--red-primary)">*</span></label>
+                    <input type="password" id="vpin" name="pin" required placeholder="Enter authorized PIN" maxlength="20" autocomplete="new-password">
+                    <small class="form-hint">Contact your HOD or admin for the PIN.</small>
+                </div>
+
+                <button type="submit" class="btn-submit" id="visitorBtn">
+                    <i class="ti ti-qrcode"></i> Generate Visitor QR
+                </button>
+            </form>
+
+            <div id="visitorSuccess" style="display:none;">
+                <div class="success-container">
+                    <div class="success-badge">
+                        <i class="ti ti-clock"></i> Pending Approval
+                    </div>
+                    <p style="color: var(--text-secondary); font-size: 0.9rem; margin-bottom: 0.5rem;">
+                        Your visitor QR code has been generated. Please present this code at the gate once approved.
+                    </p>
+                    <div class="qr-image">
+                        <img id="visitorQrImage" src="" alt="Visitor QR Code">
+                    </div>
+                    <div class="visitor-details">
+                        <div class="detail-row">
+                            <span class="detail-label">Visitor Name</span>
+                            <span class="detail-value" id="vDetailName">—</span>
+                        </div>
+                        <div class="detail-row">
+                            <span class="detail-label">Company</span>
+                            <span class="detail-value" id="vDetailCompany">—</span>
+                        </div>
+                        <div class="detail-row">
+                            <span class="detail-label">Reason</span>
+                            <span class="detail-value" id="vDetailPurpose">—</span>
+                        </div>
+                        <div class="detail-row">
+                            <span class="detail-label">Meeting Person</span>
+                            <span class="detail-value" id="vDetailMeeting">—</span>
+                        </div>
+                    </div>
+                    <button class="btn-print" onclick="window.print()">
+                        <i class="ti ti-printer"></i> Print QR Code
+                    </button>
+                    <button class="btn-submit" style="margin-top:1rem; background:var(--steel);" onclick="resetVisitorForm()" type="button">
+                        <i class="ti ti-arrow-left"></i> New Request
+                    </button>
+                </div>
+            </div>
+        </div>
     </div>
+</div>
 
-    <script>
-        // Timestamp update
-        function updateTimestamp() {
-            const now = new Date();
-            const timeStr = now.toLocaleTimeString();
-            const tsElem = document.getElementById('liveTimestamp');
-            if (tsElem) tsElem.textContent = timeStr;
-        }
-        updateTimestamp();
-        setInterval(updateTimestamp, 1000);
+<script>
+    function updateTimestamp() {
+        const now = new Date();
+        const timeStr = now.toLocaleTimeString();
+        const tsElem = document.getElementById('liveTimestamp');
+        if (tsElem) tsElem.textContent = timeStr;
+    }
+    updateTimestamp();
+    setInterval(updateTimestamp, 1000);
 
-        // Loading state on submit
-        const loginForm = document.getElementById('loginForm');
-        const loginBtn = document.getElementById('loginBtn');
-        if (loginForm && loginBtn) {
-            loginForm.addEventListener('submit', function(e) {
-                if (loginBtn.disabled) return;
-                loginBtn.innerHTML = '<i class="ti ti-loader"></i> Logging in...';
-                loginBtn.disabled = true;
+    const loginForm = document.getElementById('loginForm');
+    const loginBtn = document.getElementById('loginBtn');
+    if (loginForm && loginBtn) {
+        loginForm.addEventListener('submit', function(e) {
+            if (loginBtn.disabled) return;
+            loginBtn.innerHTML = '<i class="ti ti-loader"></i> Logging in...';
+            loginBtn.disabled = true;
+        });
+    }
+
+    const tabBtns = document.querySelectorAll('.tab-btn');
+    const tabPanels = document.querySelectorAll('.tab-panel');
+
+    tabBtns.forEach(btn => {
+        btn.addEventListener('click', () => {
+            const target = btn.getAttribute('data-tab');
+            tabBtns.forEach(b => b.classList.remove('active'));
+            tabPanels.forEach(p => p.classList.remove('active'));
+            btn.classList.add('active');
+            document.getElementById(target).classList.add('active');
+        });
+    });
+
+    const visitorForm = document.getElementById('visitorForm');
+    const visitorBtn = document.getElementById('visitorBtn');
+    const visitorError = document.getElementById('visitorError');
+    const visitorSuccess = document.getElementById('visitorSuccess');
+
+    function showVisitorError(msg) {
+        if (!visitorError) return;
+        visitorError.innerHTML = '<i class="ti ti-alert-triangle"></i> ' + msg;
+        visitorError.style.display = 'flex';
+    }
+
+    function hideVisitorError() {
+        if (!visitorError) return;
+        visitorError.style.display = 'none';
+    }
+
+    function resetVisitorForm() {
+        visitorForm.reset();
+        visitorForm.style.display = 'block';
+        visitorSuccess.style.display = 'none';
+        hideVisitorError();
+    }
+
+    if (visitorForm) {
+        visitorForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+            hideVisitorError();
+            if (visitorBtn) {
+                visitorBtn.innerHTML = '<i class="ti ti-loader"></i> Submitting...';
+                visitorBtn.disabled = true;
+            }
+            const formData = new FormData(visitorForm);
+            fetch('{{ url_for("visitor_request") }}', {
+                method: 'POST',
+                body: formData,
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest',
+                },
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.success) {
+                    visitorForm.style.display = 'none';
+                    document.getElementById('visitorQrImage').src = 'data:image/png;base64,' + data.qr_base64;
+                    document.getElementById('vDetailName').textContent = data.visitor.name || '—';
+                    document.getElementById('vDetailCompany').textContent = data.visitor.company || '—';
+                    document.getElementById('vDetailPurpose').textContent = data.visitor.purpose || '—';
+                    document.getElementById('vDetailMeeting').textContent = data.visitor.meeting_person || '—';
+                    visitorSuccess.style.display = 'block';
+                } else {
+                    showVisitorError(data.error || 'Something went wrong. Please try again.');
+                }
+            })
+            .catch(() => {
+                showVisitorError('Network error. Please try again.');
+            })
+            .finally(() => {
+                if (visitorBtn) {
+                    visitorBtn.innerHTML = '<i class="ti ti-qrcode"></i> Generate Visitor QR';
+                    visitorBtn.disabled = false;
+                }
             });
-        }
-    </script>
+        });
+    }
+</script>
 {% endblock %}

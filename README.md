@@ -28,7 +28,7 @@ Site access control, employee/fleet/visitor management, QR code scanning, and AI
 
 ## Architecture
 
-```
+```text
 ┌─────────────────────────────────────────────────────┐
 │  Browser (Dashboard)                                │
 │  ├── Socket.IO (live updates)                       │
@@ -75,7 +75,7 @@ ollama create mine-assistant -f Modelfile.mine
 OLLAMA_USE_CLOUD=false python app.py
 ```
 
-**Access:** http://localhost:8080  
+**Access:** <http://localhost:8080>  
 **Login:** `admin` / `admin`
 
 ---
@@ -83,7 +83,7 @@ OLLAMA_USE_CLOUD=false python app.py
 ## Environment Variables
 
 | Variable | Default | Description |
-|---|---|---|
+| --- | --- | --- |
 | `SECRET_KEY` | random | Flask session secret |
 | `OLLAMA_URL` | `http://localhost:11434` | Ollama local API base URL |
 | `OLLAMA_MODEL` | `mine-assistant-fast` | Primary model for AI chat |
@@ -100,12 +100,14 @@ OLLAMA_USE_CLOUD=false python app.py
 Arch-System supports two AI modes:
 
 **Local (default):** Requires Ollama running locally. Fast, private, no API costs.
+
 ```bash
 ollama serve
 ollama create mine-assistant-fast -f Modelfile.mine
 ```
 
 **Cloud:** Uses Ollama Cloud for larger models. Set environment variables:
+
 ```bash
 export OLLAMA_USE_CLOUD=true
 export OLLAMA_CLOUD_API_KEY="your-cloud-key"
@@ -119,7 +121,7 @@ Check AI status at `GET /api/ai/status` — returns `{provider: "local"|"cloud"|
 
 ## Repository Layout
 
-```
+```text
 arch-system/
 ├── app.py                  ← Main Flask application (6256 lines, 100+ routes)
 ├── models.py               ← SQLAlchemy models (10 tables)
@@ -177,7 +179,7 @@ arch-system/
 ## API Endpoints
 
 | Method | Path | Auth | Description |
-|---|---|---|---|
+| --- | --- | --- | --- |
 | `POST` | `/api/scan_qr` | API Key | QR scan from hardware scanner |
 | `POST` | `/api/scan_alt` | None | Alternative scan endpoint |
 | `POST` | `/api/c66` | LAN only | Chainway C66 ingest |
@@ -203,6 +205,7 @@ Test coverage includes: auth, employee CRUD, vehicle CRUD, visitor check-in/out,
 ## Deployment
 
 The `deploy-full-server.sh` script handles:
+
 1. Kill old processes & clear ports
 2. Configure firewall (ufw/iptables)
 3. Create/sync virtualenv

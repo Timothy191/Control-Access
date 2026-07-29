@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, maximum-scale=1.0">
     <title>Gate Scanner — Arch-System</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -58,7 +58,6 @@
             animation: beam 2s infinite;
         }
 
-        /* Input that captures keyboard emulator strokes - invisible */
         #qr-capture {
             position: fixed;
             top: -999px;
@@ -90,6 +89,36 @@
             overflow: hidden;
             text-overflow: ellipsis;
             white-space: nowrap;
+        }
+
+        /* ─── TTS TOGGLE ─── */
+        #tts-toggle {
+            position: fixed;
+            top: 1.5rem;
+            right: 1.5rem;
+            z-index: 50;
+            background: rgba(255,255,255,0.08);
+            border: 1px solid rgba(255,255,255,0.15);
+            color: #fff;
+            font-size: 1.8rem;
+            width: 3.5rem;
+            height: 3.5rem;
+            border-radius: 50%;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+        }
+        #tts-toggle:active { transform: scale(0.9); }
+        #tts-toggle.off { opacity: 0.35; background: rgba(255,255,255,0.03); }
+        #tts-toggle.off::after {
+            content: '';
+            position: absolute;
+            width: 2px;
+            height: 2rem;
+            background: #e10600;
+            transform: rotate(45deg);
         }
 
         /* ─── RESULT OVERLAY ─── */
@@ -153,6 +182,48 @@
             transition: width linear;
         }
 
+        /* ─── POPUP MODAL ─── */
+        #popup-modal {
+            position: fixed; inset: 0;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            background: rgba(0,0,0,0.7);
+            z-index: 200;
+            animation: fadeIn 0.2s;
+        }
+        #popup-modal.active { display: flex; }
+
+        .popup-box {
+            background: #1a1a2e;
+            border-radius: 24px;
+            padding: 2.5rem 3rem;
+            max-width: 85vw;
+            text-align: center;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+            border: 1px solid rgba(255,255,255,0.1);
+            animation: popIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+        .popup-icon { font-size: 5rem; margin-bottom: 1rem; }
+        .popup-title { font-size: 2.8rem; font-weight: 900; letter-spacing: 4px; text-transform: uppercase; margin-bottom: 0.75rem; }
+        .popup-title.approved { color: #00cc66; }
+        .popup-title.denied { color: #e10600; }
+        .popup-name { font-size: 1.6rem; font-weight: 600; margin-bottom: 0.5rem; opacity: 0.9; }
+        .popup-detail { font-size: 1rem; opacity: 0.6; margin-bottom: 1rem; }
+        .popup-reason { font-size: 1.2rem; font-weight: 600; color: #ff6b6b; margin-top: 0.5rem; }
+        .popup-dismiss {
+            margin-top: 1.5rem;
+            background: rgba(255,255,255,0.1);
+            border: 1px solid rgba(255,255,255,0.2);
+            color: #fff;
+            padding: 0.75rem 2.5rem;
+            border-radius: 50px;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        .popup-dismiss:active { background: rgba(255,255,255,0.2); }
+
         .result-footer {
             position: fixed;
             bottom: 1.5rem;
@@ -162,7 +233,7 @@
             text-transform: uppercase;
         }
 
-        /* ─── SPINNER (processing) ─── */
+        /* ─── SPINNER ─── */
         #processing {
             position: fixed; inset: 0;
             display: none;
@@ -176,7 +247,17 @@
         }
         #processing.active { display: flex; }
 
-        /* ─── ANIMATIONS ─── */
+        /* ─── DEVICE INFO ─── */
+        #battery-indicator {
+            position: fixed;
+            top: 1.5rem;
+            left: 1.5rem;
+            z-index: 50;
+            font-size: 0.7rem;
+            color: #333;
+            letter-spacing: 1px;
+        }
+
         @keyframes pulse {
             0%, 100% { opacity: 0.4; transform: scale(1); }
             50%       { opacity: 1;   transform: scale(1.08); }
@@ -193,13 +274,18 @@
             70%  { transform: scale(1.1); }
             100% { transform: scale(1);   opacity: 1; }
         }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to   { opacity: 1; }
+        }
     </style>
 </head>
 <body>
 
 <!-- ─── IDLE SCREEN ─── -->
 <div id="idle-screen">
-    <div class="scan-icon">⬛</div>
+    <div class="scan-icon">◻</div>
     <div class="idle-title">Ready to Scan</div>
     <div class="idle-sub">Present QR Code to Scanner</div>
     <div class="scan-beam"></div>
@@ -208,7 +294,7 @@
 <!-- ─── PROCESSING ─── -->
 <div id="processing">⏳ &nbsp; PROCESSING...</div>
 
-<!-- ─── RESULT OVERLAY ─── -->
+<!-- ─── FULLSCREEN OVERLAY ─── -->
 <div id="result-overlay">
     <div class="result-icon" id="result-icon"></div>
     <div class="result-status" id="result-status"></div>
@@ -219,40 +305,102 @@
     <div class="result-footer">Arch-System Gate Access Control</div>
 </div>
 
+<!-- ─── POPUP MODAL ─── -->
+<div id="popup-modal">
+    <div class="popup-box">
+        <div class="popup-icon" id="popup-icon"></div>
+        <div class="popup-title" id="popup-title"></div>
+        <div class="popup-name" id="popup-name"></div>
+        <div class="popup-detail" id="popup-detail"></div>
+        <div class="popup-reason" id="popup-reason" style="display:none"></div>
+        <button class="popup-dismiss" id="popup-dismiss">OK</button>
+    </div>
+</div>
+
+<!-- ─── TTS TOGGLE ─── -->
+<button id="tts-toggle">🔊</button>
+<div id="battery-indicator">● SCANNER MODE</div>
+
 <!-- ─── Hidden input captures keyboard emulator ─── -->
 <input id="qr-capture" type="text" autocomplete="off" autofocus>
 <div class="buffer-display" id="buffer-display"></div>
 <div class="typing-indicator">● KEYBOARD EMULATOR ACTIVE — SCANNER READY</div>
 
+<script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
 <script>
     const SERVER = window.location.origin;
-    const RESET_MS  = 4000;   // how long to show result before resetting
-    const COMMIT_MS = 300;    // wait after last keystroke before submitting
+    const RESET_MS  = 4000;
+    const COMMIT_MS = 300;
 
     let buffer = '';
     let commitTimer = null;
     let busy = false;
-    const capture = document.getElementById('qr-capture');
+    let ttsEnabled = true;
 
-    // ── Keep focus on the hidden input at all times ──
-    document.addEventListener('click', () => { if (!busy) capture.focus(); });
-    document.addEventListener('keydown', () => capture.focus());
-    setInterval(() => { if (!busy) capture.focus(); }, 500);
+    const capture = document.getElementById('qr-capture');
+    const ttsBtn = document.getElementById('tts-toggle');
+
+    // ── SocketIO — listen for scan results from ALL sources ──
+    let socket = null;
+    try {
+        socket = io({ transports: ['websocket', 'polling'], reconnection: true });
+        socket.on('scan_result', (data) => {
+            if (!busy && data && data.success !== undefined) {
+                showResult(data);
+            }
+        });
+    } catch(e) {
+        console.warn('SocketIO unavailable, falling back to HTTP-only mode');
+    }
+
+    // ── TTS Setup ──
+    ttsBtn.addEventListener('click', () => {
+        ttsEnabled = !ttsEnabled;
+        ttsBtn.classList.toggle('off', !ttsEnabled);
+        ttsBtn.textContent = ttsEnabled ? '🔊' : '🔇';
+    });
+
+    function speak(text) {
+        if (!ttsEnabled || !text || !window.speechSynthesis) return;
+        window.speechSynthesis.cancel();
+        const utter = new SpeechSynthesisUtterance(text);
+        utter.rate = 0.95;
+        utter.pitch = 1.0;
+        utter.volume = 1.0;
+        const voices = window.speechSynthesis.getVoices();
+        const enVoice = voices.find(v => v.lang.startsWith('en') && v.name.includes('Female'))
+                     || voices.find(v => v.lang.startsWith('en'))
+                     || null;
+        if (enVoice) utter.voice = enVoice;
+        window.speechSynthesis.speak(utter);
+    }
+
+    // Pre-load voices (async on Chrome)
+    if (window.speechSynthesis) {
+        window.speechSynthesis.getVoices();
+        window.speechSynthesis.onvoiceschanged = () => window.speechSynthesis.getVoices();
+    }
+
+    // ── Keep focus on hidden input ──
+    function refocus() {
+        if (!busy) capture.focus();
+    }
+    document.addEventListener('click', refocus);
+    document.addEventListener('keydown', refocus);
+    setInterval(refocus, 500);
     capture.focus();
 
-    // ── Capture keyboard emulator input ──
+    // ── Capture keyboard emulator ──
     capture.addEventListener('input', () => {
         if (busy) return;
         buffer = capture.value.trim();
         document.getElementById('buffer-display').textContent = buffer.length > 3 ? '●●●●●●●' : '';
-
         clearTimeout(commitTimer);
         if (buffer.length > 0) {
             commitTimer = setTimeout(() => submitScan(buffer), COMMIT_MS);
         }
     });
 
-    // Many keyboard emulators send Enter after the code
     capture.addEventListener('keydown', (e) => {
         if (e.key === 'Enter' && buffer.length > 0) {
             clearTimeout(commitTimer);
@@ -266,7 +414,6 @@
         busy = true;
         buffer = '';
         capture.value = '';
-
         showProcessing(true);
 
         fetch(`${SERVER}/api/c66`, {
@@ -285,22 +432,34 @@
         });
     }
 
-    // ── Show / hide processing spinner ──
     function showProcessing(show) {
         document.getElementById('processing').classList.toggle('active', show);
     }
 
-    // ── Render the full-screen result ──
+    // ── Show result: quiet on approved, popup + TTS on denied ──
     function showResult(data) {
         const overlay  = document.getElementById('result-overlay');
         const idle     = document.getElementById('idle-screen');
+        const modal    = document.getElementById('popup-modal');
         const approved = data.success === true || data.open_gate === true;
+        const name     = data.name || data.entity_name || 'UNKNOWN';
+        const message  = data.message || data.denial_reason || '';
 
-        overlay.className = 'active ' + (approved ? 'approved' : 'denied');
+        // ── APPROVED: silent, no popup, no sound ──
+        if (approved) {
+            busy = false;
+            refocus();
+            return;
+        }
 
-        document.getElementById('result-icon').textContent   = approved ? '✅' : '❌';
-        document.getElementById('result-status').textContent = approved ? 'APPROVED' : 'DENIED';
-        document.getElementById('result-name').textContent   = data.name || data.entity_name || 'UNKNOWN';
+        // ── DENIED: popup + TTS ──
+        const ttsText = data.tts_message || `Access denied. ${name}. ${message}`;
+
+        // Fullscreen overlay
+        overlay.className = 'active denied';
+        document.getElementById('result-icon').textContent   = '✗';
+        document.getElementById('result-status').textContent = 'DENIED';
+        document.getElementById('result-name').textContent   = name;
 
         const detail = [
             (data.entity_type || 'SCAN').toUpperCase(),
@@ -309,14 +468,32 @@
         document.getElementById('result-detail').textContent = detail;
 
         const reasonEl = document.getElementById('result-reason');
-        if (!approved && data.message && data.message !== 'Access denied') {
-            reasonEl.textContent = data.message;
+        if (message && message !== 'Access denied') {
+            reasonEl.textContent = message;
             reasonEl.style.display = 'block';
         } else {
             reasonEl.style.display = 'none';
         }
 
-        // Countdown bar animation
+        // Popup modal
+        document.getElementById('popup-icon').textContent   = '✗';
+        const titleEl = document.getElementById('popup-title');
+        titleEl.textContent = 'DENIED';
+        titleEl.className = 'popup-title denied';
+        document.getElementById('popup-name').textContent   = name;
+        document.getElementById('popup-detail').textContent = detail;
+
+        const popupReason = document.getElementById('popup-reason');
+        if (message && message !== 'Access denied') {
+            popupReason.textContent = message;
+            popupReason.style.display = 'block';
+        } else {
+            popupReason.style.display = 'none';
+        }
+
+        modal.classList.add('active');
+
+        // Countdown bar
         const bar = document.getElementById('countdown-bar');
         bar.style.transition = 'none';
         bar.style.width = '100%';
@@ -325,25 +502,37 @@
             bar.style.width = '0%';
         });
 
-        // Vibration if running inside a WebView on the device
-        if (navigator.vibrate) {
-            approved ? navigator.vibrate([80, 40, 80]) : navigator.vibrate(600);
-        }
+        // Vibration on denied only
+        if (navigator.vibrate) navigator.vibrate(600);
 
-        // Hide idle screen
+        // TTS voice on denied only
+        speak(ttsText);
+
         idle.style.display = 'none';
 
-        // Auto-reset
+        // Dismiss
+        document.getElementById('popup-dismiss').onclick = () => dismissResult(overlay, idle, modal);
+        overlay.onclick = () => dismissResult(overlay, idle, modal);
+
+        // Auto-dismiss
         setTimeout(() => {
-            overlay.className = '';
-            overlay.style.display = 'none';
-            idle.style.display = 'flex';
-            busy = false;
-            capture.focus();
+            if (modal.classList.contains('active')) {
+                dismissResult(overlay, idle, modal);
+            }
         }, RESET_MS);
     }
 
-    // ── InfoWedge / C66 WebView: listen for postMessage from InfoWedge plugin ──
+    function dismissResult(overlay, idle, modal) {
+        if (window.speechSynthesis) window.speechSynthesis.cancel();
+        modal.classList.remove('active');
+        overlay.className = '';
+        overlay.style.display = 'none';
+        idle.style.display = 'flex';
+        busy = false;
+        refocus();
+    }
+
+    // ── PostMessage from InfoWedge plugin ──
     window.addEventListener('message', (e) => {
         const d = e.data;
         if (!d) return;
@@ -355,8 +544,11 @@
         if (code && !busy) submitScan(code);
     });
 
-    // ── Also expose a global function for InfoWedge to call via JS injection ──
     window.onScan = function(code) { if (!busy) submitScan(code); };
+
+    // ── Bidirectional: if using keyboard emulator mode, submit directly ──
+    // If SocketIO is receiving results from InfoWedge, the kiosk page acts as a display
+    // If no SocketIO, the hidden input + HTTP POST handles everything
 </script>
 </body>
 </html>

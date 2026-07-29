@@ -1,0 +1,8 @@
+#!/bin/bash
+# Ollama Launcher - OpenClaw Model
+echo "=== Launching Ollama OpenClaw Model ==="
+if command -v ollama &> /dev/null; then
+  ollama run openclaw "$@"
+else
+  echo "Ollama not installed. Need root to install."
+fi

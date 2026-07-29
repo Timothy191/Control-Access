@@ -2,7 +2,7 @@
 
 ## Tree
 
-```
+```text
 arch-system/
 │
 ├── app.py                      Main Flask application
@@ -78,7 +78,7 @@ arch-system/
 ## Model Field Reference
 
 | Model | Key Fields |
-|---|---|
+| --- | --- |
 | `Employee` | `emp_code`, `first_name`, `surname`, `id_number` (NOT NULL), `job_title`, `induction_expiry`, `medical_expiry`, `qr_code`, `status` |
 | `Vehicle` | `fleet_id`, `registration_expiry`, `qr_code`, `status` |
 | `Equipment` | `radio_id`, `registration_expiry`, `qr_code`, `status` |
@@ -89,7 +89,7 @@ arch-system/
 ## Route Method Reference
 
 | Route | Method | Auth | Description |
-|---|---|---|---|
+| --- | --- | --- | --- |
 | `/employees` | GET | Session | List employees |
 | `/add_employee` | POST | admin/manager | Create employee |
 | `/edit_employee/<id>` | POST | admin/manager | Update employee |

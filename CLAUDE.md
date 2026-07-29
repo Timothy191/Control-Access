@@ -28,11 +28,13 @@ pytest --cov=app --cov-report=html
 ## Architecture
 
 **Core Files:**
+
 - `app.py` - Main Flask application with all routes (CRUD for employees/vehicles/visitors, approvals, QR generation, gate scanner API, AI chat)
 - `models.py` - SQLAlchemy models: User, Employee, Vehicle, Visitor, GateLog, Approval, Device
 - `database.py` - Database setup with SQLite, session management, auto-creates admin user
 
 **Key Features:**
+
 - Role-based access control (admin, manager, security, user)
 - Real-time updates via WebSocket (SocketIO)
 - QR code generation/scanning for access control
@@ -45,10 +47,12 @@ pytest --cov=app --cov-report=html
 **Templates:** Jinja2 templates in `templates/` directory
 
 **API Authentication:**
+
 - Web routes: Session-based authentication (login required)
 - `/api/scan_qr` endpoint: API key authentication via `X-API-Key` header
 
 **Role Permissions:**
+
 - admin: Full access
 - manager: View/dashboard access
 - security: QR scanning and gate log access

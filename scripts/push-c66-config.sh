@@ -20,7 +20,8 @@ BOLD='\033[1m'
 DIM='\033[2m'
 
 # Configuration
-PC_IP="192.168.0.217"
+PC_IP=$(hostname -I 2>/dev/null | awk '{print $1}')
+[ -z "$PC_IP" ] && PC_IP="192.168.1.100"
 PORT=8080
 CONFIG_URL="http://${PC_IP}:${PORT}/static/infowedge-dual-mode-config.json"
 PROJECT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
@@ -98,11 +99,17 @@ else
 fi
 
 # ═══════════════════════════════════════════════════════════════════════════
-# STEP 3: Push Config via ADB (if available)
+# STEP 3: Configure Apps & Push Config via ADB
 # ═══════════════════════════════════════════════════════════════════════════
-step "3" "Pushing Configuration to C66"
+step "3" "Configuring Device & Pushing Config"
 
 if [ "$ADB_AVAILABLE" = true ] && [ "$C66_CONNECTED" = true ]; then
+    status info "Optimizing scanner apps via ADB..."
+    adb shell pm disable-user --user 0 com.rscja.scanner >/dev/null 2>&1 || true
+    status ok "KeyboardEmulator disabled (prevents conflicts)"
+    adb shell pm enable com.rscja.infowedge >/dev/null 2>&1 || true
+    status ok "InfoWedge enabled as primary scanner"
+    
     status info "Pushing config to C66 Downloads folder..."
     
     if adb push "$CONFIG_FILE" /sdcard/Download/infowedge-dual-mode-config.json 2>/dev/null; then
@@ -159,10 +166,10 @@ fi
 step "5" "Checking USB Tethering Connection"
 
 # Check for RNDIS interface
-if ip link show wwan0 2>/dev/null | grep -q "state UP"; then
+if ip link show wwan0 2>/dev/null | grep -E -q "state (UP|UNKNOWN)"; then
     status ok "USB-RNDIS interface (wwan0) is UP"
     USB_ACTIVE=true
-elif ip link show usb0 2>/dev/null | grep -q "state UP"; then
+elif ip link show usb0 2>/dev/null | grep -E -q "state (UP|UNKNOWN)"; then
     status ok "USB interface (usb0) is UP"
     USB_ACTIVE=true
 else

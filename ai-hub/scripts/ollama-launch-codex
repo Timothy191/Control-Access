@@ -1,0 +1,8 @@
+#!/bin/bash
+# Ollama Launcher - Codex Model
+echo "=== Launching Ollama Codex Model ==="
+if command -v ollama &> /dev/null; then
+  ollama run codex "$@"
+else
+  echo "Ollama not installed. Need root to install."
+fi

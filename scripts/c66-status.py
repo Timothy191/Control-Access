@@ -69,9 +69,9 @@ def check_api_endpoint():
 def check_network_accessible():
     """Check if server is accessible from network IP"""
     try:
-        response = requests.get('http://192.168.0.217:8080/api/ai/status', timeout=3)
+        response = requests.get('http://192.168.0.50:8080/api/ai/status', timeout=3)
         if response.status_code == 200:
-            return True, "Network accessible (192.168.0.217:8080)"
+            return True, "Network accessible (192.168.0.50:8080)"
         return False, f"Network returned {response.status_code}"
     except requests.exceptions.ConnectionError:
         return False, "Network connection refused"
@@ -85,7 +85,7 @@ def check_c66_endpoint():
     try:
         # Test the C66 endpoint with a simple POST
         response = requests.post(
-            'http://192.168.0.217:8080/api/c66',
+            'http://192.168.0.50:8080/api/c66',
             data='TEST-CHECK',
             headers={'Content-Type': 'text/plain'},
             timeout=3
@@ -174,7 +174,7 @@ def print_status():
     checks = [
         ("Server Running (Port 8080)", check_server_running),
         ("API Endpoint (localhost)", check_api_endpoint),
-        ("Network Accessible (192.168.0.217)", check_network_accessible),
+        ("Network Accessible (192.168.0.50)", check_network_accessible),
         ("C66 Endpoint (/api/c66)", check_c66_endpoint),
         ("Log File Active", check_log_file),
         ("Recent Scan Activity", count_recent_scans),
@@ -201,7 +201,7 @@ def print_status():
         print(f"{BOLD}{GREEN}║  ✅ ALL SYSTEMS GO - C66 Ready for USB/WiFi Scanning           ║{END}")
         print(f"{BOLD}{GREEN}╚══════════════════════════════════════════════════════════════════╝{END}")
         print(f"\n{BOLD}Next Steps:{END}")
-        print(f"  1. Ensure C66 InfoWedge is configured with: http://192.168.0.217:8080/api/c66")
+        print(f"  1. Ensure C66 InfoWedge is configured with: http://192.168.0.50:8080/api/c66")
         print(f"  2. Scan a test QR code with C66")
         print(f"  3. Monitor with: python3 scripts/monitor-c66-scans.py")
         print(f"  4. For full test: ./scripts/c66-e2e-test.sh")

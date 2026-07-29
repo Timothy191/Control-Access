@@ -21,16 +21,18 @@ class TestMonitoringPage:
         """Only admin can access monitoring."""
         user = User(username="manager_mon", password="pass123", role="manager")
         db_session.add(user)
+        db_session.flush()
+        user_id = user.id
         db_session.commit()
 
         with test_app.session_transaction() as sess:
             sess["logged_in"] = True
             sess["username"] = "manager_mon"
-            sess["user_id"] = user.id
+            sess["user_id"] = user_id
             sess["role"] = "manager"
 
         response = test_app.get("/monitoring")
-        assert response.status_code == 302
+        assert response.status_code == 403
 
     def test_monitoring_access(self, authenticated_client):
         """Admin can access monitoring."""
@@ -206,16 +208,18 @@ class TestNetworkScannerAPI:
         """Scanner config requires admin."""
         user = User(username="manager_sc", password="pass123", role="manager")
         db_session.add(user)
+        db_session.flush()
+        user_id = user.id
         db_session.commit()
 
         with test_app.session_transaction() as sess:
             sess["logged_in"] = True
             sess["username"] = "manager_sc"
-            sess["user_id"] = user.id
+            sess["user_id"] = user_id
             sess["role"] = "manager"
 
         response = test_app.get("/scanner-config")
-        assert response.status_code == 302
+        assert response.status_code == 403
 
 
 class TestDashboardStatsHistory:

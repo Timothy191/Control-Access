@@ -1,10 +1,9 @@
 #!/usr/bin/env python3
-"""
-scan_ingestion.py — Multi-vector QR scan ingestion for Arch-System
-====================================================================
+"""scan_ingestion.py — Multi-vector QR/RFID scan ingestion for Arch-System
+=========================================================================
 Runs as a standalone daemon that listens on every possible channel
 the C66 (or any other scanner) might use and funnels everything to
-the main app via HTTP POST to /api/c66.
+the main app via HTTP POST.
 
 Channels covered:
   1. TCP socket   — port 9100  (InfoWedge TCP output / Zebra-style)
@@ -14,9 +13,11 @@ Channels covered:
   5. USB serial   — /dev/ttyUSB* / /dev/ttyACM*  (keyboard emulator via CDC)
   6. ADB logcat   — parses InfoWedge broadcast intent from adb logcat stream
   7. C66 pull     — actively polls C66 web API if it exposes one
-  8. Clipboard/stdin relay — for manual pipe-in
+  8. RFID TCP     — port 58628 (TCP listener for RFID scanners at 192.168.0.187)
+  9. Clipboard/stdin relay — for manual pipe-in
 
-All ingested codes are forwarded to: http://localhost:8080/api/c66
+QR/Barcode scans forwarded to: http://localhost:8080/api/c66
+RFID scans forwarded to:       http://localhost:8080/api/rfid_ingest
 
 Run with:
     python3 scan_ingestion.py
@@ -37,12 +38,17 @@ from urllib.parse import urlparse, parse_qs
 # ─── Configuration ──────────────────────────────────────────────
 ARCH_SERVER    = "http://localhost:8080"
 C66_IP         = "192.168.166.107"
-USB_IFACE_IP   = "192.168.166.179"
+USB_IFACE_IP   = "0.0.0.0"
 
 TCP_PORT       = 9100
 UDP_PORT       = 9100
 USB_TCP_PORT   = 9101
 HTTP_HOOK_PORT = 9102
+
+# RFID Scanner Configuration (IP: 192.168.0.187, Port: 58628, Protocol: TCP)
+RFID_SCANNER_IP   = "192.168.0.187"
+RFID_SCANNER_PORT = 58628
+RFID_FORWARD_URL  = f"{ARCH_SERVER}/api/rfid_ingest"
 
 SERIAL_BAUD    = 9600
 LOG_PREFIX     = "[INGESTION]"
@@ -63,10 +69,36 @@ def forward(code, source="unknown"):
         )
         data = r.json()
         status = "✅ APPROVED" if data.get("success") else "❌ DENIED"
-        name   = data.get("name", "Unknown")
-        print(f"{LOG_PREFIX} [{source}] {code[:20]}... → {status} ({name})")
+        name = data.get("name") or "Unknown"
+        entity_type = data.get("entity_type") or "QR"
+        
+        parsed = data.get("parsed_data") or {}
+        emp_id = parsed.get("employee_id") or parsed.get("fleet_id") or ""
+        id_str = f" (ID: {emp_id})" if emp_id else ""
+        
+        print(f"{LOG_PREFIX} [{source}] Scanned: {name}{id_str} [{entity_type}] → {status}")
     except Exception as e:
         print(f"{LOG_PREFIX} [{source}] Forward failed: {e}")
+
+
+def forward_rfid(rfid_tag, source="rfid"):
+    """Forward an RFID tag scan to the Arch-System RFID endpoint."""
+    rfid_tag = rfid_tag.strip().upper()
+    if not rfid_tag:
+        return
+    try:
+        r = requests.post(
+            RFID_FORWARD_URL,
+            json={"rfid_tag": rfid_tag, "reader_id": source},
+            headers={"Content-Type": "application/json", "X-Scanner-Source": source},
+            timeout=5
+        )
+        data = r.json()
+        status = "✅ APPROVED" if data.get("success") else "❌ DENIED"
+        name = data.get("name", "Unknown")
+        print(f"{LOG_PREFIX} [RFID-{source}] {rfid_tag[:24]}... → {status} ({name})")
+    except Exception as e:
+        print(f"{LOG_PREFIX} [RFID-{source}] Forward failed: {e}")
 
 
 # ══════════════════════════════════════════════════════════════════
@@ -294,6 +326,132 @@ def stdin_relay():
 
 
 # ══════════════════════════════════════════════════════════════════
+# RFID TCP LISTENER (Dedicated for RFID scanner at 192.168.0.187:58628)
+#    Receives raw RFID tag data via TCP from fixed-mount RFID readers
+#    Supports EPC Gen2, ISO 14443, and other common RFID formats
+# ══════════════════════════════════════════════════════════════════
+def rfid_tcp_listener():
+    """Listen for RFID tag scans from TCP-connected RFID readers.
+    
+    Configured for scanner at 192.168.0.187, port 58628.
+    Can also act as a server to receive connections from the RFID reader.
+    """
+    # Mode 1: Act as server - listen on local port for RFID reader to connect
+    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    
+    # Try to bind to the configured RFID port
+    try:
+        sock.bind(("0.0.0.0", RFID_SCANNER_PORT))
+        sock.listen(5)
+        print(f"{LOG_PREFIX} RFID TCP listener ready on port {RFID_SCANNER_PORT} (waiting for scanner)")
+        
+        while True:
+            try:
+                conn, addr = sock.accept()
+                client_ip = addr[0]
+                print(f"{LOG_PREFIX} RFID scanner connected from {client_ip}")
+                
+                # Handle this connection
+                handle_rfid_connection(conn, client_ip)
+            except Exception as e:
+                print(f"{LOG_PREFIX} RFID accept error: {e}")
+                time.sleep(1)
+    except OSError as e:
+        print(f"{LOG_PREFIX} RFID port {RFID_SCANNER_PORT} unavailable: {e}")
+        print(f"{LOG_PREFIX} Will try to connect to scanner at {RFID_SCANNER_IP}:{RFID_SCANNER_PORT}")
+        
+        # Mode 2: Act as client - connect to the RFID reader
+        rfid_client_mode()
+
+
+def handle_rfid_connection(conn, client_ip):
+    """Handle an RFID scanner connection and process incoming tag data."""
+    buffer = b""
+    try:
+        while True:
+            data = conn.recv(1024)
+            if not data:
+                break
+            
+            buffer += data
+            
+            # Process complete lines/tags from buffer
+            while b'\n' in buffer or b'\r' in buffer:
+                # Split on line endings
+                for delim in [b'\r\n', b'\n\r', b'\n', b'\r']:
+                    if delim in buffer:
+                        line, _, buffer = buffer.partition(delim)
+                        if line:
+                            tag_data = line.decode(errors="replace").strip()
+                            if tag_data:
+                                forward_rfid(tag_data, f"rfid-tcp:{client_ip}")
+                        break
+        
+        # Process any remaining data
+        if buffer:
+            tag_data = buffer.decode(errors="replace").strip()
+            if tag_data:
+                forward_rfid(tag_data, f"rfid-tcp:{client_ip}")
+                
+    except Exception as e:
+        print(f"{LOG_PREFIX} RFID connection error from {client_ip}: {e}")
+    finally:
+        conn.close()
+        print(f"{LOG_PREFIX} RFID scanner disconnected: {client_ip}")
+
+
+def rfid_client_mode():
+    """Act as client - actively connect to RFID reader and receive data."""
+    while True:
+        try:
+            sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            sock.settimeout(30)
+            sock.connect((RFID_SCANNER_IP, RFID_SCANNER_PORT))
+            print(f"{LOG_PREFIX} Connected to RFID scanner at {RFID_SCANNER_IP}:{RFID_SCANNER_PORT}")
+            
+            buffer = b""
+            while True:
+                data = sock.recv(1024)
+                if not data:
+                    break
+                
+                buffer += data
+                
+                # Process complete lines/tags
+                while b'\n' in buffer or b'\r' in buffer:
+                    for delim in [b'\r\n', b'\n\r', b'\n', b'\r']:
+                        if delim in buffer:
+                            line, _, buffer = buffer.partition(delim)
+                            if line:
+                                tag_data = line.decode(errors="replace").strip()
+                                if tag_data:
+                                    forward_rfid(tag_data, f"rfid-client:{RFID_SCANNER_IP}")
+                            break
+                
+                # Prevent buffer overflow
+                if len(buffer) > 8192:
+                    tag_data = buffer.decode(errors="replace").strip()
+                    if tag_data:
+                        forward_rfid(tag_data, f"rfid-client:{RFID_SCANNER_IP}")
+                    buffer = b""
+                    
+        except socket.timeout:
+            print(f"{LOG_PREFIX} RFID connection timeout, retrying...")
+        except ConnectionRefusedError:
+            print(f"{LOG_PREFIX} RFID scanner not available, retrying in 5s...")
+        except Exception as e:
+            print(f"{LOG_PREFIX} RFID client error: {e}")
+        finally:
+            try:
+                sock.close()
+            except:
+                pass
+        
+        time.sleep(5)
+
+
+# ══════════════════════════════════════════════════════════════════
 # STATUS CHECK
 # ══════════════════════════════════════════════════════════════════
 def status_check():
@@ -312,11 +470,13 @@ def status_check():
 # ══════════════════════════════════════════════════════════════════
 if __name__ == "__main__":
     print("""
-╔══════════════════════════════════════════════════════════════╗
-║     ARCH-SYSTEM — Multi-Vector Scan Ingestion Daemon         ║
-╠══════════════════════════════════════════════════════════════╣
-║  Forwarding all scans → http://localhost:8080/api/c66        ║
-╚══════════════════════════════════════════════════════════════╝
+╔══════════════════════════════════════════════════════════════════╗
+║     ARCH-SYSTEM — Multi-Vector Scan Ingestion Daemon             ║
+╠══════════════════════════════════════════════════════════════════╣
+║  QR/Barcode → http://localhost:8080/api/c66                        ║
+║  RFID       → http://localhost:8080/api/rfid_ingest              ║
+║  Scanner: 192.168.0.187:58628 (TCP)                                ║
+╚══════════════════════════════════════════════════════════════════╝
 """)
 
     threads = [
@@ -326,6 +486,7 @@ if __name__ == "__main__":
         ("HTTP-9102",     http_hook_listener),
         ("Serial/CDC",    serial_listener),
         ("ADB-logcat",    adb_logcat_listener),
+        ("RFID-58628",    rfid_tcp_listener),
         ("Status",        status_check),
     ]
 

@@ -4,6 +4,9 @@
 
 import os
 
+# Note: eventlet.monkey_patch() is called automatically by gunicorn's eventlet worker
+# Do NOT call it here to avoid blocking function errors
+
 # Worker type — eventlet required for Flask-SocketIO
 worker_class = "eventlet"
 
@@ -21,8 +24,9 @@ timeout = 120
 keepalive = 5
 
 # Logging
-accesslog = os.environ.get("LOG_FILE", "-")   # "-" = stdout
-errorlog = os.environ.get("LOG_FILE", "-")
+accesslog = os.environ.get("LOG_FILE", "server.log")   # Default to server.log instead of stdout
+errorlog = os.environ.get("LOG_FILE", "server.log")
+capture_output = True
 loglevel = os.environ.get("LOG_LEVEL", "info").lower()
 access_log_format = '%(h)s %(l)s %(u)s %(t)s "%(r)s" %(s)s %(b)s "%(f)s" "%(a)s"'
 

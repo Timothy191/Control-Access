@@ -154,7 +154,7 @@ class TestApproveRequest:
             sess["role"] = "user"
 
         response = test_app.post("/approve_request/1", json={})
-        assert response.status_code == 302
+        assert response.status_code == 403
 
     def test_approve_employee_request(self, authenticated_client, sample_pending_approval, db_cleanup):
         """Approve creates new employee record."""
@@ -238,7 +238,7 @@ class TestRejectRequest:
             sess["role"] = "user"
 
         response = test_app.post("/reject_request/1", json={"comment": "No"})
-        assert response.status_code == 302
+        assert response.status_code == 403
 
     def test_reject_request(self, authenticated_client, sample_pending_approval, db_cleanup):
         """Reject updates approval status."""
@@ -339,7 +339,10 @@ class TestQRScanCreatesApproval:
         assert response.status_code == 200
 
         # Verify approval was created
-        final_count = db_session.query(Approval).filter_by(status="Pending").count()
+        all_pending = db_session.query(Approval).filter_by(status="Pending").all()
+        for a in all_pending:
+            print(f"APPROVAL: {a.id}, {a.scanned_data}")
+        final_count = len(all_pending)
         assert final_count > initial_count
 
         data = response.get_json()

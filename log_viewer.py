@@ -1,9 +1,33 @@
 #!/usr/bin/env python3
-"""
-Arch-System — Grafana-Style Terminal Dashboard
-Monitors logs, HTTP traffic, Scans, and System Resources.
-Requires: rich, psutil, plotext (installed in venv)
-"""
+import os
+import sys
+import time
+import re
+import subprocess
+import threading
+from collections import deque
+from datetime import datetime
+
+try:
+    from rich.console import Console
+    from rich.text import Text
+    from rich.live import Live
+    from rich.layout import Layout
+    from rich.panel import Panel
+    from rich.table import Table
+    from rich.align import Align
+    from rich import box
+    import psutil
+    import plotext as plt
+except ImportError:
+    print("Dependencies missing — run: pip install rich psutil plotext")
+    sys.exit(1)
+
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+SERVER_LOG  = os.path.join(SCRIPT_DIR, "server.log")
+MONITOR_LOG = os.path.join(SCRIPT_DIR, "monitor.log")
+
+console = Console()
 
 # ── Data History (for graphs) ────────────────────────────────────────────────
 HISTORY_LEN = 40
@@ -91,20 +115,43 @@ def process_log_line(line: str, source: str):
         return
 
     # --- SCAN events ---
-    if "SCAN LOG" in line or "/api/scan_qr" in line:
+    if "SCAN LOG" in line:
         metrics["total_scans"] += 1
-        
-        if "granted: True" in line or '" 200 ' in line:
-            metrics["approved"] += 1
-            if "OUT" in line:
-                metrics["out"] += 1
-                recent_logs.append(Text(f"🚪 OUT SCAN", style="yellow"))
+        import json
+        import ast
+        try:
+            dict_str = line.split("SCAN LOG:", 1)[1].strip()
+            try:
+                data = json.loads(dict_str)
+            except Exception:
+                data = ast.literal_eval(dict_str)
+            entity = data.get("entity", "Unknown")
+            direction = data.get("direction", "IN")
+            granted = data.get("granted", False)
+            entity_type = data.get("type", "QR")
+            
+            outcome = "APPROVED" if granted else "DENIED"
+            emoji = "🚪" if direction == "OUT" else "🔑"
+            style = "green" if granted else "red"
+            
+            if granted:
+                metrics["approved"] += 1
+                if direction == "OUT":
+                    metrics["out"] += 1
+                else:
+                    metrics["in"] += 1
             else:
-                metrics["in"] += 1
-                recent_logs.append(Text(f"✅ IN SCAN", style="green"))
-        elif "granted: False" in line or "DENIED" in line:
-            metrics["denied"] += 1
-            recent_logs.append(Text(f"❌ DENIED SCAN", style="red"))
+                metrics["denied"] += 1
+                
+            recent_logs.append(Text(f"{emoji} {entity} ({entity_type}) -> {outcome}", style=style))
+        except Exception:
+            # Fallback
+            if "granted: True" in line:
+                metrics["approved"] += 1
+                recent_logs.append(Text("✅ SCAN APPROVED", style="green"))
+            else:
+                metrics["denied"] += 1
+                recent_logs.append(Text("❌ SCAN DENIED", style="red"))
         return
 
     if any(k in line for k in ["ERROR", "Exception", "CRITICAL"]):
@@ -277,10 +324,14 @@ def main():
         # Row 2
         layout["row2_c1"].update(Panel(Text.from_ansi(p_ram), title="[bold green]Memory Usage (%)", border_style="green"))
         
-        # Get monitor PID
+        # Get flask/gunicorn PID
         try:
-            result = subprocess.run(["pgrep", "-f", "monitor.py"], capture_output=True, text=True)
+            result = subprocess.run(["pgrep", "-f", "gunicorn.*app:app"], capture_output=True, text=True)
             raw_pid = result.stdout.strip().split("\n")[0]
+            if not raw_pid:
+                # fallback to monitor.py if running dev mode
+                result = subprocess.run(["pgrep", "-f", "monitor.py"], capture_output=True, text=True)
+                raw_pid = result.stdout.strip().split("\n")[0]
         except:
             raw_pid = ""
             

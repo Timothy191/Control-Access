@@ -4,16 +4,9 @@ from models import Employee, Vehicle, Visitor, GateLog
 from datetime import datetime, timedelta
 
 
-@pytest.fixture
-def api_client():
-    app.config["TESTING"] = True
-    with app.test_client() as client:
-        yield client
 
 
-@pytest.fixture
-def HARDWARE_API_KEY():
-    return "your-secret-hardware-key"
+
 
 
 class TestQRScanAPI:

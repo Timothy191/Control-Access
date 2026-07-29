@@ -81,7 +81,7 @@ class TestGateLogsPage:
             sess["role"] = "user"
 
         response = test_app.get("/gate_logs")
-        assert response.status_code == 302
+        assert response.status_code == 403
 
     def test_gate_logs_access(self, authenticated_client, sample_gate_logs):
         """Admin can view gate logs."""
@@ -318,7 +318,7 @@ class TestQRScannerPage:
             sess["role"] = "user"
 
         response = test_app.get("/qr_scanner")
-        assert response.status_code == 302
+        assert response.status_code == 403
 
     def test_qr_scanner_access(self, authenticated_client):
         """Admin can access scanner interface."""

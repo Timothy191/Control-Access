@@ -29,7 +29,8 @@ class TestConcurrentQRScans:
         db_session.commit()
 
         def make_scan_request():
-            return api_client.post(
+            with app.test_client() as client:
+                return client.post(
                 "/api/scan_qr",
                 json={
                     "qr_code": "LOAD_QR_001",
@@ -65,7 +66,8 @@ class TestConcurrentQRScans:
         initial_approvals = db_session.query(GateLog).filter_by(qr_data=qr_code).count()
 
         def make_scan_request():
-            return api_client.post(
+            with app.test_client() as client:
+                return client.post(
                 "/api/scan_qr",
                 json={
                     "qr_code": qr_code,
@@ -104,7 +106,8 @@ class TestConcurrentQRScans:
         db_session.commit()
 
         def scan_employee(emp):
-            return api_client.post(
+            with app.test_client() as client:
+                return client.post(
                 "/api/scan_qr",
                 json={
                     "qr_code": emp.qr_code,
@@ -135,18 +138,19 @@ class TestConcurrentLogins:
         db_session.commit()
 
         def attempt_login():
-            return test_app.post("/login", data={
-                "username": "concurrent",
-                "password": "testpass"
-            })
+            with app.test_client() as client:
+                return client.post("/login", data={
+                    "username": "concurrent",
+                    "password": "testpass"
+                })
 
         # Make 10 concurrent login attempts
         with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
             futures = [executor.submit(attempt_login) for _ in range(10)]
             results = [f.result() for f in concurrent.futures.as_completed(futures)]
 
-        # All should return 200 or 302
-        valid_status = sum(1 for r in results if r.status_code in [200, 302])
+        # All should return 200, 302 (success/fail) or 429 (rate limited)
+        valid_status = sum(1 for r in results if r.status_code in [200, 302, 429])
         assert valid_status == 10
 
     def test_login_rate_limiting(self, test_app, db_cleanup):
@@ -337,7 +341,9 @@ class TestDatabaseConnectionLimits:
         db_session.commit()
 
         def query_employees():
-            return authenticated_client.get("/employees")
+            with app.test_client() as client:
+                client.post("/login", data={"username": "admin", "password": "admin"})
+                return client.get("/employees")
 
         # Make concurrent queries
         with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
@@ -365,7 +371,8 @@ class TestScannerEndpoints:
         db_session.commit()
 
         def scan_alt():
-            return api_client.post(
+            with app.test_client() as client:
+                return client.post(
                 "/api/scan_alt",
                 json={"qr_code": "ALT_QR_001", "direction": "IN"}
             )
@@ -380,7 +387,8 @@ class TestScannerEndpoints:
     def test_c66_endpoint_load(self, api_client, db_cleanup):
         """C66 endpoint handles load."""
         def c66_scan():
-            return api_client.post(
+            with app.test_client() as client:
+                return client.post(
                 "/api/c66",
                 data="RAW_BARCODE_DATA_TEST",
                 content_type="text/plain"

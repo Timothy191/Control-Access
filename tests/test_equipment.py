@@ -78,7 +78,7 @@ class TestAddEquipment:
             "radio_id": "NEW001",
             "status": "Active"
         })
-        assert response.status_code == 302
+        assert response.status_code == 403
 
     def test_add_equipment(self, authenticated_client, db_cleanup):
         """Manager can add equipment."""
@@ -167,7 +167,7 @@ class TestEditEquipment:
             "radio_id": "EDITED",
             "status": "Inactive"
         })
-        assert response.status_code == 302
+        assert response.status_code == 403
 
     def test_edit_equipment(self, authenticated_client, sample_equipment, db_cleanup):
         """Manager can edit equipment."""
@@ -237,7 +237,7 @@ class TestDeleteEquipment:
             sess["role"] = "manager"
 
         response = test_app.post(f"/delete_equipment/{sample_equipment.id}")
-        assert response.status_code == 302
+        assert response.status_code == 403
 
     def test_delete_equipment(self, authenticated_client, db_cleanup):
         """Admin can delete equipment."""
@@ -283,7 +283,7 @@ class TestEquipmentQRCode:
         assert response.status_code == 200
 
         # Verify QR code was assigned
-        db_session.refresh(sample_equipment)
+        sample_equipment = db_session.query(Equipment).get(sample_equipment.id)
         assert sample_equipment.qr_code is not None
         assert len(sample_equipment.qr_code) == 32  # SHA256[:32]
 

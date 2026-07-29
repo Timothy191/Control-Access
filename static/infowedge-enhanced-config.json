@@ -7,7 +7,7 @@
   "connection_strategy": {
     "primary": {
       "type": "direct_http",
-      "url": "http://192.168.0.217:8080/api/c66",
+      "url": "http://192.168.0.50:8080/api/c66",
       "timeout": 5000,
       "retry_attempts": 3,
       "priority": 1,
@@ -15,7 +15,7 @@
     },
     "fallback_1": {
       "type": "alternative_endpoint",
-      "url": "http://192.168.0.217:8080/api/scan_alt",
+      "url": "http://192.168.0.50:8080/api/scan_alt",
       "timeout": 7000,
       "retry_attempts": 5,
       "priority": 2,
@@ -23,10 +23,10 @@
     },
     "fallback_2": {
       "type": "tunnel_proxy",
-      "url": "http://192.168.0.217:8080/api/c66",
+      "url": "http://192.168.0.50:8080/api/c66",
       "tunnel_config": {
         "type": "http_tunnel",
-        "backup_server": "http://192.168.0.217:8081",
+        "backup_server": "http://192.168.0.50:8081",
         "tunnel_port": 8082,
         "encryption": "none"
       },
@@ -37,11 +37,11 @@
     },
     "fallback_3": {
       "type": "mesh_network",
-      "url": "http://192.168.0.217:8080/api/c66",
+      "url": "http://192.168.0.50:8080/api/c66",
       "mesh_nodes": [
-        "192.168.0.217:8080",
-        "192.168.0.217:8081",
-        "192.168.0.217:8082"
+        "192.168.0.50:8080",
+        "192.168.0.50:8081",
+        "192.168.0.50:8082"
       ],
       "timeout": 15000,
       "retry_attempts": 10,
@@ -127,11 +127,11 @@
     "output": {
       "output_type": "IP Output",
       "ip_settings": {
-        "primary_url": "http://192.168.0.217:8080/api/c66",
+        "primary_url": "http://192.168.0.50:8080/api/c66",
         "fallback_urls": [
-          "http://192.168.0.217:8080/api/scan_alt",
-          "http://192.168.0.217:8081/api/c66",
-          "http://192.168.0.217:8082/api/c66"
+          "http://192.168.0.50:8080/api/scan_alt",
+          "http://192.168.0.50:8081/api/c66",
+          "http://192.168.0.50:8082/api/c66"
         ],
         "port": 8080,
         "protocol": "HTTP",
@@ -148,7 +148,7 @@
         "failover_timeout": 3000,
         "tunnel_mode": {
           "enabled": true,
-          "backup_tunnel": "http://192.168.0.217:8081",
+          "backup_tunnel": "http://192.168.0.50:8081",
           "tunnel_protocol": "HTTP",
           "auto_switch": true
         }
@@ -163,7 +163,7 @@
           "device": "{{deviceID}}",
           "scanner": "C66-Enhanced",
           "connection_mode": "{{connectionType}}",
-          "pc_target": "192.168.0.217",
+          "pc_target": "192.168.0.50",
           "fallback_used": "{{fallbackEndpoint}}",
           "retry_count": "{{retryCount}}",
           "health_score": "{{connectionHealth}}"
@@ -215,12 +215,12 @@
         "enabled": true,
         "backup_servers": [
           {
-            "url": "http://192.168.0.217:8081/api/c66",
+            "url": "http://192.168.0.50:8081/api/c66",
             "priority": 1,
             "weight": 1
           },
           {
-            "url": "http://192.168.0.217:8082/api/c66",
+            "url": "http://192.168.0.50:8082/api/c66",
             "priority": 2,
             "weight": 2
           }
@@ -232,9 +232,9 @@
       "mesh_network": {
         "enabled": true,
         "nodes": [
-          "192.168.0.217:8080",
-          "192.168.0.217:8081",
-          "192.168.0.217:8082"
+          "192.168.0.50:8080",
+          "192.168.0.50:8081",
+          "192.168.0.50:8082"
         ],
         "discovery": true,
         "auto_routing": true,
@@ -265,7 +265,7 @@
   "testing": {
     "comprehensive_test_suite": {
       "primary_endpoint": {
-        "url": "http://192.168.0.217:8080/api/c66",
+        "url": "http://192.168.0.50:8080/api/c66",
         "test_scenarios": [
           "normal_operation",
           "high_load",

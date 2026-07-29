@@ -1,11 +1,11 @@
 {
   "profile_name": "Mine Management PC-Forward",
-  "profile_description": "Forward C66 scans to PC at 192.168.0.217",
+  "profile_description": "Forward C66 scans to PC at 192.168.0.50",
   "version": "1.0",
   "created": "2026-05-07",
   "target_system": "Mine Management System v2.1.0",
   "pc_connection": {
-    "pc_ip": "192.168.0.217",
+    "pc_ip": "192.168.0.50",
     "pc_name": "tim-desktop",
     "connection_type": "USB-RNDIS",
     "device_detected": {
@@ -18,12 +18,12 @@
   },
   "endpoints": {
     "primary": {
-      "url": "http://192.168.0.217:8080/api/c66",
+      "url": "http://192.168.0.50:8080/api/c66",
       "method": "POST",
       "description": "PC endpoint - direct USB forwarding"
     },
     "alternative": {
-      "url": "http://192.168.0.217:8080/api/scan_alt", 
+      "url": "http://192.168.0.50:8080/api/scan_alt", 
       "method": "POST",
       "description": "PC alternative endpoint"
     }
@@ -54,7 +54,7 @@
     "output": {
       "output_type": "IP Output",
       "ip_settings": {
-        "target_url": "http://192.168.0.217:8080/api/c66",
+        "target_url": "http://192.168.0.50:8080/api/c66",
         "port": 8080,
         "protocol": "HTTP",
         "method": "POST",
@@ -71,7 +71,7 @@
           "timestamp": "{{timestamp}}",
           "device": "{{deviceID}}",
           "scanner": "C66-PC",
-          "pc_target": "192.168.0.217"
+          "pc_target": "192.168.0.50"
         }
       }
     },
@@ -96,7 +96,7 @@
   },
   "testing": {
     "pc_endpoint_test": {
-      "url": "http://192.168.0.217:8080/api/c66",
+      "url": "http://192.168.0.50:8080/api/c66",
       "method": "POST",
       "test_data": {
         "barcodeData": "C66-PC-TEST-SCAN",
@@ -105,7 +105,7 @@
       }
     },
     "validation_steps": [
-      "1. Configure InfoWedge with PC IP (192.168.0.217)",
+      "1. Configure InfoWedge with PC IP (192.168.0.50)",
       "2. Test USB-RNDIS connection to PC",
       "3. Scan test QR code",
       "4. Verify scan appears on PC server logs",
