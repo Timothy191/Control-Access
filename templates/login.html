@@ -8,17 +8,30 @@
         --red-glow: #ff4d4d;
         --true-black: #000000;
     }
-    .auth-page .app { display: block; }
+    html, body {
+        height: 100%;
+        margin: 0;
+        padding: 0;
+        overflow: hidden;
+    }
+    .auth-page {
+        height: 100vh;
+        overflow: hidden;
+    }
+    .auth-page .app { display: block; height: 100%; }
     .auth-page .menu-toggle { display: none !important; }
     .auth-page .sidebar { display: none !important; }
+    .auth-page .sidebar-trigger-zone { display: none !important; }
+    .auth-page .sidebar-overlay { display: none !important; }
     .auth-page .main-content {
         margin-left: 0 !important;
         padding-top: 0 !important;
         width: 100%;
-        min-height: 100vh;
+        height: 100vh;
         display: flex;
         align-items: center;
         justify-content: center;
+        overflow: auto;
     }
     .auth-page .breadcrumb { display: none !important; }
     .login-wrapper {
@@ -26,6 +39,7 @@
             z-index: 100;
             width: 100%;
             max-width: 480px;
+            margin: auto;
         }
     .login-card {
             background: rgba(10,10,10,0.9);
@@ -315,7 +329,7 @@
 <div class="login-wrapper">
     <div class="login-card">
         <div class="login-logo">
-            <i class="ti ti-hard-hat"></i>
+            <img src="{{ url_for('static', filename='logo.png') }}" alt="Arch-System Logo" style="width: 80px; height: 80px; border-radius: 16px; object-fit: cover; border: 1px solid var(--steel); box-shadow: 0 0 15px rgba(255, 107, 0, 0.3);">
         </div>
         <h2>Arch-System</h2>
 

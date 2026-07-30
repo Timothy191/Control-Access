@@ -202,37 +202,49 @@ function drawOnSiteGauge(canvasId, current, capacity) {
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
     const w = canvas.width, h = canvas.height;
-    const cx = w / 2, cy = h / 2 + 10;
-    const radius = Math.min(w, h) / 2 - 15;
-    const pct = Math.min(1, current / (capacity || 1));
+    const cx = w / 2, cy = h / 2 + 15;
+    const radius = Math.min(w, h) / 2 - 16;
+    const maxCap = capacity || 500;
+    const pct = Math.min(1, current / maxCap);
 
     ctx.clearRect(0, 0, w, h);
 
-    // Background arc
+    // Glowing outer track background arc
     ctx.beginPath();
     ctx.arc(cx, cy, radius, Math.PI, 2 * Math.PI, false);
-    ctx.strokeStyle = '#1a1a2e';
+    ctx.strokeStyle = 'rgba(212, 175, 55, 0.15)';
     ctx.lineWidth = 12;
     ctx.stroke();
 
-    // Value arc
+    // Value Arc with Glow
+    ctx.save();
+    ctx.shadowColor = pct > 0.85 ? 'rgba(239, 68, 68, 0.8)' : (pct > 0.6 ? 'rgba(255, 107, 0, 0.8)' : 'rgba(16, 185, 129, 0.8)');
+    ctx.shadowBlur = 10;
     ctx.beginPath();
     ctx.arc(cx, cy, radius, Math.PI, Math.PI + pct * Math.PI, false);
     const grad = ctx.createLinearGradient(0, 0, w, 0);
-    grad.addColorStop(0, '#4caf50');
-    grad.addColorStop(0.7, '#ff9800');
-    grad.addColorStop(1, '#f44336');
+    grad.addColorStop(0, '#10b981');
+    grad.addColorStop(0.65, '#ff6b00');
+    grad.addColorStop(1, '#ef4444');
     ctx.strokeStyle = grad;
     ctx.lineWidth = 12;
     ctx.lineCap = 'round';
     ctx.stroke();
+    ctx.restore();
 
-    // Center text
+    // Center text - Count
     ctx.fillStyle = '#ffffff';
-    ctx.font = 'bold 28px Inter, sans-serif';
+    ctx.font = 'bold 30px Inter, sans-serif';
     ctx.textAlign = 'center';
-    ctx.fillText(current, cx, cy - 5);
-    ctx.font = '12px Inter, sans-serif';
-    ctx.fillStyle = '#888';
-    ctx.fillText('ON SITE', cx, cy + 15);
+    ctx.fillText(current, cx, cy - 12);
+
+    // Sub-text - ON SITE NOW
+    ctx.font = '700 10px Inter, sans-serif';
+    ctx.fillStyle = '#ff6b00';
+    ctx.fillText('ON SITE NOW', cx, cy + 6);
+
+    // Capacity indicator
+    ctx.font = '500 10px Inter, sans-serif';
+    ctx.fillStyle = '#aaaaaa';
+    ctx.fillText(`Max Capacity: ${maxCap} (${Math.round(pct * 100)}%)`, cx, cy + 22);
 }

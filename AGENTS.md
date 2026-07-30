@@ -42,6 +42,13 @@ ruff format <file>
 - Hardware integration JSON body: `{"qr_code": "...", "direction": "IN", "gate_location": "Main Gate"}`
 - API key: `your-secret-hardware-key` (dev) or set `HARDWARE_API_KEY` env var
 
+## Mandatory Pre-Output Completion Rule
+
+Before completing any user turn or reporting changes:
+1. Increment the CSS version cache-buster query string (`style.css?v=1.0.X`) in `templates/base.html`.
+2. Perform a clean server restart (`pkill -f "python.*app.py"` then `export OLLAMA_USE_CLOUD="false" && ./venv/bin/python app.py`).
+3. Verify `http://localhost:8080/login` returns HTTP `200 OK`.
+
 ## Critical Gotchas
 
 - **eventlet monkey-patching** — `app.py` calls `eventlet.monkey_patch()` at the top.

@@ -150,9 +150,16 @@ if not _secret_key:
         "SECRET_KEY not set — using random key (sessions reset on restart). Set SECRET_KEY in .env"
     )
 
-# Warn at startup if HARDWARE_API_KEY is not configured
+# Validate HARDWARE_API_KEY at startup
 _hardware_key_check = os.environ.get("HARDWARE_API_KEY")
 if not _hardware_key_check:
+    if _is_production:
+        raise RuntimeError(
+            "HARDWARE_API_KEY environment variable is not set. "
+            "This is required for production deployments. "
+            "Generate one with: python -c \"import secrets; print(secrets.token_urlsafe(32))\" "
+            "and add it to your .env file."
+        )
     logger.warning(
         "HARDWARE_API_KEY is not set — hardware API key authentication is disabled. "
         "Set HARDWARE_API_KEY in .env for production deployments."
@@ -244,6 +251,17 @@ if _ratelimit_storage == "memory://":
 _cors_origins = os.environ.get(
     "CORS_ORIGINS", "*"
 )  # Set CORS_ORIGINS env var to restrict
+
+# Validate CORS configuration in production
+if _is_production and (_cors_origins == "*" or not _cors_origins):
+    logger.error(
+        "CORS_ORIGINS is set to '*' or not configured in production. "
+        "This allows any origin to access API endpoints. "
+        "Set CORS_ORIGINS to specific domains (comma-separated) for production."
+    )
+    # In production, we could raise an error here, but logging is safer for existing deployments
+    # raise RuntimeError("CORS_ORIGINS must be explicitly set in production (cannot be '*')")
+
 CORS(
     app,
     resources={
@@ -3800,11 +3818,13 @@ def kill_process_on_port(port):
                 for pid in pids:
                     try:
                         os.kill(int(pid), signal.SIGTERM)
+                        logger.info(f"Killed process {pid} on port {port} (SIGTERM)")
                         print(f"Killed process {pid} on port {port}")
                     except (ProcessLookupError, PermissionError):
                         # If SIGTERM fails, try SIGKILL
                         try:
                             os.kill(int(pid), signal.SIGKILL)
+                            logger.info(f"Force killed process {pid} on port {port} (SIGKILL)")
                             print(f"Force killed process {pid} on port {port}")
                         except Exception:
                             pass

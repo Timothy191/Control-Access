@@ -47,14 +47,28 @@ def require_api_key(f):
         _hardware_key = os.environ.get("HARDWARE_API_KEY", "")
         _mobile_key = os.environ.get("MOBILE_API_KEY", "")
         valid_keys = [k for k in [_hardware_key, _mobile_key] if k]
+        client_ip = request.remote_addr
+        
         if not valid_keys:
             logger.error(
-                "API authentication not configured — rejecting request. "
+                f"API authentication not configured — rejecting request from {client_ip}. "
                 "Set HARDWARE_API_KEY or MOBILE_API_KEY environment variable."
             )
             return jsonify({"error": "API authentication not configured"}), 500
+        
         if not key or not any(hmac.compare_digest(key, vk) for vk in valid_keys):
+            # Log failed authentication attempts for security monitoring
+            if key:
+                logger.warning(
+                    f"Invalid API key attempt from {client_ip} "
+                    f"(key prefix: {key[:8]}...)"
+                )
+            else:
+                logger.warning(
+                    f"Missing API key attempt from {client_ip}"
+                )
             return jsonify({"error": "Invalid API key"}), 401
+        
         return f(*args, **kwargs)
 
     return decorated

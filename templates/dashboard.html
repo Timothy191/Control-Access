@@ -26,7 +26,7 @@
     <div class="stats-grid">
         <div class="stat-card" data-tooltip="Total active employees on site" data-stat-employees="{{ stats.employees }}">
             <div class="stat-icon blue">
-                <i class="ti ti-users"></i>
+                <img src="{{ url_for('static', filename='icons/dashboard/total-employees.svg') }}" alt="Total Employees" class="dash-custom-icon">
             </div>
             <div class="stat-info">
                 <h3 id="employeesCount" class="counter-value">0</h3>
@@ -42,7 +42,7 @@
 
         <div class="stat-card" data-tooltip="Operational vehicles in fleet" data-stat-vehicles="{{ stats.vehicles }}">
             <div class="stat-icon green">
-                <i class="ti ti-truck"></i>
+                <img src="{{ url_for('static', filename='icons/dashboard/fleet-vehicles.svg') }}" alt="Fleet Vehicles" class="dash-custom-icon">
             </div>
             <div class="stat-info">
                 <h3 id="fleetCount" class="counter-value">0</h3>
@@ -56,7 +56,7 @@
 
         <div class="stat-card" data-tooltip="Currently checked-in visitors" data-stat-visitors="{{ stats.visitors }}">
             <div class="stat-icon orange">
-                <i class="ti ti-id-badge"></i>
+                <img src="{{ url_for('static', filename='icons/dashboard/active-visitors.svg') }}" alt="Active Visitors" class="dash-custom-icon">
             </div>
             <div class="stat-info">
                 <h3 id="visitorsCount" class="counter-value">0</h3>
@@ -70,7 +70,7 @@
 
         <div class="stat-card" data-tooltip="Total equipment and radio IDs" data-stat-equipment="{{ stats.equipment }}">
             <div class="stat-icon blue">
-                <i class="ti ti-device-desktop-analytics"></i>
+                <img src="{{ url_for('static', filename='icons/dashboard/radio-ids.svg') }}" alt="Radio IDs" class="dash-custom-icon">
             </div>
             <div class="stat-info">
                 <h3 id="equipmentCount" class="counter-value">0</h3>
@@ -84,7 +84,7 @@
 
         <div class="stat-card" data-tooltip="Requests awaiting approval" data-stat-pending="{{ stats.pending_approvals }}">
             <div class="stat-icon red">
-                <i class="ti ti-clock"></i>
+                <img src="{{ url_for('static', filename='icons/dashboard/pending-approvals.svg') }}" alt="Pending Approvals" class="dash-custom-icon">
             </div>
             <div class="stat-info">
                 <h3 id="pendingCount" class="counter-value">0</h3>
@@ -140,140 +140,121 @@
     </div>
     {% endif %}
 
-    <div class="card recent-activity">
-        <div class="card-header">
-            <h3><i class="ti ti-history"></i> Recent Activity</h3>
-            <span class="live-indicator"><span class="live-dot"></span> Live</span>
+    <div class="dashboard-grid-layout">
+        <!-- Main Column: Analytics & Stream -->
+        <div class="dashboard-main-col">
+            <!-- 24-Hour Analytics Chart Card -->
+            <div class="card gate-chart mb-4">
+                <div class="card-header">
+                    <h3><i class="ti ti-chart-bar"></i> Gate Scans — Last 24 Hours</h3>
+                    <span class="badge badge-gpu"><i class="ti ti-device-desktop-analytics"></i> Chart.js</span>
+                </div>
+                <div class="card-body" style="position:relative; padding: 1.25rem;">
+                    <canvas id="gateBarChart" width="800" height="220" style="width:100%; height:220px; display:block;"></canvas>
+                </div>
+            </div>
+
+            <!-- Recent Activity Live Table Card -->
+            <div class="card recent-activity mb-4">
+                <div class="card-header">
+                    <h3><i class="ti ti-history"></i> Recent Activity</h3>
+                    <span class="live-indicator"><span class="live-dot"></span> Live Telemetry</span>
+                </div>
+                <div class="card-body">
+                    <div id="recentActivityLoader" class="activity-loader">
+                        <i class="ti ti-loader"></i> Loading...
+                    </div>
+                    <div id="recentActivityEmpty" class="activity-empty" style="display:none;">
+                        <i class="ti ti-qrcode"></i> No scans recorded today
+                    </div>
+                    <table id="recentActivityTable" class="activity-table" style="display:none;">
+                        <thead>
+                            <tr>
+                                <th>Time</th>
+                                <th>Name</th>
+                                <th>Type</th>
+                                <th>Direction</th>
+                                <th>Gate</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody id="recentActivityBody">
+                        </tbody>
+                    </table>
+                </div>
+            </div>
         </div>
-        <div class="card-body">
-            <div id="recentActivityLoader" class="activity-loader">
-                <i class="ti ti-loader"></i> Loading...
+
+        <!-- Side Column: Status, Gauges & Action Panels -->
+        <div class="dashboard-side-col">
+            <!-- On Site Gauge -->
+            <div class="card on-site-gauge mb-4" style="display: flex; flex-direction: column; justify-content: space-between; height: 100%;">
+                <div class="card-header">
+                    <h3><i class="ti ti-map-pin"></i> On Site Now</h3>
+                    <span class="badge badge-gpu"><i class="ti ti-activity"></i> Real-time Occupancy</span>
+                </div>
+                <div class="card-body" style="display:flex; flex: 1; flex-direction: column; align-items:center; justify-content:center; padding: 1rem; min-height: 220px;">
+                    <canvas id="onSiteGauge" width="240" height="150" style="max-height: 160px;"></canvas>
+                </div>
             </div>
-            <div id="recentActivityEmpty" class="activity-empty" style="display:none;">
-                <i class="ti ti-qrcode"></i> No scans recorded today
+
+            <!-- Quick Actions -->
+            <div class="card quick-actions mb-4">
+                <div class="card-header">
+                    <h3><i class="ti ti-bolt"></i> Quick Actions</h3>
+                </div>
+                <div class="card-body">
+                    <div class="action-buttons">
+                        <a href="{{ url_for('employees.employees') }}" class="btn btn-primary">
+                            <i class="ti ti-user-plus"></i> Add Employee
+                        </a>
+                        <a href="{{ url_for('fleet.fleet') }}" class="btn btn-primary">
+                            <i class="ti ti-truck"></i> Add Vehicle
+                        </a>
+                        <a href="{{ url_for('visitors.visitors') }}" class="btn btn-primary">
+                            <i class="ti ti-id-badge"></i> Check-in Visitor
+                        </a>
+                        <a href="{{ url_for('pending_approvals') }}" class="btn btn-primary">
+                            <i class="ti ti-check-circle"></i> Review Approvals
+                        </a>
+                    </div>
+                </div>
             </div>
-            <table id="recentActivityTable" class="activity-table" style="display:none;">
-                <thead>
-                    <tr>
-                        <th>Time</th>
-                        <th>Name</th>
-                        <th>Type</th>
-                        <th>Direction</th>
-                        <th>Gate</th>
-                        <th>Status</th>
-                    </tr>
-                </thead>
-                <tbody id="recentActivityBody">
-                </tbody>
-            </table>
         </div>
     </div>
 
-    <div class="card gate-chart">
-        <div class="card-header">
-            <h3><i class="ti ti-chart-bar"></i> Gate Scans — Last 24 Hours</h3>
-            <span class="badge badge-gpu"><i class="ti ti-device-desktop-analytics"></i> Chart.js</span>
-        </div>
-        <div class="card-body" style="position:relative; padding: 0;">
-            <canvas id="gateBarChart" width="800" height="180" style="width:100%; height:180px;"></canvas>
-        </div>
-    </div>
-
-    <div class="dashboard-grid">
-        <div class="card on-site-gauge">
-            <div class="card-header">
-                <h3><i class="ti ti-map-pin"></i> On Site Now</h3>
+    <!-- System Status Bottom Banner -->
+    <div class="card system-status-banner mt-4">
+        <div class="system-status-banner-body">
+            <div class="status-banner-item">
+                <i class="ti ti-database"></i>
+                <span class="banner-label">Database:</span>
+                <span class="status-badge success">Connected</span>
             </div>
-            <div class="card-body" style="display:flex; align-items:center; justify-content:center;">
-                <canvas id="onSiteGauge" width="200" height="120"></canvas>
+            <div class="status-banner-item">
+                <i class="ti ti-brain"></i>
+                <span class="banner-label">AI Engine:</span>
+                <span id="aiStatus" class="status-badge">Checking...</span>
             </div>
-        </div>
-
-        <div class="card quick-actions">
-            <div class="card-header">
-                <h3><i class="ti ti-bolt"></i> Quick Actions</h3>
+            <div class="status-banner-item">
+                <i class="ti ti-device-desktop-analytics"></i>
+                <span class="banner-label">Renderer:</span>
+                <span id="rendererBadge" class="status-badge">—</span>
             </div>
-            <div class="card-body">
-                <div class="action-buttons">
-                    <a href="{{ url_for('employees.employees') }}" class="btn btn-primary">
-                        <i class="ti ti-user-plus"></i> Add Employee
-                    </a>
-                    <a href="{{ url_for('fleet.fleet') }}" class="btn btn-primary">
-                        <i class="ti ti-truck"></i> Add Vehicle
-                    </a>
-                    <a href="{{ url_for('visitors.visitors') }}" class="btn btn-primary">
-                        <i class="ti ti-id-badge"></i> Check-in Visitor
-                    </a>
-                    <a href="{{ url_for('pending_approvals') }}" class="btn btn-primary">
-                        <i class="ti ti-check-circle"></i> Review Approvals
-                    </a>
-                </div>
+            <div class="status-banner-item">
+                <i class="ti ti-tag"></i>
+                <span class="banner-label">Version:</span>
+                <span class="banner-value">{{ version }}</span>
             </div>
-        </div>
-
-        <div class="card system-status">
-            <div class="card-header">
-                <h3><i class="ti ti-info-circle"></i> System Status</h3>
+            <div class="status-banner-item">
+                <i class="ti ti-activity"></i>
+                <span class="banner-label">Live Mode:</span>
+                <span class="banner-value"><span class="live-dot"></span> Active</span>
             </div>
-            <div class="card-body">
-                <div class="status-item">
-                    <span>Database</span>
-                    <span class="status-badge success">Connected</span>
-                </div>
-                <div class="status-item">
-                    <span>AI Engine</span>
-                    <span id="aiStatus" class="status-badge">Checking...</span>
-                </div>
-                <div class="status-item">
-                    <span>Renderer</span>
-                    <span id="rendererBadge" class="status-badge">—</span>
-                </div>
-                <div class="status-item">
-                    <span>{{ version }}</span>
-                </div>
-                <div class="status-item">
-                    <span>Live Mode</span>
-                    <span><span class="live-dot"></span> Active</span>
-                </div>
-                <div class="status-item">
-                    <span>Last Sync</span>
-                    <span id="liveTimestamp">--:--:--</span>
-                </div>
-                <div class="status-item">
-                    <span>User Role</span>
-                    <span class="status-badge">{{ session.role }}</span>
-                </div>
-            </div>
-        </div>
-
-        <div class="card export-reports">
-            <div class="card-header">
-                <h3><i class="ti ti-download"></i> Export Reports</h3>
-            </div>
-            <div class="card-body">
-                <div class="action-buttons">
-                    <a href="{{ url_for('export_employees_excel') }}" class="btn btn-secondary">
-                        <i class="ti ti-users"></i> Employees (Excel)
-                    </a>
-                    <a href="{{ url_for('export_employees_pdf') }}" class="btn btn-secondary">
-                        <i class="ti ti-file-type-pdf"></i> Employees (PDF)
-                    </a>
-                    <a href="{{ url_for('export_visitors_excel') }}" class="btn btn-secondary">
-                        <i class="ti ti-id-badge"></i> Visitors (Excel)
-                    </a>
-                    <a href="{{ url_for('export_visitors_pdf') }}" class="btn btn-secondary">
-                        <i class="ti ti-file-type-pdf"></i> Visitors (PDF)
-                    </a>
-                    <a href="{{ url_for('export_fleet_excel') }}" class="btn btn-secondary">
-                        <i class="ti ti-truck"></i> Fleet (Excel)
-                    </a>
-                    <a href="{{ url_for('export_gate_logs_excel') }}" class="btn btn-secondary">
-                        <i class="ti ti-qrcode"></i> Gate Logs (Excel)
-                    </a>
-                    <a href="{{ url_for('export_gate_logs_pdf') }}" class="btn btn-secondary">
-                        <i class="ti ti-file-type-pdf"></i> Gate Logs (PDF)
-                    </a>
-                </div>
+            <div class="status-banner-item">
+                <i class="ti ti-clock"></i>
+                <span class="banner-label">Last Sync:</span>
+                <span id="liveTimestamp" class="banner-value">--:--:--</span>
             </div>
         </div>
     </div>

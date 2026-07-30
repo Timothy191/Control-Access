@@ -50,6 +50,7 @@ def universal_scan(qr_hash):
 
 @scanning_bp.route("/api/scan_qr", methods=["POST"])
 @require_api_key
+@limiter.limit("60 per minute")
 def scan_qr_code():
     from app import _process_qr_scan
     data = request.get_json()
@@ -279,6 +280,7 @@ def scan_http():
 
 @scanning_bp.route("/api/scan_rfid", methods=["POST"])
 @require_api_key
+@limiter.limit("60 per minute")
 def scan_rfid():
     """RFID tag scan endpoint for hardware RFID readers.
 
@@ -380,6 +382,7 @@ def scan_rfid():
 
 @scanning_bp.route("/api/verify-qr", methods=["POST"])
 @require_api_key
+@limiter.limit("60 per minute")
 def verify_qr_mobile():
     """Mobile app QR verification endpoint - mirrors scan_qr_code with mobile-compatible response format."""
     from datetime import datetime
