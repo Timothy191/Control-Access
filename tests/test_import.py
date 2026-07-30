@@ -2,11 +2,10 @@
 Test suite for import functionality - Excel and CSV imports.
 """
 
-import pytest
 import io
-from datetime import datetime
-from app import app, db_session
-from models import User, Employee, Vehicle
+
+from app import db_session
+from models import Employee, User, Vehicle
 
 
 class TestImportEmployees:
@@ -32,7 +31,7 @@ class TestImportEmployees:
         """Import fails without file."""
         response = authenticated_client.post("/import/employees")
         assert response.status_code == 400
-        
+
         data = response.get_json()
         assert "error" in data
 
@@ -94,7 +93,7 @@ Only,Names"""
             content_type="multipart/form-data"
         )
         assert response.status_code == 400
-        
+
         data = response.get_json()
         assert "error" in data
         assert "Missing" in data["error"]
@@ -293,7 +292,7 @@ class TestDownloadTemplates:
         response = authenticated_client.get("/download/template/employees")
         assert response.status_code == 200
         assert response.content_type.startswith("text/csv")
-        
+
         # Check content
         content = response.data.decode()
         assert "emp_code" in content
@@ -306,7 +305,7 @@ class TestDownloadTemplates:
         response = authenticated_client.get("/download/template/vehicles")
         assert response.status_code == 200
         assert response.content_type.startswith("text/csv")
-        
+
         content = response.data.decode()
         assert "fleet_id" in content
 

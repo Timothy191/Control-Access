@@ -1,21 +1,20 @@
 #!/usr/bin/env python3
-import requests
-import subprocess
-import time
-import sys
 import os
 import re
-import json
-from datetime import datetime, timedelta
-from pathlib import Path
+import subprocess
+import sys
+import time
+from datetime import datetime
+
+import requests
 
 try:
+    from rich import box
     from rich.console import Console
-    from rich.table import Table
-    from rich.panel import Panel
     from rich.layout import Layout
     from rich.live import Live
-    from rich import box
+    from rich.panel import Panel
+    from rich.table import Table
     RICH_AVAILABLE = True
 except ImportError:
     RICH_AVAILABLE = False
@@ -103,7 +102,7 @@ def kill_existing_flask():
 
 def start_app():
     global app_process, app_pid, start_time
-    log(f"Starting Flask app...")
+    log("Starting Flask app...")
     python_bin = VENV_PYTHON if os.path.exists(VENV_PYTHON) else sys.executable
     app_process = subprocess.Popen(
         [python_bin, "-u", "app.py"],
@@ -171,7 +170,7 @@ def parse_scan_logs():
             last_log_size = 0
 
         if current_size > last_log_size:
-            with open(SERVER_LOG, 'r') as f:
+            with open(SERVER_LOG) as f:
                 f.seek(last_log_size)
                 new_lines = f.readlines()
                 last_log_size = current_size
@@ -196,7 +195,7 @@ def parse_scan_logs():
 
             last_scan_logs = last_scan_logs[-20:]
 
-    except Exception as e:
+    except Exception:
         pass
 
     return last_scan_logs
@@ -221,12 +220,10 @@ def get_dashboard_stats():
         return {}
 
     try:
-        from sqlalchemy import create_engine, func
-        from sqlalchemy.orm import scoped_session, sessionmaker
 
         db_session = _get_db_session()
 
-        from models import Employee, Vehicle, Visitor, GateLog, Approval
+        from models import Approval, Employee, GateLog, Vehicle, Visitor
 
         today = datetime.now().date()
         today_start = datetime.combine(today, datetime.min.time())
@@ -239,11 +236,11 @@ def get_dashboard_stats():
         today_logs = db_session.query(GateLog).filter(GateLog.scanned_at >= today_start).count()
         today_granted = db_session.query(GateLog).filter(
             GateLog.scanned_at >= today_start,
-            GateLog.access_granted == True
+            GateLog.access_granted
         ).count()
         today_denied = db_session.query(GateLog).filter(
             GateLog.scanned_at >= today_start,
-            GateLog.access_granted == False
+            not GateLog.access_granted
         ).count()
 
         on_site_employees = db_session.query(Employee).filter_by(status="Active").count()

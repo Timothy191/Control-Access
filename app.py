@@ -11,7 +11,6 @@ from functools import wraps
 from flask import (
     Flask,
     Response,
-    flash,
     jsonify,
     redirect,
     render_template,
@@ -33,7 +32,6 @@ from models import (
     GateLog,
     GateMapping,
     SiteSetting,
-    User,
     Vehicle,
     Visitor,
 )
@@ -172,7 +170,7 @@ csrf = CSRFProtect(app)
 @app.before_request
 def csrf_protect_non_api():
     """Apply CSRF check to non-API state-changing requests.
-    
+
     API routes (/api/*) use X-API-Key header authentication and are exempt from CSRF.
     Web routes use session cookies and require CSRF tokens for POST/PUT/PATCH/DELETE.
     """
@@ -379,9 +377,14 @@ _check_ollama()
 # Listens on multiple UDP/TCP ports to catch scanners with various configurations
 from services.listeners import (
     _ensure_device_exists,
+)
+from services.listeners import (
     init_all_scanner_listeners as _init_listeners,
+)
+from services.listeners import (
     process_scan_data as _process_scan_data_listener,
 )
+
 
 def process_scan_data(qr_data, source_ip, protocol="UDP"):
     return _process_scan_data_listener(
@@ -4741,8 +4744,8 @@ from routes.ai import ai_bp
 from routes.auth import auth_bp
 from routes.dashboard import dashboard_bp
 from routes.devices import devices_bp
-from routes.equipment import equipment_bp
 from routes.employees import employees_bp
+from routes.equipment import equipment_bp
 from routes.fleet import fleet_bp
 from routes.monitoring import monitoring_bp
 from routes.scanning import scanning_bp

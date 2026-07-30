@@ -6,14 +6,13 @@ New fields: emp_code, initials, first_name, second_name, surname, id_number, job
 """
 
 import os
-import sys
-from datetime import datetime
 
 # Get the directory where this file is located
 base_dir = os.path.dirname(os.path.abspath(__file__))
 database_path = os.path.join(base_dir, "mine_management.db")
 
 import sqlite3
+
 
 def migrate():
     conn = sqlite3.connect(database_path)

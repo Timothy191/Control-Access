@@ -3,11 +3,12 @@ Test suite for approval workflow - pending approvals, approve/reject requests.
 Tests the core business logic for handling unknown QR scans.
 """
 
-import pytest
 import json
-from datetime import datetime
-from app import app, db_session
-from models import User, Employee, Vehicle, Visitor, Approval, GateLog
+
+import pytest
+
+from app import db_session
+from models import Approval, Employee, GateLog, User, Visitor
 
 
 @pytest.fixture
@@ -169,7 +170,7 @@ class TestApproveRequest:
         assert response.status_code == 200
 
         data = response.get_json()
-        assert data["success"] == True
+        assert data["success"]
         assert data["entity_type"] == "employee"
 
     def test_approve_vehicle_request(self, authenticated_client, db_cleanup):
@@ -196,7 +197,7 @@ class TestApproveRequest:
         assert response.status_code == 200
 
         data = response.get_json()
-        assert data["success"] == True
+        assert data["success"]
 
     def test_approve_not_found(self, authenticated_client):
         """Approving non-existent request fails gracefully."""
@@ -207,7 +208,7 @@ class TestApproveRequest:
         assert response.status_code == 200
 
         data = response.get_json()
-        assert data["success"] == False
+        assert not data["success"]
 
     def test_approve_updates_approval_status(self, authenticated_client, sample_pending_approval, db_cleanup):
         """Approval status changes to Approved."""
@@ -251,7 +252,7 @@ class TestRejectRequest:
         assert response.status_code == 200
 
         data = response.get_json()
-        assert data["success"] == True
+        assert data["success"]
 
         updated = db_session.query(Approval).filter_by(
             id=sample_pending_approval.id
@@ -268,7 +269,7 @@ class TestRejectRequest:
         assert response.status_code == 200
 
         data = response.get_json()
-        assert data["success"] == False
+        assert not data["success"]
 
 
 class TestVisitorApproval:
@@ -348,7 +349,7 @@ class TestQRScanCreatesApproval:
         assert final_count > initial_count
 
         data = response.get_json()
-        assert data["success"] == False  # Not yet approved
+        assert not data["success"]  # Not yet approved
         assert data["status"] == "pending"
 
     def test_auto_approve_on_second_scan(self, api_client, db_cleanup, HARDWARE_API_KEY):
@@ -367,7 +368,7 @@ class TestQRScanCreatesApproval:
         )
         assert response1.status_code == 200
         data1 = response1.get_json()
-        assert data1["success"] == False
+        assert not data1["success"]
 
         # Second scan immediately - should auto-approve
         response2 = api_client.post(
@@ -381,7 +382,7 @@ class TestQRScanCreatesApproval:
         )
         assert response2.status_code == 200
         data2 = response2.get_json()
-        assert data2["success"] == True
+        assert data2["success"]
 
 
 class TestGateLogUpdates:

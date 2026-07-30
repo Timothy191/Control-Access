@@ -23,17 +23,17 @@ Run with:
     python3 scan_ingestion.py
 """
 
+import json
+import re
 import socket
+import subprocess
+import sys
 import threading
 import time
-import sys
-import os
-import re
-import json
+from http.server import BaseHTTPRequestHandler, HTTPServer
+from urllib.parse import parse_qs, urlparse
+
 import requests
-import subprocess
-from http.server import HTTPServer, BaseHTTPRequestHandler
-from urllib.parse import urlparse, parse_qs
 
 # ─── Configuration ──────────────────────────────────────────────
 ARCH_SERVER    = "http://localhost:8080"
@@ -71,11 +71,11 @@ def forward(code, source="unknown"):
         status = "✅ APPROVED" if data.get("success") else "❌ DENIED"
         name = data.get("name") or "Unknown"
         entity_type = data.get("entity_type") or "QR"
-        
+
         parsed = data.get("parsed_data") or {}
         emp_id = parsed.get("employee_id") or parsed.get("fleet_id") or ""
         id_str = f" (ID: {emp_id})" if emp_id else ""
-        
+
         print(f"{LOG_PREFIX} [{source}] Scanned: {name}{id_str} [{entity_type}] → {status}")
     except Exception as e:
         print(f"{LOG_PREFIX} [{source}] Forward failed: {e}")
@@ -332,26 +332,26 @@ def stdin_relay():
 # ══════════════════════════════════════════════════════════════════
 def rfid_tcp_listener():
     """Listen for RFID tag scans from TCP-connected RFID readers.
-    
+
     Configured for scanner at 192.168.0.187, port 58628.
     Can also act as a server to receive connections from the RFID reader.
     """
     # Mode 1: Act as server - listen on local port for RFID reader to connect
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-    
+
     # Try to bind to the configured RFID port
     try:
         sock.bind(("0.0.0.0", RFID_SCANNER_PORT))
         sock.listen(5)
         print(f"{LOG_PREFIX} RFID TCP listener ready on port {RFID_SCANNER_PORT} (waiting for scanner)")
-        
+
         while True:
             try:
                 conn, addr = sock.accept()
                 client_ip = addr[0]
                 print(f"{LOG_PREFIX} RFID scanner connected from {client_ip}")
-                
+
                 # Handle this connection
                 handle_rfid_connection(conn, client_ip)
             except Exception as e:
@@ -360,7 +360,7 @@ def rfid_tcp_listener():
     except OSError as e:
         print(f"{LOG_PREFIX} RFID port {RFID_SCANNER_PORT} unavailable: {e}")
         print(f"{LOG_PREFIX} Will try to connect to scanner at {RFID_SCANNER_IP}:{RFID_SCANNER_PORT}")
-        
+
         # Mode 2: Act as client - connect to the RFID reader
         rfid_client_mode()
 
@@ -373,9 +373,9 @@ def handle_rfid_connection(conn, client_ip):
             data = conn.recv(1024)
             if not data:
                 break
-            
+
             buffer += data
-            
+
             # Process complete lines/tags from buffer
             while b'\n' in buffer or b'\r' in buffer:
                 # Split on line endings
@@ -387,13 +387,13 @@ def handle_rfid_connection(conn, client_ip):
                             if tag_data:
                                 forward_rfid(tag_data, f"rfid-tcp:{client_ip}")
                         break
-        
+
         # Process any remaining data
         if buffer:
             tag_data = buffer.decode(errors="replace").strip()
             if tag_data:
                 forward_rfid(tag_data, f"rfid-tcp:{client_ip}")
-                
+
     except Exception as e:
         print(f"{LOG_PREFIX} RFID connection error from {client_ip}: {e}")
     finally:
@@ -409,15 +409,15 @@ def rfid_client_mode():
             sock.settimeout(30)
             sock.connect((RFID_SCANNER_IP, RFID_SCANNER_PORT))
             print(f"{LOG_PREFIX} Connected to RFID scanner at {RFID_SCANNER_IP}:{RFID_SCANNER_PORT}")
-            
+
             buffer = b""
             while True:
                 data = sock.recv(1024)
                 if not data:
                     break
-                
+
                 buffer += data
-                
+
                 # Process complete lines/tags
                 while b'\n' in buffer or b'\r' in buffer:
                     for delim in [b'\r\n', b'\n\r', b'\n', b'\r']:
@@ -428,15 +428,15 @@ def rfid_client_mode():
                                 if tag_data:
                                     forward_rfid(tag_data, f"rfid-client:{RFID_SCANNER_IP}")
                             break
-                
+
                 # Prevent buffer overflow
                 if len(buffer) > 8192:
                     tag_data = buffer.decode(errors="replace").strip()
                     if tag_data:
                         forward_rfid(tag_data, f"rfid-client:{RFID_SCANNER_IP}")
                     buffer = b""
-                    
-        except socket.timeout:
+
+        except TimeoutError:
             print(f"{LOG_PREFIX} RFID connection timeout, retrying...")
         except ConnectionRefusedError:
             print(f"{LOG_PREFIX} RFID scanner not available, retrying in 5s...")
@@ -447,7 +447,7 @@ def rfid_client_mode():
                 sock.close()
             except:
                 pass
-        
+
         time.sleep(5)
 
 

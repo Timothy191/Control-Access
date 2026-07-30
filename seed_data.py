@@ -12,10 +12,11 @@ import argparse
 import hashlib
 import random
 from datetime import datetime, timedelta
+
 from faker import Faker
 
-from database import init_db, db_session
-from models import Employee, Vehicle, Visitor, GateLog
+from database import db_session, init_db
+from models import Employee, GateLog, Vehicle, Visitor
 
 fake = Faker()
 
@@ -372,7 +373,7 @@ def main():
     if args.clear:
         clear_existing_data()
 
-    print(f"\nGenerating sample data:")
+    print("\nGenerating sample data:")
     print(f"  - {args.employees} employees")
     print(f"  - {args.vehicles} vehicles")
     print(f"  - {args.visitors} visitors")
@@ -389,10 +390,10 @@ def main():
     print("=" * 55)
     print("✓ Database seeded successfully!")
     print("=" * 55)
-    print(f"\nYou can now:")
-    print(f"  - View employees at: http://localhost:5000/employees")
-    print(f"  - View gate logs at: http://localhost:5000/gate_logs")
-    print(f"  - Export PDF reports from the dashboard")
+    print("\nYou can now:")
+    print("  - View employees at: http://localhost:5000/employees")
+    print("  - View gate logs at: http://localhost:5000/gate_logs")
+    print("  - Export PDF reports from the dashboard")
 
 
 if __name__ == "__main__":

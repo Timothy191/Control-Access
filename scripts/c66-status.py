@@ -5,11 +5,12 @@ Shows complete connection status between C66 scanner and server
 Usage: python3 scripts/c66-status.py
 """
 
-import sys
-import subprocess
-import requests
 import os
+import subprocess
+import sys
 from datetime import datetime, timedelta
+
+import requests
 
 sys.path.insert(0, '/home/tim/Desktop/01.mine-management-system')
 
@@ -35,7 +36,7 @@ def check_server_running():
         )
         if ':8080' in result.stdout:
             return True, "Port 8080 is listening"
-        
+
         # Try ss command as fallback
         result = subprocess.run(
             ['ss', '-tlnp'],
@@ -45,7 +46,7 @@ def check_server_running():
         )
         if ':8080' in result.stdout:
             return True, "Port 8080 is listening"
-        
+
         return False, "Port 8080 not found"
     except Exception as e:
         return False, f"Check failed: {str(e)[:30]}"
@@ -102,16 +103,16 @@ def check_c66_endpoint():
 def get_last_scan_info():
     """Get information about the last scan from server.log"""
     try:
-        from database import init_db, db_session
+        from database import db_session, init_db
         from models import GateLog
-        
+
         init_db()
         last_scan = db_session.query(GateLog).order_by(GateLog.scanned_at.desc()).first()
-        
+
         if last_scan:
             time_ago = datetime.now() - last_scan.scanned_at
             minutes_ago = int(time_ago.total_seconds() / 60)
-            
+
             if minutes_ago < 1:
                 time_str = "Just now"
             elif minutes_ago < 60:
@@ -119,7 +120,7 @@ def get_last_scan_info():
             else:
                 hours_ago = minutes_ago // 60
                 time_str = f"{hours_ago}h ago"
-            
+
             return True, f"{last_scan.entity_name} ({time_str})"
         else:
             return False, "No scans in database"
@@ -129,13 +130,13 @@ def get_last_scan_info():
 def count_recent_scans():
     """Count scans in last hour"""
     try:
-        from database import init_db, db_session
+        from database import db_session, init_db
         from models import GateLog
-        
+
         init_db()
         one_hour_ago = datetime.now() - timedelta(hours=1)
         count = db_session.query(GateLog).filter(GateLog.scanned_at >= one_hour_ago).count()
-        
+
         if count > 0:
             return True, f"{count} scans/hour"
         else:
@@ -146,16 +147,16 @@ def count_recent_scans():
 def check_log_file():
     """Check if server.log exists and is being written"""
     log_path = '/home/tim/Desktop/01.mine-management-system/server.log'
-    
+
     if not os.path.exists(log_path):
         return False, "server.log not found"
-    
+
     try:
         # Check last modified time
         mtime = os.path.getmtime(log_path)
         last_write = datetime.fromtimestamp(mtime)
         time_ago = datetime.now() - last_write
-        
+
         if time_ago.total_seconds() < 300:  # Written in last 5 minutes
             return True, f"Log active (updated {int(time_ago.total_seconds()/60)}m ago)"
         else:
@@ -169,7 +170,7 @@ def print_status():
     print(f"{BOLD}{CYAN}║                   C66 CONNECTION STATUS                          ║{END}")
     print(f"{BOLD}{CYAN}╚══════════════════════════════════════════════════════════════════╝{END}")
     print(f"{DIM}Checked at: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}{END}\n")
-    
+
     # Run all checks
     checks = [
         ("Server Running (Port 8080)", check_server_running),
@@ -180,42 +181,42 @@ def print_status():
         ("Recent Scan Activity", count_recent_scans),
         ("Last Scan Recorded", get_last_scan_info),
     ]
-    
+
     all_ok = True
-    
+
     for name, check_func in checks:
         ok, message = check_func()
         status_icon = f"{GREEN}✓{END}" if ok else f"{RED}✗{END}"
         status_color = GREEN if ok else RED
-        
+
         print(f"  {status_icon} {name:35} {status_color}{message}{END}")
-        
+
         if not ok:
             all_ok = False
-    
+
     # Print summary
     print(f"\n{BOLD}{'─' * 70}{END}")
-    
+
     if all_ok:
         print(f"\n{BOLD}{GREEN}╔══════════════════════════════════════════════════════════════════╗{END}")
         print(f"{BOLD}{GREEN}║  ✅ ALL SYSTEMS GO - C66 Ready for USB/WiFi Scanning           ║{END}")
         print(f"{BOLD}{GREEN}╚══════════════════════════════════════════════════════════════════╝{END}")
         print(f"\n{BOLD}Next Steps:{END}")
-        print(f"  1. Ensure C66 InfoWedge is configured with: http://192.168.0.50:8080/api/c66")
-        print(f"  2. Scan a test QR code with C66")
-        print(f"  3. Monitor with: python3 scripts/monitor-c66-scans.py")
-        print(f"  4. For full test: ./scripts/c66-e2e-test.sh")
+        print("  1. Ensure C66 InfoWedge is configured with: http://192.168.0.50:8080/api/c66")
+        print("  2. Scan a test QR code with C66")
+        print("  3. Monitor with: python3 scripts/monitor-c66-scans.py")
+        print("  4. For full test: ./scripts/c66-e2e-test.sh")
     else:
         print(f"\n{BOLD}{RED}╔══════════════════════════════════════════════════════════════════╗{END}")
         print(f"{BOLD}{RED}║  ❌ ISSUES DETECTED - Check failed items above                   ║{END}")
         print(f"{BOLD}{RED}╚══════════════════════════════════════════════════════════════════╝{END}")
         print(f"\n{BOLD}Troubleshooting:{END}")
-        print(f"  • Server not running? Run: ./deploy-full-server.sh")
-        print(f"  • Network issue? Check: sudo ufw allow 8080/tcp")
-        print(f"  • No recent scans? This is normal if no scanning has occurred")
-    
+        print("  • Server not running? Run: ./deploy-full-server.sh")
+        print("  • Network issue? Check: sudo ufw allow 8080/tcp")
+        print("  • No recent scans? This is normal if no scanning has occurred")
+
     print()
-    
+
     return all_ok
 
 if __name__ == '__main__':

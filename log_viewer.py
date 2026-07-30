@@ -1,24 +1,24 @@
 #!/usr/bin/env python3
 import os
-import sys
-import time
 import re
 import subprocess
+import sys
 import threading
+import time
 from collections import deque
 from datetime import datetime
 
 try:
+    import plotext as plt
+    import psutil
+    from rich import box
+    from rich.align import Align
     from rich.console import Console
-    from rich.text import Text
-    from rich.live import Live
     from rich.layout import Layout
+    from rich.live import Live
     from rich.panel import Panel
     from rich.table import Table
-    from rich.align import Align
-    from rich import box
-    import psutil
-    import plotext as plt
+    from rich.text import Text
 except ImportError:
     print("Dependencies missing — run: pip install rich psutil plotext")
     sys.exit(1)
@@ -53,16 +53,16 @@ lock = threading.Lock()
 def build_plot(title, y_data, color, w, h, fill=True, y_max=100):
     plt.clf()
     plt.plotsize(w, h)
-    
+
     # Plotext config
     plt.theme("clear")
     plt.axes_color("black")
     plt.canvas_color("black")
     plt.ticks_color("white")
-    
+
     plt.ylim(0, y_max)
     plt.plot(list(y_data), color=color, fillx=fill)
-    
+
     return plt.build()
 
 def build_pie(title, labels, values, w, h):
@@ -71,24 +71,24 @@ def build_pie(title, labels, values, w, h):
     plt.theme("clear")
     plt.axes_color("black")
     plt.canvas_color("black")
-    
+
     if sum(values) == 0:
         values = [1]
         labels = ["No Data"]
-        
+
     # Plotext pie chart doesn't accept size properly in some versions, but we'll try
     try:
         # Some plotext versions have pie, some don't. Fallback to bar if pie fails.
         pass
     except:
         pass
-        
+
     try:
         # Bar chart as a safer alternative for categorical
         plt.bar(labels, values, color=["green", "red", "blue", "yellow"][:len(labels)])
     except:
         pass
-        
+
     return plt.build()
 
 # ── Log Parser ───────────────────────────────────────────────────────────────
@@ -96,19 +96,19 @@ def process_log_line(line: str, source: str):
     global metrics, endpoints_hits
     now_ts = time.time()
     line = line.rstrip()
-    
+
     # --- HTTP requests ---
     http_match = re.search(r'"(GET|POST|PUT|DELETE|PATCH) ([^ ]+)[^"]*" (\d{3})', line)
     if http_match:
         metrics["http_timestamps"].append(now_ts)
         method, path, status = http_match.groups()
-        
+
         # Track top endpoints
         base_path = path.split("?")[0]
         if base_path not in endpoints_hits:
             endpoints_hits[base_path] = 0
         endpoints_hits[base_path] += 1
-        
+
         code = int(status)
         c = "green" if code < 300 else ("yellow" if code < 400 else "red")
         recent_logs.append(Text(f"[{method}] {path[:30]} {code}", style=c))
@@ -117,8 +117,8 @@ def process_log_line(line: str, source: str):
     # --- SCAN events ---
     if "SCAN LOG" in line:
         metrics["total_scans"] += 1
-        import json
         import ast
+        import json
         try:
             dict_str = line.split("SCAN LOG:", 1)[1].strip()
             try:
@@ -129,11 +129,11 @@ def process_log_line(line: str, source: str):
             direction = data.get("direction", "IN")
             granted = data.get("granted", False)
             entity_type = data.get("type", "QR")
-            
+
             outcome = "APPROVED" if granted else "DENIED"
             emoji = "🚪" if direction == "OUT" else "🔑"
             style = "green" if granted else "red"
-            
+
             if granted:
                 metrics["approved"] += 1
                 if direction == "OUT":
@@ -142,7 +142,7 @@ def process_log_line(line: str, source: str):
                     metrics["in"] += 1
             else:
                 metrics["denied"] += 1
-                
+
             recent_logs.append(Text(f"{emoji} {entity} ({entity_type}) -> {outcome}", style=style))
         except Exception:
             # Fallback
@@ -159,7 +159,7 @@ def process_log_line(line: str, source: str):
 
 def tail_file(path: str, source: str):
     try:
-        with open(path, "r", errors="replace") as f:
+        with open(path, errors="replace") as f:
             f.seek(0, 2)
             while True:
                 line = f.readline()
@@ -180,10 +180,10 @@ def get_top_endpoints() -> Table:
     t = Table(show_header=False, show_edge=False, box=None, padding=(0,1))
     t.add_column(ratio=2)
     t.add_column(justify="right")
-    
+
     # Sort dict
     sorted_eps = sorted(endpoints_hits.items(), key=lambda x: x[1], reverse=True)[:8]
-    
+
     for path, count in sorted_eps:
         # Simple progress bar
         bar_len = min(15, count)
@@ -197,7 +197,7 @@ def get_top_endpoints() -> Table:
 def get_disk_bars() -> Table:
     t = Table(show_header=False, show_edge=False, box=None)
     t.add_column()
-    
+
     parts = psutil.disk_partitions()
     for p in parts[:4]:  # Show up to 4 partitions
         try:
@@ -206,7 +206,7 @@ def get_disk_bars() -> Table:
             c = "green" if pct < 70 else "yellow" if pct < 90 else "red"
             bar_len = int((pct / 100) * 20)
             bar = "█" * bar_len + "░" * (20 - bar_len)
-            
+
             t.add_row(Text(f"{p.mountpoint[:10]:<12} {pct:5.1f}% [{bar}]", style=c))
         except:
             pass
@@ -222,13 +222,13 @@ def get_recent_logs_panel() -> Text:
 def get_stats_text(pid: str) -> Table:
     t = Table(show_header=False, show_edge=False, box=None)
     t.add_column()
-    
+
     t.add_row(Text("SCAN METRICS", style="bold magenta"))
     t.add_row(Text(f"Total Scans: {metrics['total_scans']}", style="white"))
     t.add_row(Text(f"✅ Approved:  {metrics['approved']} ( IN: {metrics['in']} | OUT: {metrics['out']} )", style="green"))
     t.add_row(Text(f"❌ Denied:    {metrics['denied']}", style="red"))
     t.add_row(Text(""))
-    
+
     t.add_row(Text("FLASK PROCESS", style="bold cyan"))
     if pid and pid.isdigit():
         try:
@@ -243,7 +243,7 @@ def get_stats_text(pid: str) -> Table:
             t.add_row(Text("Offline", style="red"))
     else:
         t.add_row(Text("Offline", style="red"))
-        
+
     return t
 
 
@@ -253,7 +253,7 @@ def main():
     threading.Thread(target=tail_file, args=(MONITOR_LOG, "MONITOR"), daemon=True).start()
 
     console.clear()
-    
+
     # Pre-warm psutil
     psutil.cpu_percent()
 
@@ -265,14 +265,14 @@ def main():
         gh = max(5, ((term_h - 4) // 3) - 4)
 
         now = time.time()
-        
+
         with lock:
             # Update Traffic
             while metrics["http_timestamps"] and (now - metrics["http_timestamps"][0] > 60):
                 metrics["http_timestamps"].popleft()
             reqs_per_sec = len(metrics["http_timestamps"]) / 60.0
             traffic_history.append(reqs_per_sec)
-            
+
             # Update System
             cpu_history.append(psutil.cpu_percent())
             ram_history.append(psutil.virtual_memory().percent)
@@ -282,7 +282,7 @@ def main():
             Layout(name="header", size=3),
             Layout(name="main")
         )
-        
+
         # Header
         ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         header = Table.grid(expand=True)
@@ -302,8 +302,8 @@ def main():
         )
         for r in ["row1", "row2", "row3"]:
             layout[r].split_row(
-                Layout(name=f"{r}_c1"), 
-                Layout(name=f"{r}_c2"), 
+                Layout(name=f"{r}_c1"),
+                Layout(name=f"{r}_c2"),
                 Layout(name=f"{r}_c3")
             )
 
@@ -312,7 +312,7 @@ def main():
             p_cpu = build_plot("CPU", cpu_history, "red", gw, gh, fill=True)
             p_ram = build_plot("RAM", ram_history, "green", gw, gh, fill=True)
             p_trf = build_plot("Req/s", traffic_history, "magenta", gw, gh, fill=True, y_max=max(10, max(traffic_history)*1.2))
-            
+
             # Build scan breakdown chart
             p_pie = build_pie("Scans", ["Appr", "Deny"], [metrics["approved"], metrics["denied"]], gw, gh)
 
@@ -323,7 +323,7 @@ def main():
 
         # Row 2
         layout["row2_c1"].update(Panel(Text.from_ansi(p_ram), title="[bold green]Memory Usage (%)", border_style="green"))
-        
+
         # Get flask/gunicorn PID
         try:
             result = subprocess.run(["pgrep", "-f", "gunicorn.*app:app"], capture_output=True, text=True)
@@ -334,14 +334,14 @@ def main():
                 raw_pid = result.stdout.strip().split("\n")[0]
         except:
             raw_pid = ""
-            
+
         layout["row2_c2"].update(Panel(get_stats_text(raw_pid), title="[bold yellow]Key Metrics", border_style="yellow"))
         layout["row2_c3"].update(Panel(get_recent_logs_panel(), title="[bold blue]Recent Log Stream", border_style="blue"))
 
         # Row 3
         layout["row3_c1"].update(Panel(get_top_endpoints(), title="[bold cyan]Top API Endpoints", border_style="cyan"))
         layout["row3_c2"].update(Panel(get_disk_bars(), title="[bold yellow]Disk Volumes", border_style="yellow"))
-        
+
         # Bottom right - Uptime & Details
         details = Table.grid()
         details.add_column()

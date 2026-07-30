@@ -1,13 +1,23 @@
-from database import Base
-from sqlalchemy import Column, Integer, String, Boolean, DateTime, ForeignKey, Text, Index
+from datetime import UTC, datetime
+
+from sqlalchemy import (
+    Boolean,
+    Column,
+    DateTime,
+    ForeignKey,
+    Integer,
+    String,
+    Text,
+)
 from sqlalchemy.orm import relationship
-from datetime import datetime, timezone
-from werkzeug.security import generate_password_hash, check_password_hash
+from werkzeug.security import check_password_hash, generate_password_hash
+
+from database import Base
 
 
 def _utcnow_naive():
     """Return naive UTC datetime (for SQLite compatibility)."""
-    return datetime.now(timezone.utc).replace(tzinfo=None)
+    return datetime.now(UTC).replace(tzinfo=None)
 
 
 class User(Base):
@@ -26,7 +36,7 @@ class User(Base):
         # MIGRATION: Support legacy plain-text passwords during migration.
         # Passwords not starting with 'pbkdf2:' or 'scrypt:' are treated as plain-text.
         # On successful login, the password is automatically re-hashed (see routes/auth.py).
-        # 
+        #
         # CAN BE REMOVED when:
         #   1. All users have logged in at least once since hashing was implemented
         #   2. OR a manual migration script has hashed all remaining plain-text passwords

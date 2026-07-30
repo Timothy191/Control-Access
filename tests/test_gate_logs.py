@@ -2,17 +2,19 @@
 Test suite for gate logs - filtering, pagination, and API endpoints.
 """
 
-import pytest
 from datetime import datetime, timedelta
-from app import app, db_session
-from models import GateLog, User, Employee, Vehicle, Visitor
+
+import pytest
+
+from app import db_session
+from models import Employee, GateLog, User
 
 
 @pytest.fixture
 def sample_gate_logs(db_cleanup):
     """Create sample gate logs for testing."""
     logs = []
-    
+
     # Employee scan - granted
     log1 = GateLog(
         access_type="employee",
@@ -26,7 +28,7 @@ def sample_gate_logs(db_cleanup):
     )
     db_session.add(log1)
     logs.append(log1)
-    
+
     # Vehicle scan - granted
     log2 = GateLog(
         access_type="vehicle",
@@ -40,7 +42,7 @@ def sample_gate_logs(db_cleanup):
     )
     db_session.add(log2)
     logs.append(log2)
-    
+
     # Unknown scan - denied
     log3 = GateLog(
         access_type="unknown",
@@ -54,7 +56,7 @@ def sample_gate_logs(db_cleanup):
     )
     db_session.add(log3)
     logs.append(log3)
-    
+
     db_session.commit()
     return logs
 

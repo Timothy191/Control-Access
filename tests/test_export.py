@@ -2,11 +2,13 @@
 Test suite for export functionality - Excel, PDF, and QR ZIP exports.
 """
 
-import pytest
 import io
 from datetime import datetime, timedelta
-from app import app, db_session
-from models import User, Employee, Vehicle, Visitor, Equipment, GateLog
+
+import pytest
+
+from app import db_session
+from models import Employee, Equipment, GateLog, User, Vehicle, Visitor
 
 
 @pytest.fixture
@@ -22,16 +24,16 @@ def sample_data_for_export(db_cleanup):
             surname=f"Test{i}",
             id_number=f"ID{i:08d}",
             job_title=f"Job{i}",
-            induction=f"Standard",
+            induction="Standard",
             induction_expiry=datetime.now() + timedelta(days=365),
-            medical=f"Class A",
+            medical="Class A",
             medical_expiry=datetime.now() + timedelta(days=180),
             status="Active",
             qr_code=f"QR_EXP_{i}"
         )
         db_session.add(emp)
         employees.append(emp)
-    
+
     # Vehicles
     vehicles = []
     for i in range(3):
@@ -43,7 +45,7 @@ def sample_data_for_export(db_cleanup):
         )
         db_session.add(veh)
         vehicles.append(veh)
-    
+
     # Visitors
     visitors = []
     for i in range(3):
@@ -56,7 +58,7 @@ def sample_data_for_export(db_cleanup):
         )
         db_session.add(vis)
         visitors.append(vis)
-    
+
     # Equipment
     equipment = []
     for i in range(3):
@@ -67,7 +69,7 @@ def sample_data_for_export(db_cleanup):
         )
         db_session.add(eq)
         equipment.append(eq)
-    
+
     # Gate Logs
     for i in range(10):
         log = GateLog(
@@ -75,13 +77,13 @@ def sample_data_for_export(db_cleanup):
             entity_id=employees[0].id,
             entity_name=employees[0].first_name,
             direction="IN" if i % 2 == 0 else "OUT",
-            qr_data=f"QR_EXP_0",
+            qr_data="QR_EXP_0",
             access_granted=True,
             gate_location="Main Gate",
             scanned_by="Scanner1"
         )
         db_session.add(log)
-    
+
     db_session.commit()
     return employees, vehicles, visitors, equipment
 
@@ -114,13 +116,13 @@ class TestEmployeeExport:
         """Export employees to Excel."""
         response = authenticated_client.get("/export/employees/excel")
         assert response.status_code == 200
-        
+
         # Check content type
         assert response.content_type in [
             "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             "application/octet-stream"
         ]
-        
+
         # Check file content
         assert len(response.data) > 0
         # Should contain download name header or filename in response
@@ -320,7 +322,7 @@ class TestExportContent:
     def test_employee_excel_content(self, authenticated_client, sample_data_for_export):
         """Verify employee data in Excel export."""
         response = authenticated_client.get("/export/employees/excel")
-        
+
         # Save to temporary file for analysis (if needed)
         # For now just verify successful export
         assert response.status_code == 200
@@ -329,7 +331,7 @@ class TestExportContent:
     def test_employee_pdf_content(self, authenticated_client, sample_data_for_export):
         """Verify employee data in PDF export."""
         response = authenticated_client.get("/export/employees/pdf")
-        
+
         # PDF should start with %PDF magic bytes
         assert response.data[:4] == b"%PDF"
         assert response.status_code == 200
@@ -337,9 +339,9 @@ class TestExportContent:
     def test_qr_zip_contains_files(self, authenticated_client, sample_data_for_export):
         """Verify QR ZIP contains expected files."""
         import zipfile
-        
+
         response = authenticated_client.get("/export/employees/qr-zip")
-        
+
         # Verify it's a valid ZIP
         zip_buffer = io.BytesIO(response.data)
         with zipfile.ZipFile(zip_buffer, 'r') as zip_file:

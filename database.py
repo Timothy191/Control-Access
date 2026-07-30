@@ -3,9 +3,10 @@
 # interpolation. SQL injection is not possible here. User data flows through SQLAlchemy
 # ORM queries which use parameterized statements automatically.
 
+import os
+
 from sqlalchemy import create_engine, event
 from sqlalchemy.orm import declarative_base, scoped_session, sessionmaker
-import os
 
 # Get the directory where this file is located
 base_dir = os.path.dirname(os.path.abspath(__file__))
@@ -42,12 +43,12 @@ Base.query = db_session.query_property()
 
 def init_db():
     """Initialize the database by creating all tables"""
-    import models
 
     Base.metadata.create_all(bind=engine)
 
     # Auto-migrate: add meeting_person column to visitors table if missing
-    from sqlalchemy import text, inspect as sa_inspect
+    from sqlalchemy import inspect as sa_inspect
+    from sqlalchemy import text
     inspector = sa_inspect(engine)
     if "visitors" in inspector.get_table_names():
         cols = [c["name"] for c in inspector.get_columns("visitors")]

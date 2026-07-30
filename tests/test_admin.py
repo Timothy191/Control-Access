@@ -3,9 +3,8 @@ Test suite for admin routes - user management, audit logs, and gate mappings.
 Security-critical: These tests ensure admin-only routes are properly protected.
 """
 
-import pytest
-from app import app, db_session
-from models import User, AuditLog, Employee, GateMapping, SiteSetting
+from app import db_session
+from models import AuditLog, GateMapping, User
 
 
 class TestAdminUsers:
@@ -369,7 +368,7 @@ class TestGateMappings:
 
         # Verify status changed
         updated = db_session.query(GateMapping).filter_by(id=mapping_id).first()
-        assert updated.is_active == False
+        assert not updated.is_active
 
         # Toggle back on
         authenticated_client.get(
@@ -377,7 +376,7 @@ class TestGateMappings:
             follow_redirects=True
         )
         updated = db_session.query(GateMapping).filter_by(id=mapping_id).first()
-        assert updated.is_active == True
+        assert updated.is_active
 
 
 class TestVisitorPIN:

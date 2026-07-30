@@ -1,12 +1,7 @@
-import pytest
-from app import app, db_session
-from models import Employee, Vehicle, Visitor, GateLog
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
-
-
-
-
+from app import db_session
+from models import Employee, GateLog, Vehicle, Visitor
 
 
 class TestQRScanAPI:
@@ -45,7 +40,7 @@ class TestQRScanAPI:
 
         assert response.status_code == 200
         data = response.get_json()
-        assert data["success"] == True
+        assert data["success"]
         assert data["entity_type"] == "employee"
         assert "John" in data["entity_name"]
 
@@ -73,7 +68,7 @@ class TestQRScanAPI:
 
         assert response.status_code == 200
         data = response.get_json()
-        assert data["success"] == False
+        assert not data["success"]
         assert data["message"] and ("inactive" in data["message"].lower() or "not active" in data["message"].lower())
 
     def test_scan_qr_valid_vehicle_in(self, api_client, db_cleanup, HARDWARE_API_KEY):
@@ -97,7 +92,7 @@ class TestQRScanAPI:
 
         assert response.status_code == 200
         data = response.get_json()
-        assert data["success"] == True
+        assert data["success"]
         assert data["entity_type"] == "vehicle"
         assert data["entity_name"] == "ABC123"
 
@@ -123,7 +118,7 @@ class TestQRScanAPI:
 
         assert response.status_code == 200
         data = response.get_json()
-        assert data["success"] == True
+        assert data["success"]
         assert data["entity_type"] == "visitor"
 
     def test_scan_qr_invalid_qr_denied(self, api_client, db_cleanup, HARDWARE_API_KEY):
@@ -139,7 +134,7 @@ class TestQRScanAPI:
 
         assert response.status_code == 200
         data = response.get_json()
-        assert data["success"] == False
+        assert not data["success"]
         assert data["message"] is not None
 
     def test_scan_qr_creates_gate_log(self, api_client, db_cleanup, HARDWARE_API_KEY):
@@ -168,7 +163,7 @@ class TestQRScanAPI:
         assert log is not None
         assert log.access_type == "employee"
         assert log.direction == "IN"
-        assert log.access_granted == True
+        assert log.access_granted
 
     def test_scan_qr_employee_medical_expired(self, api_client, db_cleanup, HARDWARE_API_KEY):
         emp = Employee(
@@ -178,7 +173,7 @@ class TestQRScanAPI:
             id_number="1111111111",
             status="Active",
             qr_code="EMP_QR_MED",
-            medical_expiry=datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(days=30),
+            medical_expiry=datetime.now(UTC).replace(tzinfo=None) - timedelta(days=30),
         )
         db_session.add(emp)
         db_session.commit()
@@ -195,7 +190,7 @@ class TestQRScanAPI:
 
         assert response.status_code == 200
         data = response.get_json()
-        assert data["success"] == False
+        assert not data["success"]
         assert "medical" in data["message"].lower()
 
     def test_scan_qr_employee_induction_expired(self, api_client, db_cleanup, HARDWARE_API_KEY):
@@ -206,7 +201,7 @@ class TestQRScanAPI:
             id_number="2222222222",
             status="Active",
             qr_code="EMP_QR_IND",
-            induction_expiry=datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(days=30),
+            induction_expiry=datetime.now(UTC).replace(tzinfo=None) - timedelta(days=30),
         )
         db_session.add(emp)
         db_session.commit()
@@ -223,7 +218,7 @@ class TestQRScanAPI:
 
         assert response.status_code == 200
         data = response.get_json()
-        assert data["success"] == False
+        assert not data["success"]
         assert "induction" in data["message"].lower()
 
     def test_scan_qr_employee_valid_expiry(self, api_client, db_cleanup, HARDWARE_API_KEY):
@@ -234,8 +229,8 @@ class TestQRScanAPI:
             id_number="3333333333",
             status="Active",
             qr_code="EMP_QR_VALID",
-            medical_expiry=datetime.now(timezone.utc).replace(tzinfo=None) + timedelta(days=365),
-            induction_expiry=datetime.now(timezone.utc).replace(tzinfo=None) + timedelta(days=365),
+            medical_expiry=datetime.now(UTC).replace(tzinfo=None) + timedelta(days=365),
+            induction_expiry=datetime.now(UTC).replace(tzinfo=None) + timedelta(days=365),
         )
         db_session.add(emp)
         db_session.commit()
@@ -252,7 +247,7 @@ class TestQRScanAPI:
 
         assert response.status_code == 200
         data = response.get_json()
-        assert data["success"] == True
+        assert data["success"]
 
     def test_scan_qr_pending_then_auto_approve(self, api_client, db_cleanup, HARDWARE_API_KEY):
         from models import Approval
@@ -270,7 +265,7 @@ class TestQRScanAPI:
 
         assert response1.status_code == 200
         data1 = response1.get_json()
-        assert data1["success"] == False
+        assert not data1["success"]
 
         pending = db_session.query(Approval).filter_by(status="Pending").first()
         assert pending is not None
@@ -287,5 +282,5 @@ class TestQRScanAPI:
 
         assert response2.status_code == 200
         data2 = response2.get_json()
-        assert data2["success"] == True
-        assert data2["open_gate"] == True
+        assert data2["success"]
+        assert data2["open_gate"]

@@ -2,10 +2,10 @@
 Test suite for monitoring endpoints - system health, stats, and diagnostics.
 """
 
-import pytest
 from datetime import datetime
-from app import app, db_session
-from models import User, Employee, GateLog
+
+from app import db_session
+from models import User
 
 
 class TestMonitoringPage:
@@ -143,7 +143,7 @@ class TestHealthCheck:
         """Health returns service information."""
         response = test_app.get("/health")
         data = response.get_json()
-        
+
         assert data["service"] == "mine-management-api"
         # Timestamp should be parseable
         timestamp = datetime.fromisoformat(data["timestamp"].replace('Z', '+00:00'))

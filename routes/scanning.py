@@ -8,7 +8,6 @@ from datetime import datetime
 import qrcode
 from flask import Blueprint, jsonify, render_template, request, send_file
 
-from services.listeners import _ensure_device_exists
 from app import (
     _format_rfid_tag,
     _is_local_ip,
@@ -26,6 +25,7 @@ from app import (
 from models import Approval, Employee, Equipment, GateLog, Vehicle, Visitor
 from routes.dashboard import invalidate_dashboard_cache
 from routes.monitoring import invalidate_monitoring_cache
+from services.listeners import _ensure_device_exists
 
 scanning_bp = Blueprint("scanning", __name__)
 

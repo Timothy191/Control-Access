@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-import os
-import sys
 import csv
 import hashlib
+import os
+import sys
 from datetime import datetime
 
 # Add project root to path
@@ -12,12 +12,13 @@ sys.path.insert(0, PROJECT_ROOT)
 from database import db_session, init_db
 from models import Equipment
 
+
 def main():
     csv_file = "/home/tim/Desktop/01.mine-management-system/RADIO QR.csv"
     output_dir = os.path.join(PROJECT_ROOT, "radio_qrcodes")
     os.makedirs(output_dir, exist_ok=True)
 
-    print(f"Initializing Database...")
+    print("Initializing Database...")
     init_db()
 
     print(f"Reading radios from {csv_file}...")
@@ -27,10 +28,10 @@ def main():
 
     # Read CSV
     radios = []
-    with open(csv_file, mode='r', encoding='utf-8') as f:
+    with open(csv_file, encoding='utf-8') as f:
         reader = csv.reader(f, delimiter=';')
         # Skip header
-        header = next(reader, None)
+        next(reader, None)
         for row in reader:
             if not row:
                 continue
@@ -50,13 +51,14 @@ def main():
 
     # Import dependencies for QR generation and image drawing
     import qrcode
-    from PIL import Image as PilImage, ImageDraw, ImageFont
+    from PIL import Image as PilImage
+    from PIL import ImageDraw, ImageFont
 
     for idx, radio_id in enumerate(unique_radios):
         # Check if already exists in DB
         item = db_session.query(Equipment).filter_by(radio_id=radio_id).first()
         created = False
-        
+
         if not item:
             item = Equipment(
                 radio_id=radio_id,
@@ -141,7 +143,7 @@ def main():
 
     db_session.commit()
     print("\n" + "="*50)
-    print(f"Import process completed successfully.")
+    print("Import process completed successfully.")
     print(f"Unique records processed: {len(unique_radios)}")
     print(f"New radios imported:      {imported}")
     print(f"Existing radios skipped:  {skipped}")

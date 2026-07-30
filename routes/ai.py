@@ -5,6 +5,8 @@ import requests
 from flask import (
     Blueprint,
     Response,
+    abort,
+    current_app,
     jsonify,
     render_template,
     request,
@@ -33,11 +35,19 @@ ai_bp = Blueprint("ai", __name__)
 @login_required
 def ai_status():
     """Return AI engine availability and model info."""
-    from app import _ollama_checked
+    if not current_app.config.get("ENABLE_AI_CHAT", True):
+        return jsonify({
+            "available": False,
+            "provider": "disabled",
+            "model": "",
+            "model_full": "",
+            "url": "",
+        })
 
-    global _ollama_checked
+    import app
+
     if not _ollama_available:
-        _ollama_checked = False
+        app._ollama_checked = False
         _check_ollama()
     return jsonify(
         {
@@ -54,6 +64,8 @@ def ai_status():
 @login_required
 def ai_chat_page():
     """Render the AI chat interface."""
+    if not current_app.config.get("ENABLE_AI_CHAT", True):
+        abort(403)
     return render_template("chat.html")
 
 
@@ -123,11 +135,13 @@ def _ollama_generate(prompt, system_ctx, stream=False, use_full=False):
 @limiter.limit("20 per minute")
 def ai_chat():
     """API endpoint for AI chat - returns full response (non-streaming fallback)."""
-    from app import _ollama_checked
+    if not current_app.config.get("ENABLE_AI_CHAT", True):
+        return jsonify({"error": "AI chat is disabled via configuration"}), 403
 
-    global _ollama_checked
+    import app
+
     if not _ollama_available:
-        _ollama_checked = False  # Allow re-check
+        app._ollama_checked = False  # Allow re-check
         _check_ollama()
     if not _ollama_available:
         return jsonify({"error": "AI offline. Start Ollama with: ollama serve"}), 503
@@ -156,11 +170,13 @@ def ai_chat():
 @limiter.limit("20 per minute")
 def ai_chat_stream():
     """Streaming endpoint for real-time AI chat responses via Ollama."""
-    from app import _ollama_checked
+    if not current_app.config.get("ENABLE_AI_CHAT", True):
+        return jsonify({"error": "AI chat is disabled via configuration"}), 403
 
-    global _ollama_checked
+    import app
+
     if not _ollama_available:
-        _ollama_checked = False  # Allow re-check
+        app._ollama_checked = False  # Allow re-check
         _check_ollama()
     if not _ollama_available:
         return jsonify({"error": "AI offline. Start Ollama with: ollama serve"}), 503

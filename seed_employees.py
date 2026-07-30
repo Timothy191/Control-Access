@@ -10,10 +10,11 @@ from datetime import datetime, timedelta
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from faker import Faker
-import qrcode
-from io import BytesIO
 import base64
+from io import BytesIO
+
+import qrcode
+from faker import Faker
 
 fake = Faker()
 
@@ -115,7 +116,7 @@ def seed_employees():
     count = db_session.query(Employee).count()
     print(f"\nDone! {count} employees seeded.")
     print(f"Department: {department}")
-    print(f"QR codes: Generated for all employees")
+    print("QR codes: Generated for all employees")
     print(f"Expired Medical: {expired_med}, Expired Induction: {expired_ind}")
 
 

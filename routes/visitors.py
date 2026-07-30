@@ -2,7 +2,15 @@
 
 from datetime import datetime
 
-from flask import Blueprint, jsonify, redirect, render_template, request, session, url_for
+from flask import (
+    Blueprint,
+    jsonify,
+    redirect,
+    render_template,
+    request,
+    session,
+    url_for,
+)
 
 from app import _utcnow, db_session, log_audit, login_required, role_required, socketio
 from models import Approval, Employee, GateLog, SiteSetting, Visitor

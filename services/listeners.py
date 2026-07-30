@@ -7,11 +7,10 @@ import os
 import re
 import socket
 import threading
-from datetime import timezone, datetime
+from datetime import UTC, datetime
 
 from database import db_session
 from models import Device
-
 
 UDP_BUFFER_SIZE = 1024 * 1024  # 1MB buffer for high-throughput scanning
 TCP_BACKLOG = 2048  # Increased TCP connection queue
@@ -50,7 +49,7 @@ def get_broadcast_address():
 
 
 def _utcnow_naive():
-    return datetime.now(timezone.utc).replace(tzinfo=None)
+    return datetime.now(UTC).replace(tzinfo=None)
 
 
 def _ensure_device_exists(ip_address):

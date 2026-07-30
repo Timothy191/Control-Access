@@ -4,9 +4,9 @@ Database Operations Orchestrator
 Automated tasks for the Arch-System database
 """
 
-import sqlite3
 import os
 import shutil
+import sqlite3
 from datetime import datetime
 
 DB_PATH = "/home/tim/Desktop/01.mine-management-system/mine_management.db"

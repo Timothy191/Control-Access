@@ -1,4 +1,5 @@
 import os
+
 import pytest
 
 # Mock environment variables before importing app
@@ -6,14 +7,15 @@ os.environ["HARDWARE_API_KEY"] = "your-secret-hardware-key"
 
 from app import app, db_session
 from database import Base
-from models import User, Employee, Vehicle, Visitor
+from models import Employee, User, Vehicle, Visitor
+
 
 @pytest.fixture(scope="function")
 def test_app():
     app.config["TESTING"] = True
     app.config["SECRET_KEY"] = "test-secret-key"
     app.config["RATELIMIT_ENABLED"] = False
-    
+
     from app import limiter
     limiter.enabled = False
 

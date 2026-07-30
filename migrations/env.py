@@ -1,17 +1,15 @@
 import logging
+import os
+import sys
 from logging.config import fileConfig
 
-from flask import current_app
 from alembic import context
-import sys
-import os
 
 # Add project root to path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 # Import our database setup
 from database import Base, engine
-from models import User, Employee, Vehicle, Visitor, Approval, GateLog
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.

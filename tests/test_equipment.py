@@ -2,9 +2,11 @@
 Test suite for equipment management - CRUD operations for equipment/radio devices.
 """
 
+from datetime import datetime
+
 import pytest
-from datetime import datetime, timedelta
-from app import app, db_session
+
+from app import db_session
 from models import Equipment, User
 
 

@@ -4,11 +4,10 @@ Covers: valid QR scan, invalid QR hash, expired employee, vehicle scan,
 visitor scan, and related edge cases through the /api/scan_qr endpoint.
 """
 
-import pytest
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
-from app import app, db_session
-from models import Employee, Vehicle, Visitor, GateLog, Approval
+from app import db_session
+from models import Employee, GateLog, Vehicle, Visitor
 
 
 class TestScanningBlueprint:
@@ -131,7 +130,7 @@ class TestScanningBlueprint:
             id_number="1000000010",
             status="Active",
             qr_code="SCAN_QR_MED",
-            medical_expiry=datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(days=10),
+            medical_expiry=datetime.now(UTC).replace(tzinfo=None) - timedelta(days=10),
         )
         db_session.add(emp)
         db_session.commit()
@@ -162,7 +161,7 @@ class TestScanningBlueprint:
             id_number="1000000011",
             status="Active",
             qr_code="SCAN_QR_IND",
-            induction_expiry=datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(days=5),
+            induction_expiry=datetime.now(UTC).replace(tzinfo=None) - timedelta(days=5),
         )
         db_session.add(emp)
         db_session.commit()
@@ -193,8 +192,8 @@ class TestScanningBlueprint:
             id_number="1000000012",
             status="Active",
             qr_code="SCAN_QR_VALID",
-            medical_expiry=datetime.now(timezone.utc).replace(tzinfo=None) + timedelta(days=365),
-            induction_expiry=datetime.now(timezone.utc).replace(tzinfo=None) + timedelta(days=365),
+            medical_expiry=datetime.now(UTC).replace(tzinfo=None) + timedelta(days=365),
+            induction_expiry=datetime.now(UTC).replace(tzinfo=None) + timedelta(days=365),
         )
         db_session.add(emp)
         db_session.commit()
@@ -304,7 +303,7 @@ class TestScanningBlueprint:
             fleet_id="VEH-SCAN-03",
             status="Active",
             qr_code="VEH_SCAN_QR_03",
-            registration_expiry=datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(days=15),
+            registration_expiry=datetime.now(UTC).replace(tzinfo=None) - timedelta(days=15),
         )
         db_session.add(vehicle)
         db_session.commit()
