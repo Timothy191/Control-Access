@@ -27,7 +27,7 @@ fi
 # ── 2. Verify C66 connected via ADB ──
 C66=$(adb devices 2>/dev/null | grep -v "List" | grep -v "^$" | head -1)
 if [ -n "$C66" ]; then
-    echo -e "  ${GREEN}✓${NC} C66 connected via ADB ($(echo $C66 | awk '{print $1}'))"
+    echo -e "  ${GREEN}✓${NC} C66 connected via ADB ($(echo "$C66" | awk '{print $1}'))"
 else
     echo -e "  ${RED}✗${NC} C66 not detected via ADB. Plug in USB with debugging enabled."
     exit 1
@@ -64,21 +64,26 @@ RECEIVER=".receiver.CustomBroadcastReceiver_xb"
 BROADCAST="adb shell am broadcast -a com.rscja.scanner.action"
 FLAGS="-n ${SCANNER_PKG}/${RECEIVER} --user 0"
 
+# shellcheck disable=SC2086  # Intentional word splitting for command composition
+send_signal() {
+    $BROADCAST."$1" $FLAGS >/dev/null 2>&1
+}
+
 echo -e "  Flashing red laser... (2 pulses)"
-$BROADCAST.BARCODESTARTSCAN $FLAGS >/dev/null 2>&1
+send_signal BARCODESTARTSCAN
 sleep 0.2
-$BROADCAST.BARCODESTOPSCAN $FLAGS >/dev/null 2>&1
+send_signal BARCODESTOPSCAN
 sleep 0.15
-$BROADCAST.BEEP $FLAGS >/dev/null 2>&1
+send_signal BEEP
 
 sleep 0.3
 
-$BROADCAST.BARCODESTARTSCAN $FLAGS >/dev/null 2>&1
+send_signal BARCODESTARTSCAN
 sleep 0.2
-$BROADCAST.BARCODESTOPSCAN $FLAGS >/dev/null 2>&1
+send_signal BARCODESTOPSCAN
 sleep 0.15
-$BROADCAST.BEEP $FLAGS >/dev/null 2>&1
-$BROADCAST.VIBRATE $FLAGS >/dev/null 2>&1
+send_signal BEEP
+send_signal VIBRATE
 
 echo -e "  ${GREEN}✓${NC} Ready signal sent to C66"
 echo ""

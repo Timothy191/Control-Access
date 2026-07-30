@@ -4,7 +4,7 @@
 
 {% block breadcrumb %}
 <i class="ti ti-home"></i>
-<a href="{{ url_for('dashboard') }}">Dashboard</a>
+<a href="{{ url_for('dashboard.dashboard') }}">Dashboard</a>
 <i class="ti ti-chevron-right"></i>
 <span>Employees</span>
 {% endblock %}
@@ -57,7 +57,7 @@
             <button type="submit" class="btn btn-primary">
                 <i class="ti ti-filter"></i> Apply
             </button>
-            <a href="{{ url_for('employees') }}" class="btn btn-secondary">
+            <a href="{{ url_for('employees.employees') }}" class="btn btn-secondary">
                 <i class="ti ti-x"></i> Clear
             </a>
         </div>
@@ -135,11 +135,11 @@
                     </td>
                     <td>
                         {% if emp.qr_code %}
-                        <a href="{{ url_for('generate_qr_code', entity_type='employee', entity_id=emp.id) }}" class="btn btn-sm btn-success" title="Download QR Code">
+                        <a href="{{ url_for('scanning.generate_qr_code', entity_type='employee', entity_id=emp.id) }}" class="btn btn-sm btn-success" title="Download QR Code">
                             <i class="ti ti-download"></i> Download QR
                         </a>
                         {% else %}
-                        <a href="{{ url_for('generate_qr_code', entity_type='employee', entity_id=emp.id) }}" class="btn btn-sm btn-primary">
+                        <a href="{{ url_for('scanning.generate_qr_code', entity_type='employee', entity_id=emp.id) }}" class="btn btn-sm btn-primary">
                             <i class="ti ti-qrcode"></i> Generate QR
                         </a>
                         {% endif %}

@@ -19,7 +19,8 @@ class TestMonitoringPage:
 
     def test_monitoring_requires_admin(self, test_app, db_cleanup):
         """Only admin can access monitoring."""
-        user = User(username="manager_mon", password="pass123", role="manager")
+        user = User(username="manager_mon", role="manager")
+        user.set_password("pass123")
         db_session.add(user)
         db_session.flush()
         user_id = user.id
@@ -206,7 +207,8 @@ class TestNetworkScannerAPI:
 
     def test_scanner_config_requires_admin(self, test_app, db_cleanup):
         """Scanner config requires admin."""
-        user = User(username="manager_sc", password="pass123", role="manager")
+        user = User(username="manager_sc", role="manager")
+        user.set_password("pass123")
         db_session.add(user)
         db_session.flush()
         user_id = user.id

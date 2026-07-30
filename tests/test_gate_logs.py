@@ -70,7 +70,8 @@ class TestGateLogsPage:
 
     def test_gate_logs_requires_security_role(self, test_app, db_cleanup):
         """Regular users cannot view gate logs."""
-        user = User(username="regular_gl", password="pass123", role="user")
+        user = User(username="regular_gl", role="user")
+        user.set_password("pass123")
         db_session.add(user)
         db_session.commit()
 
@@ -175,11 +176,14 @@ class TestGateLogsAPI:
         assert response.status_code == 200
 
         data = response.get_json()
-        assert isinstance(data, list)
-        assert len(data) >= 3
+        assert isinstance(data, dict)
+        assert "logs" in data
+        assert "page" in data
+        assert "total" in data
+        assert len(data["logs"]) >= 3
 
         # Check structure
-        first_log = data[0]
+        first_log = data["logs"][0]
         assert "id" in first_log
         assert "type" in first_log
         assert "name" in first_log
@@ -192,7 +196,8 @@ class TestGateLogsAPI:
         assert response.status_code == 200
 
         data = response.get_json()
-        assert len(data) == 2
+        assert len(data["logs"]) == 2
+        assert data["limit"] == 2
 
     def test_api_gate_logs_ordering(self, authenticated_client, sample_gate_logs):
         """Logs ordered by timestamp desc."""
@@ -200,10 +205,11 @@ class TestGateLogsAPI:
         assert response.status_code == 200
 
         data = response.get_json()
-        if len(data) >= 2:
+        logs = data["logs"]
+        if len(logs) >= 2:
             # Should be newest first
-            first_time = datetime.strptime(data[0]["time"], "%Y-%m-%d %H:%M:%S")
-            second_time = datetime.strptime(data[1]["time"], "%Y-%m-%d %H:%M:%S")
+            first_time = datetime.strptime(logs[0]["time"], "%Y-%m-%d %H:%M:%S")
+            second_time = datetime.strptime(logs[1]["time"], "%Y-%m-%d %H:%M:%S")
             assert first_time >= second_time
 
 
@@ -307,7 +313,8 @@ class TestQRScannerPage:
 
     def test_qr_scanner_requires_security_role(self, test_app, db_cleanup):
         """Regular users cannot access scanner interface."""
-        user = User(username="regular_qr", password="pass123", role="user")
+        user = User(username="regular_qr", role="user")
+        user.set_password("pass123")
         db_session.add(user)
         db_session.commit()
 

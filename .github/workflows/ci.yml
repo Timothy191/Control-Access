@@ -39,7 +39,7 @@ jobs:
         run: pip install -q -r requirements.txt
 
       - name: Type check with mypy
-        run: pip install -q mypy && mypy app.py --ignore-missing-imports
+        run: pip install -q mypy && mypy app.py models.py database.py --config-file mypy.ini
 
   test:
     runs-on: ubuntu-latest

@@ -89,9 +89,16 @@ def get_app_uptime():
     return str(uptime).split('.')[0]
 
 def kill_existing_flask():
-    subprocess.run(
-        "pkill -f 'python.*app.py' || pkill -f 'flask run' || true", shell=True
-    )
+    # Try each pkill pattern separately; ignore failures (no match = nonzero exit).
+    for pattern in ["python.*app.py", "flask run"]:
+        try:
+            subprocess.run(
+                ["pkill", "-f", pattern],
+                capture_output=True,
+                timeout=5,
+            )
+        except (subprocess.TimeoutExpired, FileNotFoundError):
+            pass
     time.sleep(2)
 
 def start_app():
@@ -402,10 +409,6 @@ def run_loop():
 
         if issues:
             log(f"ISSUES: {issues}")
-            log("Restarting app...")
-            kill_existing_flask()
-            time.sleep(2)
-            start_app()
 
         if RICH_AVAILABLE:
             render_rich_display(results, issues, avg_time, stats)

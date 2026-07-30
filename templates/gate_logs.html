@@ -4,7 +4,7 @@
 
 {% block breadcrumb %}
 <i class="ti ti-home"></i>
-<a href="{{ url_for('dashboard') }}">Dashboard</a>
+<a href="{{ url_for('dashboard.dashboard') }}">Dashboard</a>
 <i class="ti ti-chevron-right"></i>
 <span>Gate Logs</span>
 {% endblock %}
@@ -14,10 +14,10 @@
     <div class="page-header">
         <h1><i class="ti ti-qrcode"></i> Gate Access Logs</h1>
         <div class="export-buttons">
-            <a href="{{ url_for('export_gate_logs_excel') }}" class="btn btn-primary">
+            <a href="{{ url_for('export_gate_logs_excel', type=request.args.get('type', ''), direction=request.args.get('direction', ''), status=request.args.get('status', ''), gate=request.args.get('gate', ''), date_from=request.args.get('date_from', ''), date_to=request.args.get('date_to', '')) }}" class="btn btn-primary">
                 <i class="ti ti-file-type-xls"></i> Excel
             </a>
-            <a href="{{ url_for('export_gate_logs_pdf', type=request.args.get('type', ''), direction=request.args.get('direction', ''), status=request.args.get('status', ''), date_from=request.args.get('date_from', ''), date_to=request.args.get('date_to', '')) }}" class="btn btn-primary">
+            <a href="{{ url_for('export_gate_logs_pdf', type=request.args.get('type', ''), direction=request.args.get('direction', ''), status=request.args.get('status', ''), gate=request.args.get('gate', ''), date_from=request.args.get('date_from', ''), date_to=request.args.get('date_to', '')) }}" class="btn btn-primary">
                 <i class="ti ti-file-type-pdf"></i> PDF
             </a>
         </div>
@@ -48,6 +48,10 @@
                 <option value="granted" {% if selected_status == 'granted' %}selected{% endif %}>Granted</option>
                 <option value="denied" {% if selected_status == 'denied' %}selected{% endif %}>Denied</option>
             </select>
+        </div>
+        <div class="filter-group">
+            <label for="gateFilter">Gate:</label>
+            <input type="text" id="gateFilter" name="gate" value="{{ selected_gate or '' }}" placeholder="e.g. Main Gate">
         </div>
         <div class="filter-group">
             <label for="dateFrom">Date From:</label>
@@ -142,19 +146,19 @@
         <span class="pagination-info">Showing {{ (page - 1) * per_page + 1 }}–{{ [page * per_page, total] | min }} of {{ total }}</span>
         <div class="pagination-controls">
             {% if page > 1 %}
-            <a href="{{ url_for('gate_logs', page=page-1, type=selected_type, direction=selected_direction, status=selected_status, date_from=selected_date_from, date_to=selected_date_to, per_page=per_page) }}" class="btn btn-sm btn-secondary">&laquo; Prev</a>
+            <a href="{{ url_for('gate_logs', page=page-1, type=selected_type, direction=selected_direction, status=selected_status, gate=selected_gate, date_from=selected_date_from, date_to=selected_date_to, per_page=per_page) }}" class="btn btn-sm btn-secondary">&laquo; Prev</a>
             {% endif %}
             {% for p in range(1, total_pages + 1) %}
                 {% if p == page %}
                 <span class="btn btn-sm btn-primary pagination-current">{{ p }}</span>
                 {% elif p == 1 or p == total_pages or (p >= page - 2 and p <= page + 2) %}
-                <a href="{{ url_for('gate_logs', page=p, type=selected_type, direction=selected_direction, status=selected_status, date_from=selected_date_from, date_to=selected_date_to, per_page=per_page) }}" class="btn btn-sm btn-secondary">{{ p }}</a>
+                <a href="{{ url_for('gate_logs', page=p, type=selected_type, direction=selected_direction, status=selected_status, gate=selected_gate, date_from=selected_date_from, date_to=selected_date_to, per_page=per_page) }}" class="btn btn-sm btn-secondary">{{ p }}</a>
                 {% elif p == page - 3 or p == page + 3 %}
                 <span class="pagination-ellipsis">…</span>
                 {% endif %}
             {% endfor %}
             {% if page < total_pages %}
-            <a href="{{ url_for('gate_logs', page=page+1, type=selected_type, direction=selected_direction, status=selected_status, date_from=selected_date_from, date_to=selected_date_to, per_page=per_page) }}" class="btn btn-sm btn-secondary">Next &raquo;</a>
+            <a href="{{ url_for('gate_logs', page=page+1, type=selected_type, direction=selected_direction, status=selected_status, gate=selected_gate, date_from=selected_date_from, date_to=selected_date_to, per_page=per_page) }}" class="btn btn-sm btn-secondary">Next &raquo;</a>
             {% endif %}
         </div>
     </div>

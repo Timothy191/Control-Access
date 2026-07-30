@@ -3,13 +3,11 @@ Load and stress tests for system stability and reliability.
 Tests concurrent operations, database locking, and performance under load.
 """
 
-import pytest
-import threading
-import time
 import concurrent.futures
-from datetime import datetime
+import time
+
 from app import app, db_session
-from models import Employee, Vehicle, GateLog, User
+from models import Employee, GateLog, User
 
 
 class TestConcurrentQRScans:
@@ -62,7 +60,7 @@ class TestConcurrentQRScans:
     def test_concurrent_unknown_qr_creates_approvals(self, api_client, db_cleanup, HARDWARE_API_KEY):
         """Concurrent unknown QR scans create single approval."""
         qr_code = f"CONCURRENT_UNKNOWN_{int(time.time())}"
-        
+
         initial_approvals = db_session.query(GateLog).filter_by(qr_data=qr_code).count()
 
         def make_scan_request():
@@ -96,7 +94,7 @@ class TestConcurrentQRScans:
         for i in range(10):
             emp = Employee(
                 emp_code=f"LOCK{i:03d}",
-                first_name=f"Lock",
+                first_name="Lock",
                 surname=f"Test{i}",
                 status="Active",
                 qr_code=f"LOCK_QR_{i:03d}"
@@ -133,7 +131,8 @@ class TestConcurrentLogins:
     def test_concurrent_login_attempts(self, test_app, db_cleanup):
         """Multiple concurrent login attempts."""
         # Create user
-        user = User(username="concurrent", password="testpass", role="user")
+        user = User(username="concurrent", role="user")
+        user.set_password("testpass")
         db_session.add(user)
         db_session.commit()
 
@@ -156,7 +155,8 @@ class TestConcurrentLogins:
     def test_login_rate_limiting(self, test_app, db_cleanup):
         """Rate limiting prevents abuse."""
         # Create user
-        user = User(username="ratetest", password="testpass", role="user")
+        user = User(username="ratetest", role="user")
+        user.set_password("testpass")
         db_session.add(user)
         db_session.commit()
 
@@ -406,8 +406,12 @@ class TestScannerEndpoints:
 class TestConcurrentModifications:
     """Tests for concurrent data modifications."""
 
-    def test_concurrent_employee_edits(self, authenticated_client, db_cleanup):
+    def test_concurrent_employee_edits(self, test_app, db_cleanup):
         """Concurrent edits to same employee handled."""
+        admin_user = User(username="admin_concurrent", role="admin")
+        admin_user.set_password("admin_concurrent")
+        db_session.add(admin_user)
+
         emp = Employee(
             emp_code="EDIT001",
             first_name="Edit",
@@ -417,20 +421,27 @@ class TestConcurrentModifications:
         db_session.add(emp)
         db_session.commit()
         emp_id = emp.id
+        admin_user_id = admin_user.id
 
         def edit_employee(i):
-            return authenticated_client.post(
-                f"/edit_employee/{emp_id}",
-                data={
-                    "emp_code": "EDIT001",
-                    "first_name": f"Edit{i}",
-                    "surname": "Test",
-                    "id_number": "1234567890",
-                    "job_title": "Tester",
-                    "status": "Active"
-                },
-                follow_redirects=True
-            )
+            with app.test_client() as client:
+                with client.session_transaction() as sess:
+                    sess["logged_in"] = True
+                    sess["username"] = "admin_concurrent"
+                    sess["user_id"] = admin_user_id
+                    sess["role"] = "admin"
+                return client.post(
+                    f"/edit_employee/{emp_id}",
+                    data={
+                        "emp_code": "EDIT001",
+                        "first_name": f"Edit{i}",
+                        "surname": "Test",
+                        "id_number": "1234567890",
+                        "job_title": "Tester",
+                        "status": "Active"
+                    },
+                    follow_redirects=True
+                )
 
         # Concurrent edits
         with concurrent.futures.ThreadPoolExecutor(max_workers=3) as executor:

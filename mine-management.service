@@ -13,8 +13,7 @@ ExecStart=/home/tim/Desktop/New Folder/01.mine-management-system/venv/bin/gunico
 ExecReload=/bin/kill -HUP $MAINPID
 KillMode=mixed
 TimeoutStopSec=30
-Restart=always
-RestartSec=5
+Restart=no
 
 NoNewPrivileges=true
 PrivateTmp=true

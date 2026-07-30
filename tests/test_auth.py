@@ -10,7 +10,8 @@ class TestAuthentication:
         assert b"login" in response.data.lower()
 
     def test_login_success(self, test_app, db_cleanup):
-        user = User(username="testuser", password="testpass", role="admin")
+        user = User(username="testuser", role="admin")
+        user.set_password("testpass")
         db_session.add(user)
         db_session.commit()
 
@@ -32,7 +33,8 @@ class TestAuthentication:
         assert b"invalid" in response.data.lower()
 
     def test_logout(self, test_app, db_cleanup):
-        user = User(username="testuser", password="testpass", role="admin")
+        user = User(username="testuser", role="admin")
+        user.set_password("testpass")
         db_session.add(user)
         db_session.commit()
 

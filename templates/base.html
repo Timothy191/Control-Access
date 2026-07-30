@@ -558,7 +558,7 @@
             </div>
             <nav class="sidebar-nav">
                 {# Dashboard - Always visible #}
-                <a href="{{ url_for('dashboard') }}" class="nav-item {% if request.endpoint == 'dashboard' %}active{% endif %}">
+                <a href="{{ url_for('dashboard.dashboard') }}" class="nav-item {% if request.endpoint == 'dashboard.dashboard' %}active{% endif %}">
                     <i class="ti ti-dashboard"></i>
                     <span>Dashboard</span>
                 </a>
@@ -571,19 +571,19 @@
                         <span>MANAGEMENT</span>
                     </div>
                     <div class="nav-section-content">
-                        <a href="{{ url_for('employees') }}" class="nav-item {% if request.endpoint == 'employees' %}active{% endif %}">
+                        <a href="{{ url_for('employees.employees') }}" class="nav-item {% if request.endpoint == 'employees.employees' %}active{% endif %}">
                             <i class="ti ti-users"></i>
                             <span>Employees</span>
                         </a>
-                        <a href="{{ url_for('fleet') }}" class="nav-item {% if request.endpoint == 'fleet' %}active{% endif %}">
+                        <a href="{{ url_for('fleet.fleet') }}" class="nav-item {% if request.endpoint == 'fleet.fleet' %}active{% endif %}">
                             <i class="ti ti-truck"></i>
                             <span>Fleet</span>
                         </a>
-                        <a href="{{ url_for('equipment') }}" class="nav-item {% if request.endpoint == 'equipment' %}active{% endif %}">
+                        <a href="{{ url_for('equipment.equipment') }}" class="nav-item {% if request.endpoint == 'equipment.equipment' %}active{% endif %}">
                             <i class="ti ti-device-desktop-analytics"></i>
                             <span>Equipment</span>
                         </a>
-                        <a href="{{ url_for('visitors') }}" class="nav-item {% if request.endpoint == 'visitors' %}active{% endif %}">
+                        <a href="{{ url_for('visitors.visitors') }}" class="nav-item {% if request.endpoint == 'visitors.visitors' %}active{% endif %}">
                             <i class="ti ti-id-badge"></i>
                             <span>Visitors</span>
                         </a>
@@ -598,7 +598,7 @@
                         <span>OPERATIONS</span>
                     </div>
                     <div class="nav-section-content">
-                        <a href="{{ url_for('qr_scanner') }}" class="nav-item {% if request.endpoint == 'qr_scanner' %}active{% endif %}">
+                        <a href="{{ url_for('scanning.qr_scanner') }}" class="nav-item {% if request.endpoint == 'scanning.qr_scanner' %}active{% endif %}">
                             <i class="ti ti-scan"></i>
                             <span>Gate Scanner</span>
                         </a>
@@ -618,18 +618,18 @@
                 </div>
 
                 {# TOOLS SECTION #}
-                {% set tools_active = request.endpoint in ['generate_qr_page', 'ai_chat_page'] %}
+                {% set tools_active = request.endpoint in ['scanning.generate_qr_page', 'ai_chat_page'] %}
                 <div class="nav-section {% if tools_active %}expanded{% endif %}" data-section="tools">
                     <div class="nav-section-header" onclick="toggleSection('tools')">
                         <i class="ti ti-chevron-right section-toggle"></i>
                         <span>TOOLS</span>
                     </div>
                     <div class="nav-section-content">
-                        <a href="{{ url_for('generate_qr_page') }}" class="nav-item {% if request.endpoint == 'generate_qr_page' %}active{% endif %}">
+                        <a href="{{ url_for('scanning.generate_qr_page') }}" class="nav-item {% if request.endpoint == 'scanning.generate_qr_page' %}active{% endif %}">
                             <i class="ti ti-qrcode"></i>
                             <span>Generate QR</span>
                         </a>
-                        <a href="{{ url_for('ai_chat_page') }}" class="nav-item {% if request.endpoint == 'ai_chat_page' %}active{% endif %}">
+                        <a href="{{ url_for('ai.ai_chat_page') }}" class="nav-item {% if request.endpoint == 'ai.ai_chat_page' %}active{% endif %}">
                             <i class="ti ti-brain"></i>
                             <span>AI Assistant</span>
                         </a>
@@ -645,19 +645,19 @@
                         <span>ADMIN</span>
                     </div>
                     <div class="nav-section-content">
-                        <a href="{{ url_for('monitoring') }}" class="nav-item {% if request.endpoint == 'monitoring' %}active{% endif %}">
+                        <a href="{{ url_for('monitoring.monitoring') }}" class="nav-item {% if request.endpoint == 'monitoring.monitoring' %}active{% endif %}">
                             <i class="ti ti-device-analytics"></i>
                             <span>Monitoring</span>
                         </a>
-                        <a href="{{ url_for('audit_logs') }}" class="nav-item {% if request.endpoint == 'audit_logs' %}active{% endif %}">
+                        <a href="{{ url_for('admin.audit_logs') }}" class="nav-item {% if request.endpoint == 'admin.audit_logs' %}active{% endif %}">
                             <i class="ti ti-shield"></i>
                             <span>Audit Logs</span>
                         </a>
-                        <a href="{{ url_for('manage_users') }}" class="nav-item {% if request.endpoint == 'manage_users' %}active{% endif %}">
+                        <a href="{{ url_for('admin.manage_users') }}" class="nav-item {% if request.endpoint == 'admin.manage_users' %}active{% endif %}">
                             <i class="ti ti-users-group"></i>
                             <span>Users</span>
                         </a>
-                        <a href="{{ url_for('gate_mappings') }}" class="nav-item {% if request.endpoint == 'gate_mappings' %}active{% endif %}">
+                        <a href="{{ url_for('admin.gate_mappings') }}" class="nav-item {% if request.endpoint == 'admin.gate_mappings' %}active{% endif %}">
                             <i class="ti ti-map-pin"></i>
                             <span>Gate Mappings</span>
                         </a>
@@ -675,7 +675,7 @@
                     <span>{{ session.username }}</span>
                     <span class="role-badge">{{ session.role }}</span>
                 </div>
-                <a href="{{ url_for('logout') }}" class="logout-btn">
+                <a href="{{ url_for('auth.logout') }}" class="logout-btn">
                     <i class="ti ti-logout"></i>
                     <span>Logout</span>
                 </a>
@@ -685,7 +685,7 @@
             <div class="breadcrumb">
                 {% block breadcrumb %}
                 <i class="ti ti-home"></i>
-                <a href="{{ url_for('dashboard') }}">Dashboard</a>
+                <a href="{{ url_for('dashboard.dashboard') }}">Dashboard</a>
                 {% if request.endpoint != 'dashboard' %}
                     <i class="ti ti-chevron-right"></i>
                     <span>{% block page_name %}{% endblock %}</span>

@@ -96,7 +96,8 @@ class TestEmployeeExport:
 
     def test_export_employees_excel_requires_manager(self, test_app, db_cleanup):
         """Regular users cannot export."""
-        user = User(username="regular_exp", password="pass123", role="user")
+        user = User(username="regular_exp", role="user")
+        user.set_password("pass123")
         db_session.add(user)
         db_session.commit()
 
@@ -276,7 +277,8 @@ class TestGateLogExport:
 
     def test_export_gate_logs_excel_requires_admin(self, test_app, db_cleanup):
         """Gate logs export requires admin."""
-        user = User(username="manager_gl", password="pass123", role="manager")
+        user = User(username="manager_gl", role="manager")
+        user.set_password("pass123")
         db_session.add(user)
         db_session.commit()
 

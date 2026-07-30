@@ -3,7 +3,6 @@
 # Prioritizes scanner traffic for fast, reliable data transfer
 
 # Colors
-RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
@@ -53,30 +52,30 @@ apply_qos() {
     echo -e "${YELLOW}Applying QoS rules...${NC}"
     
     # Clean up existing rules
-    tc qdisc del dev $INTERFACE root 2>/dev/null
+    tc qdisc del dev "$INTERFACE" root 2>/dev/null
     
     # Create hierarchical token bucket (HTB) for bandwidth shaping
-    tc qdisc add dev $INTERFACE root handle 1: htb default 10
+    tc qdisc add dev "$INTERFACE" root handle 1: htb default 10
     
     # Root class - 100Mbps max
-    tc class add dev $INTERFACE parent 1: classid 1:1 htb rate 100mbit burst 15k
+    tc class add dev "$INTERFACE" parent 1: classid 1:1 htb rate 100mbit burst 15k
     
     # High priority for scanner UDP traffic (port 9999)
-    tc class add dev $INTERFACE parent 1:1 classid 1:10 htb rate 50mbit prio 0 burst 15k
+    tc class add dev "$INTERFACE" parent 1:1 classid 1:10 htb rate 50mbit prio 0 burst 15k
     
     # Medium priority for API traffic
-    tc class add dev $INTERFACE parent 1:1 classid 1:20 htb rate 30mbit prio 1 burst 15k
+    tc class add dev "$INTERFACE" parent 1:1 classid 1:20 htb rate 30mbit prio 1 burst 15k
     
     # Low priority for general traffic
-    tc class add dev $INTERFACE parent 1:1 classid 1:30 htb rate 20mbit prio 2 burst 15k
+    tc class add dev "$INTERFACE" parent 1:1 classid 1:30 htb rate 20mbit prio 2 burst 15k
     
     # Filter: Mark UDP scanner packets (port 9999)
-    tc filter add dev $INTERFACE parent 1: protocol all prio 0 u32 match ip dport 9999 0xffff flowid 1:10
-    tc filter add dev $INTERFACE parent 1: protocol all prio 0 u32 match ip sport 9999 0xffff flowid 1:10
+    tc filter add dev "$INTERFACE" parent 1: protocol all prio 0 u32 match ip dport 9999 0xffff flowid 1:10
+    tc filter add dev "$INTERFACE" parent 1: protocol all prio 0 u32 match ip sport 9999 0xffff flowid 1:10
     
     # Filter: Mark API traffic
-    tc filter add dev $INTERFACE parent 1: protocol all prio 1 u32 match ip dport 8080 0xffff flowid 1:20
-    tc filter add dev $INTERFACE parent 1: protocol all prio 1 u32 match ip dport 3000 0xffff flowid 1:20
+    tc filter add dev "$INTERFACE" parent 1: protocol all prio 1 u32 match ip dport 8080 0xffff flowid 1:20
+    tc filter add dev "$INTERFACE" parent 1: protocol all prio 1 u32 match ip dport 3000 0xffff flowid 1:20
     
     echo -e "${GREEN}✓ QoS rules applied successfully${NC}"
 }
@@ -148,10 +147,10 @@ status() {
     echo -e "${BLUE}============================================================${NC}"
     
     echo -e "\n${GREEN}Traffic Classes:${NC}"
-    tc class show dev $INTERFACE 2>/dev/null || echo "  No QoS classes configured"
+    tc class show dev "$INTERFACE" 2>/dev/null || echo "  No QoS classes configured"
     
     echo -e "\n${GREEN}Traffic Filters:${NC}"
-    tc filter show dev $INTERFACE 2>/dev/null | grep -E "filter|flowid" || echo "  No filters configured"
+    tc filter show dev "$INTERFACE" 2>/dev/null | grep -E "filter|flowid" || echo "  No filters configured"
     
     echo -e "\n${GREEN}Network Buffers:${NC}"
     echo "  rmem_max: $(cat /proc/sys/net/core/rmem_max 2>/dev/null || echo 'N/A')"
@@ -164,7 +163,7 @@ status() {
 # Function to clean up QoS rules
 cleanup() {
     echo -e "${YELLOW}Cleaning up QoS rules...${NC}"
-    tc qdisc del dev $INTERFACE root 2>/dev/null
+    tc qdisc del dev "$INTERFACE" root 2>/dev/null
     echo -e "${GREEN}✓ QoS rules removed${NC}"
 }
 

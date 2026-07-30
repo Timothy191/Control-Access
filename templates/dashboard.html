@@ -4,7 +4,7 @@
 
 {% block breadcrumb %}
 <i class="ti ti-home"></i>
-<a href="{{ url_for('dashboard') }}">Dashboard</a>
+<a href="{{ url_for('dashboard.dashboard') }}">Dashboard</a>
 {% endblock %}
 
 {% block content %}
@@ -195,13 +195,13 @@
             </div>
             <div class="card-body">
                 <div class="action-buttons">
-                    <a href="{{ url_for('employees') }}" class="btn btn-primary">
+                    <a href="{{ url_for('employees.employees') }}" class="btn btn-primary">
                         <i class="ti ti-user-plus"></i> Add Employee
                     </a>
-                    <a href="{{ url_for('fleet') }}" class="btn btn-primary">
+                    <a href="{{ url_for('fleet.fleet') }}" class="btn btn-primary">
                         <i class="ti ti-truck"></i> Add Vehicle
                     </a>
-                    <a href="{{ url_for('visitors') }}" class="btn btn-primary">
+                    <a href="{{ url_for('visitors.visitors') }}" class="btn btn-primary">
                         <i class="ti ti-id-badge"></i> Check-in Visitor
                     </a>
                     <a href="{{ url_for('pending_approvals') }}" class="btn btn-primary">

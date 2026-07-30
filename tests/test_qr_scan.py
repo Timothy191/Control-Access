@@ -1,7 +1,7 @@
 import pytest
 from app import app, db_session
 from models import Employee, Vehicle, Visitor, GateLog
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 
 
@@ -178,7 +178,7 @@ class TestQRScanAPI:
             id_number="1111111111",
             status="Active",
             qr_code="EMP_QR_MED",
-            medical_expiry=datetime.utcnow() - timedelta(days=30),
+            medical_expiry=datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(days=30),
         )
         db_session.add(emp)
         db_session.commit()
@@ -206,7 +206,7 @@ class TestQRScanAPI:
             id_number="2222222222",
             status="Active",
             qr_code="EMP_QR_IND",
-            induction_expiry=datetime.utcnow() - timedelta(days=30),
+            induction_expiry=datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(days=30),
         )
         db_session.add(emp)
         db_session.commit()
@@ -234,8 +234,8 @@ class TestQRScanAPI:
             id_number="3333333333",
             status="Active",
             qr_code="EMP_QR_VALID",
-            medical_expiry=datetime.utcnow() + timedelta(days=365),
-            induction_expiry=datetime.utcnow() + timedelta(days=365),
+            medical_expiry=datetime.now(timezone.utc).replace(tzinfo=None) + timedelta(days=365),
+            induction_expiry=datetime.now(timezone.utc).replace(tzinfo=None) + timedelta(days=365),
         )
         db_session.add(emp)
         db_session.commit()

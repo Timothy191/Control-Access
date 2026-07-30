@@ -4,7 +4,7 @@
 
 {% block breadcrumb %}
 <i class="ti ti-home"></i>
-<a href="{{ url_for('dashboard') }}">Dashboard</a>
+<a href="{{ url_for('dashboard.dashboard') }}">Dashboard</a>
 <i class="ti ti-chevron-right"></i>
 <span>Visitors</span>
 {% endblock %}
@@ -25,7 +25,7 @@
 
     {% if session.get('role') == 'admin' %}
     <div class="pin-management-card">
-        <form method="POST" action="{{ url_for('update_visitor_pin') }}" class="pin-form">
+        <form method="POST" action="{{ url_for('admin.update_visitor_pin') }}" class="pin-form">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <span class="pin-label"><i class="ti ti-key"></i> Visitor Request PIN:</span>
             <input type="text" name="new_pin" value="{{ current_pin }}" class="pin-input" maxlength="20" required title="Visitor Request PIN">
@@ -59,7 +59,7 @@
             <button type="submit" class="btn btn-primary">
                 <i class="ti ti-filter"></i> Apply
             </button>
-            <a href="{{ url_for('visitors') }}" class="btn btn-secondary">
+            <a href="{{ url_for('visitors.visitors') }}" class="btn btn-secondary">
                 <i class="ti ti-x"></i> Clear
             </a>
         </div>
@@ -112,7 +112,7 @@
                             {% if visitor.qr_code %}
                             <span class="status-badge success">Generated</span>
                             {% else %}
-                            <a href="{{ url_for('generate_qr_code', entity_type='visitor', entity_id=visitor.id) }}" class="btn btn-sm btn-primary">
+                            <a href="{{ url_for('scanning.generate_qr_code', entity_type='visitor', entity_id=visitor.id) }}" class="btn btn-sm btn-primary">
                                 <i class="ti ti-qrcode"></i>
                             </a>
                             {% endif %}
@@ -254,7 +254,7 @@
             <h3>Visitor Check-in</h3>
             <span class="close">&times;</span>
         </div>
-        <form id="checkinForm" action="{{ url_for('checkin_visitor') }}" method="POST">
+        <form id="checkinForm" action="{{ url_for('visitors.checkin_visitor') }}" method="POST">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <div class="form-group">
                 <label for="visitor_name">Visitor Name *</label>

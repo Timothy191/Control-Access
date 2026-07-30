@@ -180,7 +180,7 @@ pre_deployment_checklist() {
         echo -e "${YELLOW}Fix the errors above before deploying to production.${NC}"
         echo -e "${DIM}For development/testing, you may continue with warnings.${NC}"
         echo ""
-        read -p "Continue anyway? [y/N]: " response
+        read -r -p "Continue anyway? [y/N]: " response
         if [[ ! "$response" =~ ^[Yy]$ ]]; then
             echo -e "\n${CYAN}Deployment cancelled. Fix issues and retry.${NC}"
             exit 1
@@ -221,7 +221,7 @@ for port in $APP_PORT 8081 8082 5000 6000 7000 9100 9101 9102 58628; do
     
     # Aggressive fallback with lsof if available
     if command -v lsof >/dev/null 2>&1; then
-        lsof -ti :$port | xargs kill -9 2>/dev/null || true
+        lsof -ti :"$port" | xargs kill -9 2>/dev/null || true
     fi
 done
 echo -e " ${GREEN}✓ DONE${NC}"

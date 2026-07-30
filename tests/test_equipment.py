@@ -64,7 +64,8 @@ class TestAddEquipment:
 
     def test_add_equipment_requires_manager(self, test_app, db_cleanup):
         """Regular users cannot add equipment."""
-        user = User(username="regular_eq", password="pass123", role="user")
+        user = User(username="regular_eq", role="user")
+        user.set_password("pass123")
         db_session.add(user)
         db_session.commit()
 
@@ -153,7 +154,8 @@ class TestEditEquipment:
 
     def test_edit_equipment_requires_manager(self, test_app, sample_equipment):
         """Regular users cannot edit equipment."""
-        user = User(username="regular_edit", password="pass123", role="user")
+        user = User(username="regular_edit", role="user")
+        user.set_password("pass123")
         db_session.add(user)
         db_session.commit()
 
@@ -226,7 +228,8 @@ class TestDeleteEquipment:
 
     def test_delete_equipment_requires_admin(self, test_app, sample_equipment):
         """Non-admin cannot delete equipment."""
-        user = User(username="manager_del", password="pass123", role="manager")
+        user = User(username="manager_del", role="manager")
+        user.set_password("pass123")
         db_session.add(user)
         db_session.commit()
 

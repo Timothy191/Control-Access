@@ -14,7 +14,8 @@ class TestAdminUsers:
     def test_users_list_requires_admin(self, test_app, db_cleanup):
         """Non-admin users should be denied access."""
         # Create non-admin user
-        user = User(username="user1", password="pass123", role="user")
+        user = User(username="user1", role="user")
+        user.set_password("pass123")
         db_session.add(user)
         db_session.commit()
 
@@ -55,7 +56,8 @@ class TestAdminUsers:
     def test_add_user_duplicate_username(self, authenticated_client, db_cleanup):
         """Cannot add user with duplicate username."""
         # Add first user
-        user = User(username="duplicate", password="pass123", role="user")
+        user = User(username="duplicate", role="user")
+        user.set_password("pass123")
         db_session.add(user)
         db_session.commit()
 
@@ -90,7 +92,8 @@ class TestAdminUsers:
 
     def test_edit_user(self, authenticated_client, db_cleanup):
         """Admin can edit user role."""
-        user = User(username="editme", password="pass123", role="user")
+        user = User(username="editme", role="user")
+        user.set_password("pass123")
         db_session.add(user)
         db_session.commit()
         user_id = user.id
@@ -111,7 +114,8 @@ class TestAdminUsers:
 
     def test_edit_user_password(self, authenticated_client, db_cleanup):
         """Admin can change user password."""
-        user = User(username="changepass", password="oldpass", role="user")
+        user = User(username="changepass", role="user")
+        user.set_password("oldpass")
         db_session.add(user)
         db_session.commit()
         user_id = user.id
@@ -143,7 +147,8 @@ class TestAdminUsers:
 
     def test_delete_user(self, authenticated_client, db_cleanup):
         """Admin can delete users."""
-        user = User(username="deleteme", password="pass123", role="user")
+        user = User(username="deleteme", role="user")
+        user.set_password("pass123")
         db_session.add(user)
         db_session.commit()
         user_id = user.id
@@ -182,7 +187,8 @@ class TestAuditLogs:
 
     def test_audit_logs_requires_admin(self, test_app, db_cleanup):
         """Non-admin cannot view audit logs."""
-        user = User(username="audittest", password="pass123", role="user")
+        user = User(username="audittest", role="user")
+        user.set_password("pass123")
         db_session.add(user)
         db_session.commit()
 
@@ -243,7 +249,8 @@ class TestGateMappings:
 
     def test_gate_mappings_requires_admin(self, test_app, db_cleanup):
         """Non-admin cannot view gate mappings."""
-        user = User(username="gatetest", password="pass123", role="user")
+        user = User(username="gatetest", role="user")
+        user.set_password("pass123")
         db_session.add(user)
         db_session.commit()
 
@@ -378,7 +385,8 @@ class TestVisitorPIN:
 
     def test_update_visitor_pin_requires_admin(self, test_app, db_cleanup):
         """Non-admin cannot update visitor PIN."""
-        user = User(username="pintest", password="pass123", role="user")
+        user = User(username="pintest", role="user")
+        user.set_password("pass123")
         db_session.add(user)
         db_session.commit()
 

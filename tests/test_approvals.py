@@ -143,7 +143,8 @@ class TestApproveRequest:
 
     def test_approve_request_requires_admin_or_manager(self, test_app, db_cleanup):
         """Regular users cannot approve."""
-        user = User(username="regular", password="pass123", role="user")
+        user = User(username="regular", role="user")
+        user.set_password("pass123")
         db_session.add(user)
         db_session.commit()
 
@@ -227,7 +228,8 @@ class TestRejectRequest:
 
     def test_reject_request_requires_admin(self, test_app, db_cleanup):
         """Regular users cannot reject."""
-        user = User(username="regular2", password="pass123", role="user")
+        user = User(username="regular2", role="user")
+        user.set_password("pass123")
         db_session.add(user)
         db_session.commit()
 

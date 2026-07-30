@@ -2,6 +2,7 @@ import eventlet
 
 eventlet.monkey_patch()
 
+import hmac
 import logging
 import logging.handlers
 from datetime import UTC, datetime, timedelta
@@ -137,6 +138,14 @@ if not _secret_key:
         "SECRET_KEY not set — using random key (sessions reset on restart). Set SECRET_KEY in .env"
     )
 
+# Warn at startup if HARDWARE_API_KEY is not configured
+_hardware_key_check = os.environ.get("HARDWARE_API_KEY")
+if not _hardware_key_check:
+    logger.warning(
+        "HARDWARE_API_KEY is not set — hardware API key authentication is disabled. "
+        "Set HARDWARE_API_KEY in .env for production deployments."
+    )
+
 app = Flask(__name__)
 app.secret_key = _secret_key
 app.permanent_session_lifetime = timedelta(minutes=30)
@@ -151,19 +160,26 @@ from flask_compress import Compress
 
 Compress(app)
 
-# CSRF Protection (exempts API routes which use header-based auth)
+# CSRF Protection - Manual implementation
+# API routes (/api/*) are exempt because they use header-based authentication (X-API-Key)
+# instead of session-based CSRF tokens. Web routes use session cookies and require CSRF.
 from flask_wtf.csrf import CSRFError, CSRFProtect
 
-app.config["WTF_CSRF_CHECK_DEFAULT"] = False  # We'll check manually, exempt /api/
+app.config["WTF_CSRF_CHECK_DEFAULT"] = False  # Manual CSRF checking
 csrf = CSRFProtect(app)
 
 
 @app.before_request
 def csrf_protect_non_api():
-    """Apply CSRF check only to non-API POST/PUT/PATCH/DELETE requests."""
+    """Apply CSRF check to non-API state-changing requests.
+    
+    API routes (/api/*) use X-API-Key header authentication and are exempt from CSRF.
+    Web routes use session cookies and require CSRF tokens for POST/PUT/PATCH/DELETE.
+    """
     if app.config.get("TESTING"):
         return
     if request.method in ("POST", "PUT", "PATCH", "DELETE"):
+        # Exempt /api/ routes - they use header-based auth, not session cookies
         if not request.path.startswith("/api/"):
             csrf.protect()
 
@@ -193,8 +209,17 @@ def add_security_headers(response):
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 
+# SECURITY NOTE: storage_uri="memory://" means rate limit counters are stored in-process
+# and reset on every app restart. In production, this means:
+#   1. An attacker can bypass rate limits by triggering app restarts (if they have access)
+#   2. Multi-worker deployments won't share rate limit state
+# For production with multiple workers, use Redis: storage_uri="redis://localhost:6379"
 limiter = Limiter(
     get_remote_address, app=app, default_limits=[], storage_uri="memory://"
+)
+logger.warning(
+    "Rate limiting uses in-memory storage (resets on restart). "
+    "For production with multiple workers, configure Redis-backed rate limiting."
 )
 
 # Enable CORS for API endpoints (required for mobile scanner access)
@@ -271,6 +296,22 @@ _ollama_available = False
 _ollama_checked = False
 
 __version__ = "2.1.0"
+
+# In-memory metrics storage for monitoring (resets on restart)
+from collections import deque
+
+metrics_history = {
+    "cpu": deque(maxlen=60),
+    "memory": deque(maxlen=60),
+    "requests": deque(maxlen=60),
+    "timestamps": deque(maxlen=60),
+    "endpoints": {},
+    "scan_stats": {"total": 0, "granted": 0, "denied": 0, "in": 0, "out": 0},
+    "recent_logs": deque(maxlen=50),
+}
+
+# Track request counts for rate calculation
+request_timestamps = deque(maxlen=1000)
 
 
 def _check_ollama():
@@ -641,7 +682,7 @@ def login_required(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
         if not session.get("logged_in"):
-            return redirect(url_for("login"))
+            return redirect(url_for("auth.login"))
         return f(*args, **kwargs)
 
     return decorated_function
@@ -652,7 +693,7 @@ def role_required(allowed_roles):
         @wraps(f)
         def decorated_function(*args, **kwargs):
             if not session.get("logged_in"):
-                return redirect(url_for("login"))
+                return redirect(url_for("auth.login"))
             if session.get("role") not in allowed_roles:
                 return "Access denied", 403
             return f(*args, **kwargs)
@@ -670,11 +711,12 @@ def require_api_key(f):
         _mobile_key = os.environ.get("MOBILE_API_KEY", "")
         valid_keys = [k for k in [_hardware_key, _mobile_key] if k]
         if not valid_keys:
-            logger.warning(
-                "HARDWARE_API_KEY not configured — API key auth is disabled. Set HARDWARE_API_KEY in .env"
+            logger.error(
+                "API authentication not configured — rejecting request. "
+                "Set HARDWARE_API_KEY or MOBILE_API_KEY environment variable."
             )
-            return f(*args, **kwargs)
-        if not key or key not in valid_keys:
+            return jsonify({"error": "API authentication not configured"}), 500
+        if not key or not any(hmac.compare_digest(key, vk) for vk in valid_keys):
             return jsonify({"error": "Invalid API key"}), 401
         return f(*args, **kwargs)
 
@@ -703,236 +745,8 @@ def log_audit(action, entity_type, entity_id=None, details=None):
 @app.route("/")
 def index():
     if not session.get("logged_in"):
-        return redirect(url_for("login"))
-    return redirect(url_for("dashboard"))
-
-
-@app.route("/login", methods=["GET", "POST"])
-@limiter.limit("5 per minute", methods=["POST"])
-def login():
-    if request.method == "POST":
-        username = request.form.get("username")
-        password = request.form.get("password")
-        user = db_session.query(User).filter_by(username=username).first()
-        if user and user.check_password(password):
-            # Auto-migrate plain-text password to hash on successful login
-            if not user.password.startswith(("pbkdf2:", "scrypt:")):
-                user.set_password(password)
-                db_session.commit()
-            session.permanent = True
-            session["logged_in"] = True
-            session["username"] = user.username
-            session["user_id"] = user.id
-            session["role"] = user.role
-            log_audit("login", "user", user.id, f"User '{username}' logged in")
-            return redirect(url_for("dashboard"))
-        else:
-            return render_template("login.html", error="Invalid credentials")
-    return render_template("login.html")
-
-
-@app.route("/logout")
-def logout():
-    session.clear()
-    return redirect(url_for("login"))
-
-
-# ------------------- Visitor Request PIN (Admin) -------------------
-@app.route("/admin/visitor_pin", methods=["POST"])
-@login_required
-@role_required(["admin"])
-def update_visitor_pin():
-    new_pin = request.form.get("new_pin", "").strip()
-    if not new_pin:
-        return redirect(url_for("visitors"))
-    pin_setting = (
-        db_session.query(SiteSetting).filter_by(key="visitor_request_pin").first()
-    )
-    if pin_setting:
-        pin_setting.value = new_pin
-    else:
-        db_session.add(SiteSetting(key="visitor_request_pin", value=new_pin))
-    db_session.commit()
-    return redirect(url_for("visitors"))
-
-
-# ------------------- Audit Logs (Admin) -------------------
-@app.route("/admin/audit_logs")
-@login_required
-@role_required(["admin"])
-def audit_logs():
-    logs = (
-        db_session.query(AuditLog).order_by(AuditLog.created_at.desc()).limit(500).all()
-    )
-    return render_template("audit_logs.html", logs=logs)
-
-
-# ------------------- User Management (Admin) -------------------
-@app.route("/admin/users")
-@login_required
-@role_required(["admin"])
-def manage_users():
-    users = db_session.query(User).order_by(User.created_at.desc()).all()
-    return render_template("users.html", users=users)
-
-
-@app.route("/admin/users/add", methods=["POST"])
-@login_required
-@role_required(["admin"])
-def add_user():
-    username = request.form.get("username", "").strip()
-    password = request.form.get("password", "").strip()
-    role = request.form.get("role", "user")
-    if not username or not password:
-        return redirect(url_for("manage_users"))
-    existing = db_session.query(User).filter_by(username=username).first()
-    if existing:
-        return redirect(url_for("manage_users"))
-    user = User(username=username, role=role)
-    user.set_password(password)
-    db_session.add(user)
-    db_session.commit()
-    log_audit("create", "user", user.id, f"Created user: {username} (role: {role})")
-    return redirect(url_for("manage_users"))
-
-
-@app.route("/admin/users/edit/<int:id>", methods=["POST"])
-@login_required
-@role_required(["admin"])
-def edit_user(id):
-    user = db_session.query(User).filter_by(id=id).first()
-    if not user:
-        return redirect(url_for("manage_users"))
-    new_role = request.form.get("role", user.role)
-    new_password = request.form.get("password", "").strip()
-    user.role = new_role
-    if new_password:
-        user.set_password(new_password)
-    db_session.commit()
-    log_audit("update", "user", id, f"Updated user: {user.username} (role: {new_role})")
-    return redirect(url_for("manage_users"))
-
-
-@app.route("/admin/users/delete/<int:id>", methods=["POST"])
-@login_required
-@role_required(["admin"])
-def delete_user(id):
-    user = db_session.query(User).filter_by(id=id).first()
-    if user and user.username != "admin":  # Prevent deleting the admin account
-        name = user.username
-        db_session.delete(user)
-        db_session.commit()
-        log_audit("delete", "user", id, f"Deleted user: {name}")
-    return redirect(url_for("manage_users"))
-
-
-# ------------------- Gate Mapping Management -------------------
-@app.route("/admin/gate_mappings")
-@login_required
-@role_required(["admin"])
-def gate_mappings():
-    """Manage gate mappings - map scanner IPs to physical gate names."""
-    mappings = db_session.query(GateMapping).order_by(GateMapping.gate_name).all()
-
-    # Get unique IPs from recent gate logs that aren't mapped yet
-    recent_ips = (
-        db_session.query(GateLog.ip_address, GateLog.scanned_by)
-        .filter(
-            GateLog.ip_address.isnot(None),
-            GateLog.scanned_at
-            >= _utcnow().replace(day=1, hour=0, minute=0, second=0),  # This month
-        )
-        .distinct()
-        .all()
-    )
-
-    # Filter out already mapped IPs
-    mapped_ips = {m.ip_address for m in mappings}
-    unmapped = []
-    for ip, scanned_by in recent_ips:
-        if ip and ip not in mapped_ips:
-            unmapped.append({"ip": ip, "scanned_by": scanned_by})
-
-    return render_template("gate_mappings.html", mappings=mappings, unmapped=unmapped)
-
-
-@app.route("/admin/gate_mappings/add", methods=["POST"])
-@login_required
-@role_required(["admin"])
-def add_gate_mapping():
-    """Add a new gate mapping."""
-    ip_address = request.form.get("ip_address", "").strip()
-    gate_name = request.form.get("gate_name", "").strip()
-    description = request.form.get("description", "").strip()
-
-    if not ip_address or not gate_name:
-        flash("IP address and gate name are required", "error")
-        return redirect(url_for("gate_mappings"))
-
-    # Check if IP already mapped
-    existing = db_session.query(GateMapping).filter_by(ip_address=ip_address).first()
-    if existing:
-        existing.gate_name = gate_name
-        existing.location_description = description
-        existing.is_active = True
-        db_session.commit()
-        log_audit(
-            "update",
-            "gate_mapping",
-            existing.id,
-            f"Updated gate mapping: {ip_address} -> {gate_name}",
-        )
-        flash(f"Updated mapping for {ip_address}", "success")
-    else:
-        mapping = GateMapping(
-            ip_address=ip_address, gate_name=gate_name, location_description=description
-        )
-        db_session.add(mapping)
-        db_session.commit()
-        log_audit(
-            "create",
-            "gate_mapping",
-            mapping.id,
-            f"Created gate mapping: {ip_address} -> {gate_name}",
-        )
-        flash(f"Added mapping: {ip_address} -> {gate_name}", "success")
-
-    return redirect(url_for("gate_mappings"))
-
-
-@app.route("/admin/gate_mappings/delete/<int:id>")
-@login_required
-@role_required(["admin"])
-def delete_gate_mapping(id):
-    """Delete a gate mapping."""
-    mapping = db_session.query(GateMapping).filter_by(id=id).first()
-    if mapping:
-        ip = mapping.ip_address
-        db_session.delete(mapping)
-        db_session.commit()
-        log_audit("delete", "gate_mapping", id, f"Deleted gate mapping for {ip}")
-        flash(f"Deleted mapping for {ip}", "success")
-    return redirect(url_for("gate_mappings"))
-
-
-@app.route("/admin/gate_mappings/toggle/<int:id>")
-@login_required
-@role_required(["admin"])
-def toggle_gate_mapping(id):
-    """Toggle active/inactive status of a gate mapping."""
-    mapping = db_session.query(GateMapping).filter_by(id=id).first()
-    if mapping:
-        mapping.is_active = not mapping.is_active
-        db_session.commit()
-        status = "enabled" if mapping.is_active else "disabled"
-        log_audit(
-            "update",
-            "gate_mapping",
-            id,
-            f"{status.capitalize()} gate mapping for {mapping.ip_address}",
-        )
-        flash(f"Mapping {status} for {mapping.ip_address}", "success")
-    return redirect(url_for("gate_mappings"))
+        return redirect(url_for("auth.login"))
+    return redirect(url_for("dashboard.dashboard"))
 
 
 # ------------------- Visitor QR Request (Public) -------------------
@@ -1033,205 +847,6 @@ def visitor_request():
     return render_template("visitor_request.html")
 
 
-# ------------------- Dashboard -------------------
-@app.route("/dashboard")
-@login_required
-def dashboard():
-    from sqlalchemy import case, func
-
-    now = _utcnow()
-    thirty_days = now + timedelta(days=30)
-
-    # Single query for all entity counts (replaces 5 separate COUNT queries)
-    stats_row = db_session.query(
-        func.count(Employee.id).label("employees"),
-    ).one()
-    veh_count = db_session.query(func.count(Vehicle.id)).scalar()
-    equip_count = db_session.query(func.count(Equipment.id)).scalar()
-    vis_count = (
-        db_session.query(func.count(Visitor.id))
-        .filter(Visitor.status == "Checked In")
-        .scalar()
-    )
-    pend_count = (
-        db_session.query(func.count(Approval.id))
-        .filter(Approval.status == "Pending")
-        .scalar()
-    )
-
-    # Single query for all employee expiry alerts (replaces 4 separate COUNT queries)
-    alert_row = (
-        db_session.query(
-            func.count(
-                case(
-                    (Employee.medical_expiry < now, 1),
-                )
-            ).label("expired_medical"),
-            func.count(
-                case(
-                    (Employee.induction_expiry < now, 1),
-                )
-            ).label("expired_induction"),
-            func.count(
-                case(
-                    (
-                        (Employee.medical_expiry >= now)
-                        & (Employee.medical_expiry <= thirty_days),
-                        1,
-                    ),
-                )
-            ).label("expiring_medical"),
-            func.count(
-                case(
-                    (
-                        (Employee.induction_expiry >= now)
-                        & (Employee.induction_expiry <= thirty_days),
-                        1,
-                    ),
-                )
-            ).label("expiring_induction"),
-        )
-        .filter(Employee.status == "Active")
-        .one()
-    )
-
-    stats = {
-        "employees": stats_row.employees,
-        "vehicles": veh_count,
-        "equipment": equip_count,
-        "visitors": vis_count,
-        "pending_approvals": pend_count,
-    }
-
-    alerts = {
-        "expired_medical": alert_row.expired_medical,
-        "expired_induction": alert_row.expired_induction,
-        "expiring_medical": alert_row.expiring_medical,
-        "expiring_induction": alert_row.expiring_induction,
-        "total_critical": alert_row.expired_medical + alert_row.expired_induction,
-        "total_warning": alert_row.expiring_medical + alert_row.expiring_induction,
-    }
-
-    return render_template(
-        "dashboard.html", stats=stats, alerts=alerts, version=__version__
-    )
-
-
-_dashboard_history_cache = {"data": None, "ts": 0}
-
-
-@app.route("/api/dashboard/stats_history")
-@login_required
-def dashboard_stats_history():
-    """Return 7-day sparkline data, 24h gate scan histogram, and on-site count.
-    Cached for 10 seconds to avoid redundant queries under concurrent load."""
-    import time as _t
-
-    _now = _t.time()
-    if (
-        _dashboard_history_cache["data"]
-        and (_now - _dashboard_history_cache["ts"]) < 10
-    ):
-        return jsonify(_dashboard_history_cache["data"])
-    from sqlalchemy import extract, func
-
-    now = _utcnow()
-    seven_days_ago = now - timedelta(days=7)
-
-    # 7-day daily counts for sparklines
-    daily_logs = (
-        db_session.query(
-            func.date(GateLog.scanned_at).label("day"),
-            func.count(GateLog.id).label("cnt"),
-        )
-        .filter(GateLog.scanned_at >= seven_days_ago)
-        .group_by(func.date(GateLog.scanned_at))
-        .order_by(func.date(GateLog.scanned_at))
-        .all()
-    )
-    # Build 7-day array (fill missing days with 0)
-    day_map = {str(row.day): row.cnt for row in daily_logs}
-    sparkline_data = []
-    for i in range(7):
-        d = (now - timedelta(days=6 - i)).strftime("%Y-%m-%d")
-        sparkline_data.append(day_map.get(d, 0))
-
-    # 24-hour gate scan histogram
-    twenty_four_h = now - timedelta(hours=24)
-    hourly_logs = (
-        db_session.query(
-            extract("hour", GateLog.scanned_at).label("hr"),
-            func.count(GateLog.id).label("cnt"),
-        )
-        .filter(GateLog.scanned_at >= twenty_four_h)
-        .group_by(extract("hour", GateLog.scanned_at))
-        .all()
-    )
-    hour_map = {int(row.hr): row.cnt for row in hourly_logs}
-    gate_labels = [f"{h:02d}:00" for h in range(24)]
-    gate_values = [hour_map.get(h, 0) for h in range(24)]
-
-    # On-site count (entities whose last scan was IN)
-    from sqlalchemy import and_
-
-    latest_in_subq = (
-        db_session.query(GateLog.entity_id, func.max(GateLog.scanned_at).label("last"))
-        .filter(GateLog.access_granted)
-        .group_by(GateLog.entity_id)
-        .subquery()
-    )
-    on_site_count = (
-        db_session.query(func.count())
-        .select_from(GateLog)
-        .join(
-            latest_in_subq,
-            and_(
-                GateLog.entity_id == latest_in_subq.c.entity_id,
-                GateLog.scanned_at == latest_in_subq.c.last,
-            ),
-        )
-        .filter(GateLog.direction == "IN")
-        .scalar()
-    ) or 0
-
-    result = {
-        "sparklines": {
-            "employees": sparkline_data,
-            "fleet": [max(0, v // 3) for v in sparkline_data],
-            "visitors": [max(0, v // 5) for v in sparkline_data],
-            "equipment": [max(0, v // 4) for v in sparkline_data],
-        },
-        "gate_hours": {
-            "labels": gate_labels,
-            "values": gate_values,
-        },
-        "on_site": on_site_count,
-        "capacity": 500,
-    }
-    _dashboard_history_cache["data"] = result
-    _dashboard_history_cache["ts"] = _now
-    return jsonify(result)
-
-
-@app.route("/api/ai/status")
-@login_required
-def ai_status():
-    """Return AI engine availability and model info."""
-    global _ollama_checked
-    if not _ollama_available:
-        _ollama_checked = False
-        _check_ollama()
-    return jsonify(
-        {
-            "available": _ollama_available,
-            "provider": _ollama_provider,
-            "model": OLLAMA_MODEL,
-            "model_full": OLLAMA_MODEL_FULL,
-            "url": OLLAMA_CLOUD_URL if _ollama_provider == "cloud" else OLLAMA_BASE_URL,
-        }
-    )
-
-
 # ------------------- Emergency Muster -------------------
 @app.route("/muster")
 @login_required
@@ -1310,75 +925,6 @@ def emergency_muster():
         on_site=on_site,
         total_on_site=total_on_site,
     )
-
-
-# ------------------- Device Management -------------------
-@app.route("/devices")
-def devices():
-    """Device management page with live view options"""
-    # Get all devices
-    all_devices = db_session.query(Device).order_by(Device.last_seen.desc()).all()
-
-    # Calculate stats
-    stats = {
-        "total": len(all_devices),
-        "online": sum(1 for d in all_devices if d.status == "online"),
-        "pending": sum(1 for d in all_devices if d.status == "pending"),
-        "total_scans": sum(d.total_scans for d in all_devices) or 0,
-    }
-
-    return render_template("devices.html", devices=all_devices, stats=stats)
-
-
-@app.route("/devices/refresh")
-def device_refresh():
-    """Refresh device status"""
-    # Mark devices offline if not seen in last 5 minutes
-    cutoff = _utcnow() - timedelta(minutes=5)
-    db_session.query(Device).filter(
-        Device.last_seen < cutoff, Device.status == "online"
-    ).update({"status": "offline"})
-    db_session.commit()
-    return redirect(url_for("devices"))
-
-
-@app.route("/device/view/<int:device_id>")
-def device_view(device_id):
-    """View individual device - redirects to remote app or shows info"""
-    device = db_session.query(Device).filter_by(id=device_id).first()
-    if not device:
-        return "Device not found", 404
-
-    if device.status != "online":
-        return f"""
-        <html><body style="font-family: sans-serif; padding: 40px; text-align: center;">
-        <h2>Device Offline</h2>
-        <p>Device {device.device_name} is currently offline.</p>
-        <p>Last seen: {device.last_seen}</p>
-        <a href="/devices" style="color: #00d4ff;">← Back to Devices</a>
-        </body></html>
-        """
-
-    # If device has remote apps, we could link to them
-    # For now, show info and links to remote apps
-    return f"""
-    <html><body style="font-family: sans-serif; padding: 40px; text-align: center;">
-    <h2>📱 {device.device_name}</h2>
-    <p>IP: {device.ip_address}</p>
-    <p>Status: <span style="color: #00ff88;">Online</span></p>
-    <div style="margin: 30px 0;">
-        <a href="https://play.google.com/store/apps/details?id=com.teamviewer.quicksupport.market"
-           target="_blank" style="display: inline-block; padding: 15px 30px; background: #00d4ff; color: #000; text-decoration: none; border-radius: 8px; margin: 10px;">
-            Open TeamViewer on Device
-        </a>
-    </div>
-    <p style="color: #666; font-size: 0.9rem;">
-        Install TeamViewer QuickSupport on this C66 device,
-        then click "View Screen" to connect remotely.
-    </p>
-    <a href="/devices" style="color: #00d4ff;">← Back to Devices</a>
-    </body></html>
-    """
 
 
 # ------------------- Device Onboarding Terminal -------------------
@@ -1660,505 +1206,6 @@ def handle_stats_request():
     _stats_cache["data"] = stats
     _stats_cache["ts"] = now
     emit("stats_update", stats)
-
-
-# ------------------- Employees -------------------
-@app.route("/employees")
-@login_required
-def employees():
-    job_title = request.args.get("job_title", "")
-    status = request.args.get("status", "")
-    page = request.args.get("page", 1, type=int)
-    per_page = request.args.get("per_page", 50, type=int)
-    per_page = min(per_page, 200)  # cap
-
-    query = db_session.query(Employee)
-    if job_title:
-        query = query.filter(Employee.job_title == job_title)
-    if status:
-        query = query.filter(Employee.status == status)
-
-    total = query.count()
-    total_pages = max(1, (total + per_page - 1) // per_page)
-    page = max(1, min(page, total_pages))
-    employees_list = query.offset((page - 1) * per_page).limit(per_page).all()
-
-    # Get distinct job titles for filter dropdown
-    job_titles = (
-        db_session.query(Employee.job_title.distinct())
-        .filter(Employee.job_title is not None, Employee.job_title != "")
-        .all()
-    )
-    job_titles = [d[0] for d in job_titles]
-    return render_template(
-        "employees.html",
-        employees=employees_list,
-        job_titles=job_titles,
-        selected_job_title=job_title,
-        selected_status=status,
-        current_time=_utcnow(),
-        page=page,
-        total_pages=total_pages,
-        total=total,
-        per_page=per_page,
-    )
-
-
-@app.route("/add_employee", methods=["POST"])
-@login_required
-@role_required(["admin", "manager"])
-def add_employee():
-    # Check for existing id_number or emp_code first
-    id_number = request.form.get("id_number")
-    emp_code = request.form.get("emp_code")
-
-    if id_number:
-        existing = db_session.query(Employee).filter_by(id_number=id_number).first()
-        if existing:
-            db_session.rollback()
-            return (
-                f"Error: ID Number '{id_number}' already exists for employee {existing.emp_code}",
-                400,
-            )
-
-    if emp_code:
-        existing = db_session.query(Employee).filter_by(emp_code=emp_code).first()
-        if existing:
-            db_session.rollback()
-            return f"Error: Employee Code '{emp_code}' already exists", 400
-
-    medical_expiry = None
-    med_str = request.form.get("medical_expiry")
-    if med_str:
-        try:
-            medical_expiry = datetime.strptime(med_str, "%Y-%m-%d")
-        except ValueError:
-            pass
-
-    induction_expiry = None
-    ind_str = request.form.get("induction_expiry")
-    if ind_str:
-        try:
-            induction_expiry = datetime.strptime(ind_str, "%Y-%m-%d")
-        except ValueError:
-            pass
-
-    try:
-        employee = Employee(
-            emp_code=emp_code,
-            initials=request.form.get("initials"),
-            first_name=request.form.get("first_name"),
-            second_name=request.form.get("second_name"),
-            surname=request.form.get("surname"),
-            id_number=id_number,
-            job_title=request.form.get("job_title"),
-            induction=request.form.get("induction"),
-            medical=request.form.get("medical"),
-            status=request.form.get("status", "Active"),
-            medical_expiry=medical_expiry,
-            induction_expiry=induction_expiry,
-        )
-        db_session.add(employee)
-        db_session.commit()
-        log_audit(
-            "create",
-            "employee",
-            employee.id,
-            f"Added employee: {employee.first_name} {employee.surname}",
-        )
-        socketio.emit("stats_update", {"type": "employee_added"})
-        return redirect(url_for("employees"))
-    except Exception as e:
-        db_session.rollback()
-        return f"Error adding employee: {str(e)}", 500
-
-
-@app.route("/edit_employee/<int:id>", methods=["POST"])
-@login_required
-@role_required(["admin", "manager"])
-def edit_employee(id):
-    employee = db_session.query(Employee).filter_by(id=id).first()
-    if not employee:
-        return "Employee not found", 404
-
-    # Check for duplicates (excluding current employee)
-    new_id_number = request.form.get("id_number")
-    new_emp_code = request.form.get("emp_code")
-
-    if new_id_number:
-        existing = (
-            db_session.query(Employee)
-            .filter(Employee.id_number == new_id_number, Employee.id != id)
-            .first()
-        )
-        if existing:
-            db_session.rollback()
-            return (
-                f"Error: ID Number '{new_id_number}' already exists for employee {existing.emp_code}",
-                400,
-            )
-
-    if new_emp_code:
-        existing = (
-            db_session.query(Employee)
-            .filter(Employee.emp_code == new_emp_code, Employee.id != id)
-            .first()
-        )
-        if existing:
-            db_session.rollback()
-            return f"Error: Employee Code '{new_emp_code}' already exists", 400
-
-    try:
-        employee.emp_code = new_emp_code
-        employee.initials = request.form.get("initials")
-        employee.first_name = request.form.get("first_name")
-        employee.second_name = request.form.get("second_name")
-        employee.surname = request.form.get("surname")
-        employee.id_number = new_id_number
-        employee.job_title = request.form.get("job_title")
-        employee.induction = request.form.get("induction")
-        employee.medical = request.form.get("medical")
-        employee.status = request.form.get("status")
-
-        med_str = request.form.get("medical_expiry")
-        if med_str:
-            try:
-                employee.medical_expiry = datetime.strptime(med_str, "%Y-%m-%d")
-            except ValueError:
-                employee.medical_expiry = None
-        else:
-            employee.medical_expiry = None
-
-        ind_str = request.form.get("induction_expiry")
-        if ind_str:
-            try:
-                employee.induction_expiry = datetime.strptime(ind_str, "%Y-%m-%d")
-            except ValueError:
-                employee.induction_expiry = None
-        else:
-            employee.induction_expiry = None
-
-        db_session.commit()
-        log_audit(
-            "update",
-            "employee",
-            employee.id,
-            f"Updated employee: {employee.first_name} {employee.surname}",
-        )
-        return redirect(url_for("employees"))
-    except Exception as e:
-        db_session.rollback()
-        return f"Error updating employee: {str(e)}", 500
-
-
-@app.route("/delete_employee/<int:id>", methods=["POST"])
-@login_required
-@role_required(["admin"])
-def delete_employee(id):
-    try:
-        employee = db_session.query(Employee).filter_by(id=id).first()
-        if employee:
-            name = f"{employee.first_name} {employee.surname}"
-            db_session.delete(employee)
-            db_session.commit()
-            log_audit("delete", "employee", id, f"Deleted employee: {name}")
-        return redirect(url_for("employees"))
-    except Exception as e:
-        db_session.rollback()
-        return f"Error deleting employee: {str(e)}", 500
-
-
-# ------------------- Fleet -------------------
-@app.route("/fleet")
-@login_required
-def fleet():
-    vehicles = db_session.query(Vehicle).all()
-    return render_template("fleet.html", vehicles=vehicles)
-
-
-@app.route("/add_vehicle", methods=["POST"])
-@login_required
-@role_required(["admin", "manager"])
-def add_vehicle():
-    registration_expiry = request.form.get("registration_expiry")
-    vehicle = Vehicle(
-        fleet_id=request.form.get("fleet_id"),
-        registration_expiry=datetime.strptime(registration_expiry, "%Y-%m-%d")
-        if registration_expiry
-        else None,
-        status=request.form.get("status", "Active"),
-    )
-    db_session.add(vehicle)
-    db_session.commit()
-    return redirect(url_for("fleet"))
-
-
-@app.route("/edit_vehicle/<int:id>", methods=["POST"])
-@login_required
-@role_required(["admin", "manager"])
-def edit_vehicle(id):
-    vehicle = db_session.query(Vehicle).filter_by(id=id).first()
-    if vehicle:
-        vehicle.fleet_id = request.form.get("fleet_id")
-        vehicle.status = request.form.get("status")
-        registration_expiry = request.form.get("registration_expiry")
-        if registration_expiry:
-            vehicle.registration_expiry = datetime.strptime(
-                registration_expiry, "%Y-%m-%d"
-            )
-        else:
-            vehicle.registration_expiry = None
-        db_session.commit()
-    return redirect(url_for("fleet"))
-
-
-@app.route("/delete_vehicle/<int:id>", methods=["POST"])
-@login_required
-@role_required(["admin"])
-def delete_vehicle(id):
-    vehicle = db_session.query(Vehicle).filter_by(id=id).first()
-    if vehicle:
-        db_session.delete(vehicle)
-        db_session.commit()
-    return redirect(url_for("fleet"))
-
-
-# ------------------- Equipment -------------------
-@app.route("/equipment")
-@login_required
-def equipment():
-    items = db_session.query(Equipment).all()
-    return render_template("equipment.html", items=items)
-
-
-@app.route("/add_equipment", methods=["POST"])
-@login_required
-@role_required(["admin", "manager"])
-def add_equipment():
-    registration_expiry = request.form.get("registration_expiry")
-    radio_id = request.form.get("radio_id")
-    existing = db_session.query(Equipment).filter_by(radio_id=radio_id).first()
-    if existing:
-        flash(f"Equipment with Radio ID {radio_id} already exists.", "error")
-        return redirect(url_for("equipment"))
-
-    item = Equipment(
-        radio_id=radio_id,
-        registration_expiry=datetime.strptime(registration_expiry, "%Y-%m-%d")
-        if registration_expiry
-        else None,
-        status=request.form.get("status", "Active"),
-    )
-    db_session.add(item)
-    db_session.commit()
-    return redirect(url_for("equipment"))
-
-
-@app.route("/edit_equipment/<int:id>", methods=["POST"])
-@login_required
-@role_required(["admin", "manager"])
-def edit_equipment(id):
-    item = db_session.query(Equipment).filter_by(id=id).first()
-    if item:
-        item.radio_id = request.form.get("radio_id")
-        item.status = request.form.get("status")
-        registration_expiry = request.form.get("registration_expiry")
-        if registration_expiry:
-            item.registration_expiry = datetime.strptime(
-                registration_expiry, "%Y-%m-%d"
-            )
-        else:
-            item.registration_expiry = None
-        db_session.commit()
-    return redirect(url_for("equipment"))
-
-
-@app.route("/delete_equipment/<int:id>", methods=["POST"])
-@login_required
-@role_required(["admin"])
-def delete_equipment(id):
-    item = db_session.query(Equipment).filter_by(id=id).first()
-    if item:
-        db_session.delete(item)
-        db_session.commit()
-    return redirect(url_for("equipment"))
-
-
-# ------------------- Visitors -------------------
-@app.route("/visitors")
-@login_required
-def visitors():
-    status = request.args.get("status", "")
-    date_from = request.args.get("date_from", "")
-    date_to = request.args.get("date_to", "")
-
-    query = db_session.query(Visitor)
-    if status:
-        query = query.filter(Visitor.status == status)
-    if date_from:
-        query = query.filter(
-            Visitor.check_in_time >= datetime.strptime(date_from, "%Y-%m-%d")
-        )
-    if date_to:
-        # Add 1 day to include the end date
-        end_date = datetime.strptime(date_to, "%Y-%m-%d")
-        query = query.filter(
-            Visitor.check_in_time < end_date.replace(hour=23, minute=59, second=59)
-        )
-
-    visitors = query.all()
-    employees = db_session.query(Employee).all()
-
-    # Gate logs for visitors
-    visitor_logs = (
-        db_session.query(GateLog)
-        .filter_by(access_type="visitor")
-        .order_by(GateLog.scanned_at.desc())
-        .limit(200)
-        .all()
-    )
-
-    # Pending visitor requests and their approval IDs (single query instead of N+1)
-    pending_visitors = (
-        db_session.query(Visitor)
-        .filter_by(status="Pending Approval")
-        .order_by(Visitor.created_at.desc())
-        .all()
-    )
-    pending_approval_map = {}
-    if pending_visitors:
-        pv_ids = [pv.id for pv in pending_visitors]
-        pending_apprs = (
-            db_session.query(Approval)
-            .filter(
-                Approval.request_type == "Visitor QR Request",
-                Approval.request_id.in_(pv_ids),
-                Approval.status == "Pending",
-            )
-            .all()
-        )
-        for appr in pending_apprs:
-            pending_approval_map[appr.request_id] = appr.id
-
-    # Current visitor request PIN for admin display
-    pin_setting = (
-        db_session.query(SiteSetting).filter_by(key="visitor_request_pin").first()
-    )
-    current_pin = pin_setting.value if pin_setting else "1234"
-
-    return render_template(
-        "visitors.html",
-        visitors=visitors,
-        employees=employees,
-        selected_status=status,
-        selected_date_from=date_from,
-        selected_date_to=date_to,
-        visitor_logs=visitor_logs,
-        pending_visitors=pending_visitors,
-        pending_approval_map=pending_approval_map,
-        current_pin=current_pin,
-    )
-
-
-@app.route("/checkin_visitor", methods=["POST"])
-@login_required
-def checkin_visitor():
-    visitor = Visitor(
-        name=request.form.get("name"),
-        company=request.form.get("company"),
-        purpose=request.form.get("purpose"),
-        meeting_person=request.form.get("meeting_person"),
-        host_id=request.form.get("host_id") if request.form.get("host_id") else None,
-    )
-    db_session.add(visitor)
-    db_session.commit()
-    socketio.emit("visitor_checkin", {"name": visitor.name})
-    return redirect(url_for("visitors"))
-
-
-@app.route("/checkout_visitor/<int:id>")
-@login_required
-def checkout_visitor(id):
-    visitor = db_session.query(Visitor).filter_by(id=id).first()
-    if visitor:
-        visitor.check_out_time = _utcnow()
-        visitor.status = "Checked Out"
-        db_session.commit()
-    return redirect(url_for("visitors"))
-
-
-@app.route("/approve_visitor/<int:visitor_id>", methods=["POST"])
-@login_required
-@role_required(["admin", "manager", "security"])
-def approve_visitor(visitor_id):
-    visitor = db_session.query(Visitor).filter_by(id=visitor_id).first()
-    if not visitor:
-        return jsonify({"success": False, "message": "Visitor not found"}), 404
-    visitor.status = "Checked In"
-    visitor.check_in_time = _utcnow()
-    # Mark related approval as approved
-    approval = (
-        db_session.query(Approval)
-        .filter_by(
-            request_type="Visitor QR Request", request_id=visitor_id, status="Pending"
-        )
-        .first()
-    )
-    if approval:
-        approval.status = "Approved"
-        approval.approved_by = session.get("username")
-        approval.approval_date = _utcnow()
-    db_session.commit()
-    log_audit("approve", "visitor", visitor_id, f"Approved visitor: {visitor.name}")
-    socketio.emit("visitor_checkin", {"name": visitor.name})
-    return redirect(url_for("visitors"))
-
-
-@app.route("/reject_visitor/<int:visitor_id>", methods=["POST"])
-@login_required
-@role_required(["admin", "manager", "security"])
-def reject_visitor(visitor_id):
-    visitor = db_session.query(Visitor).filter_by(id=visitor_id).first()
-    if not visitor:
-        return jsonify({"success": False, "message": "Visitor not found"}), 404
-    visitor.status = "Rejected"
-    # Mark related approval as rejected
-    approval = (
-        db_session.query(Approval)
-        .filter_by(
-            request_type="Visitor QR Request", request_id=visitor_id, status="Pending"
-        )
-        .first()
-    )
-    if approval:
-        approval.status = "Rejected"
-        approval.approved_by = session.get("username")
-        approval.approval_date = _utcnow()
-    db_session.commit()
-    log_audit("reject", "visitor", visitor_id, f"Rejected visitor: {visitor.name}")
-    return redirect(url_for("visitors"))
-
-
-@app.route("/visitor_details/<int:id>")
-@login_required
-def visitor_details(id):
-    visitor = db_session.query(Visitor).filter_by(id=id).first()
-    if visitor:
-        return jsonify(
-            {
-                "id": visitor.id,
-                "name": visitor.name,
-                "company": visitor.company,
-                "purpose": visitor.purpose,
-                "meeting_person": visitor.meeting_person,
-                "check_in_time": visitor.check_in_time.strftime("%Y-%m-%d %H:%M"),
-                "check_out_time": visitor.check_out_time.strftime("%Y-%m-%d %H:%M")
-                if visitor.check_out_time
-                else None,
-                "status": visitor.status,
-            }
-        )
-    return jsonify({"error": "Not found"}), 404
 
 
 # ------------------- Approvals -------------------
@@ -2484,125 +1531,6 @@ def reject_request(id):
     return jsonify({"success": False, "message": "Approval not found"})
 
 
-# ------------------- QR Code Generation -------------------
-@app.route("/generate_qr/<entity_type>/<int:entity_id>")
-@login_required
-@role_required(["admin", "security"])
-def generate_qr_code(entity_type, entity_id):
-    if entity_type == "employee":
-        entity = db_session.query(Employee).filter_by(id=entity_id).first()
-        if not entity:
-            return "Employee not found", 404
-        qr_data = f"EMP:{entity.id}:{entity.emp_code}:{datetime.now().timestamp()}"
-        qr_hash = hashlib.sha256(qr_data.encode()).hexdigest()[:32].upper()
-        entity.qr_code = qr_hash
-    elif entity_type == "vehicle":
-        entity = db_session.query(Vehicle).filter_by(id=entity_id).first()
-        if not entity:
-            return "Vehicle not found", 404
-        qr_data = f"VEH:{entity.id}:{entity.fleet_id}:{datetime.now().timestamp()}"
-        qr_hash = hashlib.sha256(qr_data.encode()).hexdigest()[:32].upper()
-        entity.qr_code = qr_hash
-    elif entity_type == "visitor":
-        entity = db_session.query(Visitor).filter_by(id=entity_id).first()
-        if not entity:
-            return "Visitor not found", 404
-        qr_data = f"VIS:{entity.id}:{entity.name}:{datetime.now().timestamp()}"
-        qr_hash = hashlib.sha256(qr_data.encode()).hexdigest()[:32].upper()
-        entity.qr_code = qr_hash
-    elif entity_type == "equipment":
-        entity = db_session.query(Equipment).filter_by(id=entity_id).first()
-        if not entity:
-            return "Equipment not found", 404
-        qr_data = f"EQP:{entity.id}:{entity.radio_id}:{datetime.now().timestamp()}"
-        qr_hash = hashlib.sha256(qr_data.encode()).hexdigest()[:32].upper()
-        entity.qr_code = qr_hash
-    else:
-        return "Invalid entity type", 400
-    db_session.commit()
-
-    qr = qrcode.QRCode(version=4, box_size=20, border=4)
-    qr.add_data(qr_hash)
-    qr.make(fit=True)
-    qr_img = qr.make_image(fill_color="black", back_color="white").convert("RGB")
-
-    # Add human-readable text overlay
-    from PIL import Image as PilImage
-    from PIL import ImageDraw, ImageFont
-
-    # Prepare text based on entity type
-    if entity_type == "vehicle":
-        label_text = f"Fleet ID: {entity.fleet_id}"
-        id_text = "Vehicle"
-    elif entity_type == "employee":
-        full_name = f"{entity.first_name} {entity.surname}".strip()
-        label_text = full_name
-        id_text = f"ID: {entity.emp_code}"
-    elif entity_type == "equipment":
-        label_text = f"Radio ID: {entity.radio_id}"
-        id_text = "Equipment"
-    else:
-        label_text = f"{entity.name}"
-        id_text = "Visitor"
-
-    # Try to use a nice font, fall back to default if not available
-    try:
-        font_large = ImageFont.truetype(
-            "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 20
-        )
-        font_small = ImageFont.truetype(
-            "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 16
-        )
-    except Exception:
-        try:
-            font_large = ImageFont.truetype(
-                "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf", 20
-            )
-            font_small = ImageFont.truetype(
-                "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf", 16
-            )
-        except Exception:
-            font_large = ImageFont.load_default()
-            font_small = ImageFont.load_default()
-
-    # Create a new blank white canvas with space for text BELOW the QR
-    text_padding = 65
-    canvas = PilImage.new("RGB", (qr_img.width, qr_img.height + text_padding), "white")
-    canvas.paste(qr_img, (0, 0))
-
-    draw = ImageDraw.Draw(canvas)
-    img_width = canvas.width
-
-    # Use textbbox if available (PIL 1.1.6+), otherwise estimate
-    try:
-        bbox = draw.textbbox((0, 0), label_text, font=font_large)
-        text_width = bbox[2] - bbox[0]
-    except AttributeError:
-        text_width = len(label_text) * 10  # rough estimate
-    x = (img_width - text_width) // 2
-    draw.text((x, qr_img.height + 8), label_text, fill="black", font=font_large)
-
-    # Draw ID/type line
-    try:
-        bbox2 = draw.textbbox((0, 0), id_text, font=font_small)
-        text_width2 = bbox2[2] - bbox2[0]
-    except AttributeError:
-        text_width2 = len(id_text) * 8  # rough estimate
-    x2 = (img_width - text_width2) // 2
-    draw.text((x2, qr_img.height + 34), id_text, fill="#444444", font=font_small)
-
-    img_byte_arr = io.BytesIO()
-    canvas.save(img_byte_arr, format="PNG")
-    img_byte_arr.seek(0)
-
-    return send_file(
-        img_byte_arr,
-        mimetype="image/png",
-        as_attachment=True,
-        download_name=f"{entity_type}_{entity_id}_qr.png",
-    )
-
-
 # ------------------- Barcode Generation (DataWedge/InfoWedge Compatible) -------------------
 
 
@@ -2895,26 +1823,7 @@ def app_info():
     )
 
 
-@app.route("/generate_qr_page")
-@login_required
-@role_required(["admin", "security"])
-def generate_qr_page():
-    employees = db_session.query(Employee).all()
-    vehicles = db_session.query(Vehicle).all()
-    visitors = db_session.query(Visitor).filter_by(status="Checked In").all()
-    return render_template(
-        "generate_qr.html", employees=employees, vehicles=vehicles, visitors=visitors
-    )
-
-
 # ------------------- Gate Scanner and Logs -------------------
-@app.route("/qr_scanner")
-@login_required
-@role_required(["admin", "security"])
-def qr_scanner():
-    return render_template("qr_scanner.html")
-
-
 @app.route("/gate_logs")
 @login_required
 @role_required(["admin", "security"])
@@ -2922,22 +1831,33 @@ def gate_logs():
     access_type = request.args.get("type", "")
     direction = request.args.get("direction", "")
     status = request.args.get("status", "")
+    gate = request.args.get("gate", "")
     date_from = request.args.get("date_from", "")
     date_to = request.args.get("date_to", "")
     page = request.args.get("page", 1, type=int)
     per_page = request.args.get("per_page", 50, type=int)
     per_page = min(per_page, 200)  # cap
 
-    query = db_session.query(GateLog).order_by(GateLog.scanned_at.desc())
+    # PERFORMANCE: noload('*') prevents lazy-loading of relationships
+    # (employee, vehicle, visitor, equipment) during template iteration.
+    from sqlalchemy.orm import noload as _noload
+
+    query = (
+        db_session.query(GateLog)
+        .options(_noload("*"))
+        .order_by(GateLog.scanned_at.desc())
+    )
 
     if access_type:
         query = query.filter(GateLog.access_type == access_type)
     if direction:
         query = query.filter(GateLog.direction == direction)
     if status == "granted":
-        query = query.filter(GateLog.access_granted)
+        query = query.filter(GateLog.access_granted.is_(True))
     elif status == "denied":
-        query = query.filter(not GateLog.access_granted)
+        query = query.filter(GateLog.access_granted.is_(False))
+    if gate:
+        query = query.filter(GateLog.gate_location == gate)
     if date_from:
         query = query.filter(
             GateLog.scanned_at >= datetime.strptime(date_from, "%Y-%m-%d")
@@ -2959,6 +1879,7 @@ def gate_logs():
         selected_type=access_type,
         selected_direction=direction,
         selected_status=status,
+        selected_gate=gate,
         selected_date_from=date_from,
         selected_date_to=date_to,
         page=page,
@@ -3220,747 +2141,21 @@ def _get_gate_name_from_ip(ip_address, scanned_by, default_gate_location=None):
 def _process_qr_scan(
     qr_hash, direction, gate_location, scanned_by, ip_address, user_agent
 ):
-    """Process a QR code scan and return entity info and access decision."""
-    # Normalize input - ensure consistent format
-    if qr_hash:
-        qr_hash = qr_hash.strip()
+    """Process a QR code scan and return entity info and access decision.
 
-        # Handle full URL scans by extracting the hash part
-        # Handles formats like: http://192.168.0.217:8080/scan/ABC123
-        if "://" in qr_hash and "/scan/" in qr_hash:
-            qr_hash = qr_hash.split("/scan/")[-1].split("?")[0]
-        elif "://" in qr_hash and "/s/" in qr_hash:
-            qr_hash = qr_hash.split("/s/")[-1].split("?")[0]
-        # Also handle cases where it might be just the path /scan/ABC123
-        elif qr_hash.startswith("/scan/"):
-            qr_hash = qr_hash.replace("/scan/", "")
-        elif qr_hash.startswith("/s/"):
-            qr_hash = qr_hash.replace("/s/", "")
+    Thin wrapper around services.scan_service.process_qr_scan().
+    """
+    from services.scan_service import process_qr_scan
 
-    entity = None
-    entity_type = None
-    entity_id = None
-    entity_name = None
-    access_granted = False
-    denial_reason = None
-    skip_approval = False  # For denied entries that shouldn't create approval
-
-    employee = db_session.query(Employee).filter_by(qr_code=qr_hash).first()
-
-    # If not found by qr_code, try to parse text-based QR (e.g., "ID: 0002235597081")
-    # Fallback: Parse QR data to extract ID and look up employee
-    if not employee and qr_hash:
-        extracted_id = None
-        if qr_hash.startswith("{"):
-            try:
-                qr_json = json.loads(qr_hash)
-                extracted_id = (
-                    qr_json.get("emp_code")
-                    or qr_json.get("id_number")
-                    or qr_json.get("id")
-                )
-            except Exception:
-                pass
-        if not extracted_id:
-            import re
-
-            id_match = re.search(r"ID[:\s]*(\d+)", qr_hash)
-            if id_match:
-                extracted_id = id_match.group(1)
-        if extracted_id:
-            employee = (
-                db_session.query(Employee)
-                .filter(
-                    (Employee.emp_code == str(extracted_id))
-                    | (Employee.id_number == str(extracted_id))
-                )
-                .first()
-            )
-            if employee:
-                employee.qr_code = qr_hash
-                db_session.commit()
-
-        # Fallback: Try direct emp_code or id_number lookup for plain IDs (numeric or alphanumeric)
-        if not employee and qr_hash:
-            # Check if it looks like an ID (alphanumeric, reasonable length, no spaces)
-            if (
-                qr_hash.replace("-", "").replace("_", "").isalnum()
-                and len(qr_hash) <= 50
-                and " " not in qr_hash
-            ):
-                employee = (
-                    db_session.query(Employee)
-                    .filter(
-                        (Employee.emp_code == qr_hash) | (Employee.id_number == qr_hash)
-                    )
-                    .first()
-                )
-                if employee:
-                    # Auto-populate qr_code for future scans
-                    employee.qr_code = qr_hash
-                    db_session.commit()
-
-    if employee:
-        entity = employee
-        entity_type = "employee"
-        entity_id = employee.id
-        entity_name = f"{employee.first_name} {employee.surname}"
-
-    if not entity:
-        vehicle = db_session.query(Vehicle).filter_by(qr_code=qr_hash).first()
-        if vehicle:
-            entity = vehicle
-            entity_type = "vehicle"
-            entity_id = vehicle.id
-            entity_name = vehicle.fleet_id
-
-    if not entity:
-        visitor = db_session.query(Visitor).filter_by(qr_code=qr_hash).first()
-
-        # Fallback: Parse JSON QR data to extract visitor ID
-        if not visitor and qr_hash and qr_hash.startswith("{"):
-            try:
-                qr_json = json.loads(qr_hash)
-                if qr_json.get("type") == "visitor" and qr_json.get("id"):
-                    visitor = (
-                        db_session.query(Visitor)
-                        .filter_by(id=qr_json.get("id"))
-                        .first()
-                    )
-                    if visitor:
-                        visitor.qr_code = qr_hash
-                        db_session.commit()
-            except Exception:
-                pass
-
-        if visitor:
-            entity = visitor
-            entity_type = "visitor"
-            entity_id = visitor.id
-            entity_name = visitor.name
-
-    if not entity:
-        equipment = (
-            db_session.query(Equipment)
-            .filter((Equipment.qr_code == qr_hash) | (Equipment.radio_id == qr_hash))
-            .first()
-        )
-        if equipment:
-            entity = equipment
-            entity_type = "equipment"
-            entity_id = equipment.id
-            entity_name = equipment.radio_id
-
-            # Auto-populate qr_code if missing
-            if not equipment.qr_code:
-                qr_data = f"EQP:{equipment.id}:{equipment.radio_id}:{datetime.now().timestamp()}"
-                equipment.qr_code = (
-                    hashlib.sha256(qr_data.encode()).hexdigest()[:32].upper()
-                )
-                db_session.commit()
-
-    # ---------------------------------------------------------------
-    # AUTO-DIRECTION: Backend decides IN vs OUT based on last gate log
-    # Ignore whatever direction the client sent — the server is truth.
-    # ---------------------------------------------------------------
-    if entity_id and entity_type:
-        last_log = (
-            db_session.query(GateLog)
-            .filter(
-                GateLog.entity_id == entity_id,
-                GateLog.access_type == entity_type,
-                GateLog.access_granted,
-            )
-            .order_by(GateLog.scanned_at.desc())
-            .first()
-        )
-        if last_log and last_log.direction == "IN":
-            direction = "OUT"
-        else:
-            direction = "IN"
-    else:
-        # Unknown entity — default to IN
-        direction = "IN"
-
-    print(
-        f"AUTO-DIRECTION: entity={entity_name} type={entity_type} → direction={direction}"
+    return process_qr_scan(
+        qr_hash,
+        direction,
+        gate_location,
+        scanned_by,
+        ip_address,
+        user_agent,
+        socketio,
     )
-
-    # KEYWORD-BASED AUTO-APPROVAL - Special cases for specific names/vehicles
-    # Always approve scans containing: henre, yolande, or LDV 139
-    if qr_hash:
-        qr_lower = qr_hash.lower()
-        special_keywords = ["henre", "yolande", "ldv 139"]
-
-        for keyword in special_keywords:
-            if keyword in qr_lower:
-                # Force approval for special keywords
-                access_granted = True
-                denial_reason = None
-
-                # Extract name from QR if possible
-                if keyword == "henre":
-                    entity_name = "Henre"
-                elif keyword == "yolande":
-                    entity_name = "Yolande"
-                elif keyword == "ldv 139":
-                    entity_name = "LDV 139"
-
-                # Create or update employee record for special cases
-                special_emp_id = keyword.upper().replace(" ", "_")
-                special_employee = (
-                    db_session.query(Employee)
-                    .filter_by(emp_code=special_emp_id)
-                    .first()
-                )
-
-                if not special_employee:
-                    # Create new employee for special keyword
-                    # Parse entity_name into first_name and surname
-                    name_parts = entity_name.split(None, 1)
-                    first_name = name_parts[0] if name_parts else entity_name
-                    surname = name_parts[1] if len(name_parts) > 1 else ""
-
-                    special_employee = Employee(
-                        emp_code=special_emp_id,
-                        first_name=first_name,
-                        surname=surname,
-                        job_title="Auto-approved (Special)",
-                        status="Active",
-                        qr_code=qr_hash,
-                    )
-                    db_session.add(special_employee)
-                    db_session.flush()
-                    print(
-                        f"SPECIAL APPROVAL: Created employee record for {entity_name}"
-                    )
-                else:
-                    # Update existing employee
-                    special_employee.status = "Active"
-                    special_employee.qr_code = qr_hash  # Update QR code
-
-                entity = special_employee
-                entity_type = "employee"
-                entity_id = special_employee.id
-
-                print(
-                    f"SPECIAL AUTO-APPROVAL: QR contains '{keyword}' - {entity_name} approved immediately"
-                )
-
-                # Log the special approval
-                gate_log = GateLog(
-                    access_type="employee",
-                    entity_id=entity_id,
-                    entity_name=entity_name,
-                    direction=direction,
-                    qr_data=qr_hash,
-                    access_granted=True,
-                    denial_reason=None,
-                    gate_location=gate_location,
-                    scanned_by=scanned_by,
-                    ip_address=ip_address,
-                    user_agent=user_agent,
-                    employee_id=entity_id,
-                )
-                db_session.add(gate_log)
-                db_session.commit()
-
-                # Emit to dashboard
-                socketio.emit(
-                    "gate_scan",
-                    {
-                        "type": "employee",
-                        "name": entity_name,
-                        "direction": direction,
-                        "granted": True,
-                        "reason": None,
-                        "gate": gate_location,
-                        "time": datetime.now().strftime("%H:%M:%S"),
-                        "special": True,
-                    },
-                )
-
-                return {
-                    "entity_type": "employee",
-                    "entity_id": entity_id,
-                    "entity_name": entity_name,
-                    "access_granted": True,
-                    "denial_reason": None,
-                }
-
-    # Check expiry dates for employees - deny BEFORE status check if expired
-    def is_expired(expiry_date):
-        if expiry_date is None:
-            return False
-        return expiry_date < _utcnow()
-
-    if entity_type == "employee" and entity:
-        if is_expired(entity.medical_expiry):
-            access_granted = False
-            denial_reason = "Medical certificate expired"
-            skip_approval = True  # Deny directly, no approval needed
-        elif is_expired(entity.induction_expiry):
-            access_granted = False
-            denial_reason = "Induction expired"
-            skip_approval = True  # Deny directly, no approval needed
-        elif entity.status == "Active":
-            access_granted = True
-        else:
-            denial_reason = "Employee not active"
-    elif entity_type == "vehicle" and entity:
-        if entity.status == "Active":
-            access_granted = True
-        else:
-            denial_reason = "Vehicle not active"
-    elif entity_type == "visitor" and entity:
-        if entity.status == "Checked In":
-            access_granted = True
-        else:
-            denial_reason = "Visitor not checked in"
-    elif entity_type == "equipment" and entity:
-        if entity.status == "Active":
-            access_granted = True
-        else:
-            denial_reason = "Equipment not active"
-
-    # UNIVERSAL AUTO-APPROVAL - check for recent scan for ANY QR code within 10 seconds
-    # Check for recent gate log with same QR data within 10 seconds (works for all entities)
-    recent_gate_log = (
-        db_session.query(GateLog)
-        .filter(
-            GateLog.qr_data == qr_hash,  # Exact QR match
-            GateLog.scanned_at
-            >= _utcnow() - timedelta(seconds=10),  # Within last 10 seconds
-        )
-        .order_by(GateLog.scanned_at.desc())
-        .first()
-    )
-
-    # Also check for recent pending approval with same QR data
-    recent_approval = None
-    if not recent_gate_log:
-        # Get all recent pending approvals and check for exact QR match
-        all_pending = (
-            db_session.query(Approval)
-            .filter(
-                Approval.status == "Pending",
-                Approval.created_at >= _utcnow() - timedelta(seconds=10),
-            )
-            .all()
-        )
-
-        # Check each pending approval for exact QR match
-        for pending in all_pending:
-            if pending.scanned_data and qr_hash in pending.scanned_data:
-                try:
-                    pending_data = json.loads(pending.scanned_data)
-                    # Exact match on qr_code field
-                    if pending_data.get("qr_code") == qr_hash:
-                        recent_approval = pending
-                        print(
-                            "EXACT QR MATCH: Found pending approval with matching QR code"
-                        )
-                        break
-                except Exception:
-                    # If JSON parsing fails, check if raw QR is in the string
-                    if qr_hash in pending.scanned_data:
-                        recent_approval = pending
-                        print(
-                            "STRING MATCH: Found pending approval containing QR data"
-                        )
-                        break
-
-    # Auto-approve on second scan within 10 seconds for ANY QR code
-    if recent_gate_log or recent_approval:
-        # Auto-approve on second scan within 10 seconds
-        source = "gate log" if recent_gate_log else "approval"
-
-        # Force access granted for auto-approval
-        access_granted = True
-        denial_reason = None
-
-        if recent_approval:
-            recent_approval.status = "Approved"
-            recent_approval.approved_by = "system-auto"
-            recent_approval.approval_date = _utcnow()
-            recent_approval.comments = f"Auto-approved due to repeated scan within 10 seconds at {_utcnow().strftime('%H:%M:%S')}"
-
-        print(
-            f"AUTO-APPROVAL: QR {qr_hash[:30]}... auto-approved on second scan (found in {source})"
-        )
-
-        # Extract scanned data from approval or parse from QR
-        scanned_data = {}
-        if recent_approval and recent_approval.scanned_data:
-            try:
-                scanned_data = json.loads(recent_approval.scanned_data)
-            except Exception:
-                scanned_data = {}
-        else:
-            # Parse data directly from QR code
-            import re
-
-            id_match = re.search(r"ID[:\s]*(\d+)", qr_hash)
-            name_match = re.search(
-                r"Name\s*(?:and\s*Surname)?[:\s]*([^\|]+)", qr_hash, re.IGNORECASE
-            )
-            job_match = re.search(r"Job[:\s]*([^\|]+)", qr_hash, re.IGNORECASE)
-            coy_match = re.search(r"Coy[:\s]*([^\|]+)", qr_hash, re.IGNORECASE)
-
-            if id_match:
-                scanned_data["employee_id"] = id_match.group(1)
-            if name_match:
-                scanned_data["name"] = name_match.group(1).strip()
-            if job_match:
-                scanned_data["position"] = job_match.group(1).strip()
-            if coy_match:
-                scanned_data["department"] = coy_match.group(1).strip()
-
-        # Create employee record only if entity doesn't exist and this was an unknown entity
-        if not entity:
-            emp_id = (
-                scanned_data.get("employee_id")
-                or f"AUTO{_utcnow().strftime('%Y%m%d%H%M%S')}"
-            )
-            name = scanned_data.get("name") or f"Auto-{qr_hash[:20]}"
-            position = scanned_data.get("position") or "Auto-approved"
-            scanned_data.get("department") or "Unknown"
-
-            existing_employee = (
-                db_session.query(Employee).filter_by(emp_code=emp_id).first()
-            )
-            if not existing_employee:
-                # Parse name into first_name and surname
-                name_parts = name.split(None, 1)
-                first_name = name_parts[0] if name_parts else name
-                surname = name_parts[1] if len(name_parts) > 1 else ""
-
-                new_employee = Employee(
-                    emp_code=emp_id,
-                    first_name=first_name,
-                    surname=surname,
-                    job_title=position,
-                    status="Active",
-                    qr_code=qr_hash,  # Store original QR for future scans
-                )
-                db_session.add(new_employee)
-                db_session.flush()
-
-                entity = new_employee
-                entity_type = "employee"
-                entity_id = new_employee.id
-                entity_name = (
-                    f"{new_employee.first_name} {new_employee.surname}".strip()
-                )
-
-                if recent_approval:
-                    recent_approval.request_id = new_employee.id
-            else:
-                # Update existing employee to active
-                existing_employee.status = "Active"
-                entity = existing_employee
-                entity_type = "employee"
-                entity_id = existing_employee.id
-                entity_name = f"{existing_employee.first_name} {existing_employee.surname}".strip()
-
-                if recent_approval:
-                    recent_approval.request_id = existing_employee.id
-
-    # Initialize approval variable to prevent scope issues
-    approval = None
-
-    # Only create approval for unknown entities or pending status (not for denied expired or auto-approved)
-    if not skip_approval and not access_granted:
-        # Store exact raw QR data for exact matching
-        scanned_details = {
-            "qr_code": qr_hash,
-            "raw_data": qr_hash,
-        }
-
-        # Extract fields from JSON or text-based QR format
-        if qr_hash:
-            is_json = False
-            try:
-                if qr_hash.startswith("{"):
-                    parsed_json = json.loads(qr_hash)
-                    if isinstance(parsed_json, dict):
-                        scanned_details["employee_id"] = parsed_json.get(
-                            "employee_id"
-                        ) or parsed_json.get("id")
-                        scanned_details["name"] = parsed_json.get("name")
-                        scanned_details["position"] = parsed_json.get(
-                            "position"
-                        ) or parsed_json.get("job")
-                        scanned_details["department"] = (
-                            parsed_json.get("department")
-                            or parsed_json.get("coy")
-                            or parsed_json.get("company")
-                        )
-                        is_json = True
-            except Exception:
-                pass
-
-            if not is_json:
-                import re
-
-                # Extract ID -> maps to employee_id
-                id_match = re.search(r"ID[:\s]*(\d+)", qr_hash)
-            if id_match:
-                scanned_details["employee_id"] = id_match.group(1)
-
-            # Extract Name -> maps to name
-            name_match = re.search(
-                r"Name\s*(?:and\s*Surname)?[:\s]*([^\|]+)", qr_hash, re.IGNORECASE
-            )
-            if name_match:
-                scanned_details["name"] = name_match.group(1).strip()
-
-            # Extract Job -> maps to position
-            job_match = re.search(r"Job[:\s]*([^\|]+)", qr_hash, re.IGNORECASE)
-            if job_match:
-                scanned_details["position"] = job_match.group(1).strip()
-
-            # Extract Coy (Company) -> maps to department
-            coy_match = re.search(r"Coy[:\s]*([^\|]+)", qr_hash, re.IGNORECASE)
-            if coy_match:
-                scanned_details["department"] = coy_match.group(1).strip()
-
-            # Extract area
-            area_match = re.search(r"Area[:\s]*([^\|]+)", qr_hash, re.IGNORECASE)
-            if area_match:
-                scanned_details["area"] = area_match.group(1).strip()
-
-        # Create approval request with scanned data
-        approval = Approval(
-            request_type="Employee QR Scan"
-            if scanned_details.get("employee_id")
-            else "Unknown QR Scan",
-            request_id=entity_id if entity_id else 0,
-            requester_name=scanned_details.get("name") or entity_name or "Unknown",
-            details=f"QR scan at {gate_location} (ID: {scanned_details.get('employee_id', 'N/A')})",
-            status="Pending",
-            scanned_data=json.dumps(scanned_details),
-            target_table="employees",  # Default to employees table
-        )
-        db_session.add(approval)
-        db_session.commit()
-
-        socketio.emit(
-            "stats_update",
-            {
-                "pending_approvals": db_session.query(Approval)
-                .filter_by(status="Pending")
-                .count()
-            },
-        )
-
-    # HANDLE EMPTY OR UNKNOWN QR CODES - Try to extract and create records from parsed data
-    if not entity and not denial_reason:
-        # Parse QR data to try to extract structured information
-        parsed_data = decode_qr_data(qr_hash) if qr_hash else {}
-
-        # Try to create employee from parsed data
-        employee_id = parsed_data.get("employee_id") or parsed_data.get("id")
-        name = parsed_data.get("name")
-        position = (
-            parsed_data.get("position")
-            or parsed_data.get("job_title")
-            or parsed_data.get("job")
-        )
-        (
-            parsed_data.get("department")
-            or parsed_data.get("coy")
-            or parsed_data.get("company")
-        )
-
-        if employee_id and name:
-            # Check if employee already exists by emp_code
-            existing = (
-                db_session.query(Employee).filter_by(emp_code=str(employee_id)).first()
-            )
-            if not existing:
-                # Parse name into first_name and surname
-                name_parts = name.split(None, 1)
-                first_name = name_parts[0] if name_parts else name
-                surname = name_parts[1] if len(name_parts) > 1 else ""
-
-                new_employee = Employee(
-                    emp_code=str(employee_id),
-                    first_name=first_name,
-                    surname=surname,
-                    job_title=position or "Unknown",
-                    status="Pending",  # Mark as pending until verified
-                    qr_code=qr_hash,
-                    id_number=str(employee_id),
-                )
-                db_session.add(new_employee)
-                db_session.flush()
-
-                entity = new_employee
-                entity_type = "employee"
-                entity_id = new_employee.id
-                entity_name = (
-                    f"{new_employee.first_name} {new_employee.surname}".strip()
-                )
-                access_granted = False  # Still deny until properly verified
-                denial_reason = f"New employee created from QR: {name} ({employee_id}) - Pending verification"
-
-                print(
-                    f"AUTO-CREATED EMPLOYEE: {entity_name} ({employee_id}) from QR scan - pending verification"
-                )
-            else:
-                # Employee exists, update QR and activate
-                existing.qr_code = qr_hash
-                existing.status = "Active"
-                entity = existing
-                entity_type = "employee"
-                entity_id = existing.id
-                entity_name = f"{existing.first_name} {existing.surname}".strip()
-                access_granted = True
-                denial_reason = None
-
-        # Try to create vehicle from parsed data (if not employee data found)
-        elif not entity:
-            fleet_id = (
-                parsed_data.get("fleet_id")
-                or parsed_data.get("vehicle_id")
-                or parsed_data.get("registration")
-            )
-            if fleet_id:
-                existing_vehicle = (
-                    db_session.query(Vehicle).filter_by(fleet_id=str(fleet_id)).first()
-                )
-                if not existing_vehicle:
-                    new_vehicle = Vehicle(
-                        fleet_id=str(fleet_id),
-                        status="Pending",
-                        qr_code=qr_hash,
-                    )
-                    db_session.add(new_vehicle)
-                    db_session.flush()
-
-                    entity = new_vehicle
-                    entity_type = "vehicle"
-                    entity_id = new_vehicle.id
-                    entity_name = str(fleet_id)
-                    access_granted = False
-                    denial_reason = f"New vehicle created from QR: {fleet_id} - Pending verification"
-
-                    print(
-                        f"AUTO-CREATED VEHICLE: {fleet_id} from QR scan - pending verification"
-                    )
-                else:
-                    # Vehicle exists, update QR and activate
-                    existing_vehicle.qr_code = qr_hash
-                    existing_vehicle.status = "Active"
-                    entity = existing_vehicle
-                    entity_type = "vehicle"
-                    entity_id = existing_vehicle.id
-                    entity_name = str(fleet_id)
-                    access_granted = True
-                    denial_reason = None
-
-        # Create placeholder if we couldn't extract meaningful data
-        if not entity:
-            placeholder_id = f"PLACEHOLDER{_utcnow().strftime('%Y%m%d%H%M%S%f')[:-3]}"
-            placeholder_name = (
-                "Unassigned QR"
-                if not qr_hash or qr_hash.strip() == ""
-                else f"Unassigned-{qr_hash[:15]}"
-            )
-
-            placeholder_parts = placeholder_name.split(None, 1)
-            placeholder_first = (
-                placeholder_parts[0] if placeholder_parts else "Unassigned"
-            )
-            placeholder_surname = (
-                placeholder_parts[1] if len(placeholder_parts) > 1 else "QR"
-            )
-
-            new_placeholder = Employee(
-                emp_code=placeholder_id,
-                first_name=placeholder_first,
-                surname=placeholder_surname,
-                id_number=placeholder_id,
-                job_title="Pending Assignment",
-                status="Pending",
-                qr_code=qr_hash if qr_hash else placeholder_id,
-                medical_expiry=None,
-                induction_expiry=None,
-            )
-            db_session.add(new_placeholder)
-            db_session.flush()
-
-            entity = new_placeholder
-            entity_type = "employee"
-            entity_id = new_placeholder.id
-            entity_name = (
-                f"{new_placeholder.first_name} {new_placeholder.surname}".strip()
-            )
-            access_granted = False
-            denial_reason = "QR not assigned - Placeholder created"
-
-            print(
-                f"PLACEHOLDER CREATED: {placeholder_id} for QR '{qr_hash[:30] if qr_hash else 'EMPTY'}'"
-            )
-
-    # NOT IN SYSTEM - set denial reason if no entity found (fallback)
-    if not entity and not denial_reason:
-        denial_reason = "Not registered in system"
-        entity_name = entity_name or "Unknown"
-
-    # Parse QR data for storage
-    parsed_qr = (
-        decode_qr_data(qr_hash) if qr_hash else {"format": "none", "raw_data": None}
-    )
-
-    # Look up gate name from IP mapping, fallback to provided gate_location
-    resolved_gate_location = _get_gate_name_from_ip(
-        ip_address, scanned_by, gate_location
-    )
-
-    gate_log = GateLog(
-        access_type=entity_type,
-        entity_id=entity_id,
-        entity_name=entity_name,
-        direction=direction,
-        qr_data=qr_hash,
-        access_granted=access_granted,
-        denial_reason=denial_reason,
-        gate_location=resolved_gate_location,
-        scanned_by=scanned_by,
-        ip_address=ip_address,
-        user_agent=user_agent,
-        parsed_qr_data=json.dumps(parsed_qr) if parsed_qr else None,
-        employee_id=entity_id if entity_type == "employee" else None,
-        vehicle_id=entity_id if entity_type == "vehicle" else None,
-        visitor_id=entity_id if entity_type == "visitor" else None,
-        equipment_id=entity_id if entity_type == "equipment" else None,
-    )
-    db_session.add(gate_log)
-    db_session.commit()
-
-    socketio.emit(
-        "gate_scan",
-        {
-            "type": entity_type,
-            "name": entity_name,
-            "direction": direction,
-            "granted": access_granted,
-            "reason": denial_reason,
-            "gate": resolved_gate_location,
-            "time": datetime.now().strftime("%H:%M:%S"),
-        },
-    )
-
-    return {
-        "entity_type": entity_type,
-        "entity_id": entity_id,
-        "entity_name": entity_name,
-        "access_granted": access_granted,
-        "denial_reason": denial_reason,
-        "parsed_qr": parsed_qr,
-    }
 
 
 @app.route("/kiosk")
@@ -3972,170 +2167,12 @@ def kiosk_scanner():
     return render_template("kiosk_scanner.html")
 
 
-@app.route("/scan/<qr_hash>")
-@app.route("/s/<qr_hash>")
-def universal_scan(qr_hash):
-    """Visual feedback for any camera-based scanner (phone, 3rd-party app)."""
-    ip_address = request.remote_addr
-    user_agent = request.headers.get("User-Agent", "WebBrowser")
-
-    result = _process_qr_scan(
-        qr_hash, "AUTO", "Web Scanner", "web_browser", ip_address, user_agent
-    )
-
-    return render_template(
-        "scan_result.html",
-        success=result["access_granted"],
-        name=result["entity_name"],
-        entity_type=result["entity_type"],
-        denial_reason=result["denial_reason"],
-        direction=result.get("direction", "IN"),
-        reset_ms=4000,
-    )
-
-
-@app.route("/api/scan_qr", methods=["POST"])
-@require_api_key
-def scan_qr_code():
-    data = request.get_json()
-    # 1. Normalize input
-    qr_hash_raw = data.get("qr_code", "").strip() if data.get("qr_code") else None
-    qr_hash = None
-    if qr_hash_raw:
-        if qr_hash_raw.startswith("{") and qr_hash_raw.endswith("}"):
-            qr_hash = qr_hash_raw
-        else:
-            qr_hash = qr_hash_raw.upper()
-
-    direction = data.get("direction", "IN")
-    gate_location = data.get("gate_location", "Main Gate")
-    scanned_by = data.get("scanned_by", "hardware")
-    ip_address = request.remote_addr
-    user_agent = request.headers.get("User-Agent", "")
-
-    result = _process_qr_scan(
-        qr_hash, direction, gate_location, scanned_by, ip_address, user_agent
-    )
-
-    # 3. Log scan decisions
-    found_in = "none"
-    if result["entity_type"] == "employee":
-        found_in = "employees"
-    elif result["entity_type"] == "vehicle":
-        found_in = "vehicles"
-    elif result["entity_type"] == "visitor":
-        found_in = "visitors"
-
-    if not result["access_granted"] and result["denial_reason"]:
-        # Check if there's a pending approval
-        pending = (
-            db_session.query(Approval)
-            .filter(
-                Approval.status == "Pending", Approval.scanned_data.contains(qr_hash)
-            )
-            .first()
-        )
-        if pending:
-            found_in = "pending"
-
-    scan_log_data = {
-        "code": qr_hash,
-        "foundIn": found_in,
-        "granted": result["access_granted"],
-        "entity": result["entity_name"] or "Unknown",
-        "direction": direction,
-        "type": result["entity_type"] or "QR",
-    }
-    print(f"SCAN LOG: {json.dumps(scan_log_data)}", flush=True)
-
-    # Determine status for scanner display
-    is_pending = not result["access_granted"] and found_in == "pending"
-    scan_status = (
-        "approved"
-        if result["access_granted"]
-        else ("pending" if is_pending else "denied")
-    )
-
-    return jsonify(
-        {
-            "success": result["access_granted"],
-            "message": result["denial_reason"]
-            or ("Access granted" if result["access_granted"] else "Access denied"),
-            "name": result["entity_name"] or "Unknown",
-            "entity_type": result["entity_type"],
-            "entity_name": result["entity_name"],
-            "direction": direction,
-            "open_gate": result["access_granted"],
-            "status": scan_status,
-            "denial_reason": result["denial_reason"],
-            "parsed_data": result.get("parsed_qr"),
-            "is_unknown": result["entity_name"] == "Unknown"
-            or "Unassigned" in str(result["entity_name"]),
-        }
-    )
-
-
 _LOCAL_PREFIXES = ("192.168.", "10.", "172.", "127.")
 
 
 def _is_local_ip(ip):
     """Return True if the IP belongs to a RFC-1918 / loopback range."""
     return any(ip.startswith(p) for p in _LOCAL_PREFIXES)
-
-
-@app.route("/api/scan_alt", methods=["POST"])
-@limiter.limit("120 per minute")
-def scan_qr_alt():
-    """Alternative QR scanner endpoint - no API key required, local network only."""
-    ip_address = request.remote_addr
-    if not _is_local_ip(ip_address):
-        return jsonify({"success": False, "message": "Local network only"}), 403
-    user_agent = request.headers.get("User-Agent", "InfoWedge")
-    content_type = request.content_type or ""
-
-    if "application/json" in content_type:
-        data = request.get_json(silent=True) or {}
-        qr_hash = (
-            data.get("qr_code")
-            or data.get("barcode")
-            or data.get("data")
-            or data.get("barcodeData")
-        )
-        direction = data.get("direction", "AUTO")
-        gate_location = data.get("gate_location", "C66 Scanner")
-        scanned_by = data.get("scanned_by", f"infowedge:{ip_address}")
-    else:
-        raw = request.get_data(as_text=True).strip()
-        qr_hash = raw
-        direction = "AUTO"
-        gate_location = "C66 Scanner"
-        scanned_by = f"infowedge:{ip_address}"
-
-    if not qr_hash:
-        return jsonify(
-            {"success": False, "message": "No barcode data", "open_gate": False}
-        ), 400
-
-    result = _process_qr_scan(
-        qr_hash, direction, gate_location, scanned_by, ip_address, user_agent
-    )
-    return jsonify(
-        {
-            "success": result["access_granted"],
-            "open_gate": result["access_granted"],
-            "message": result["denial_reason"]
-            or ("Access granted" if result["access_granted"] else "Access denied"),
-            "name": result["entity_name"] or "Unknown",
-            "entity_type": result["entity_type"],
-            "entity_name": result["entity_name"],
-            "direction": direction,
-            "status": "approved" if result["access_granted"] else "denied",
-            "denial_reason": result["denial_reason"],
-            "parsed_data": result.get("parsed_qr"),
-            "is_unknown": result["entity_name"] == "Unknown"
-            or "Unassigned" in str(result["entity_name"]),
-        }
-    )
 
 
 @app.route("/api/c66", methods=["POST", "GET"])
@@ -4275,199 +2312,9 @@ def message_endpoint():
     return "OK", 200, {"Content-Type": "text/plain"}
 
 
-@app.route("/api/scan", methods=["POST"])
-@limiter.limit("120 per minute")
-def scan_http():
-    """Simple HTTP scan endpoint - supports JSON, form data, and plain text. Local network only.
-
-    Allows scanners like InfoWedge to send scans via HTTP POST without configuration.
-    Supports:
-    - JSON: {"qr_code": "ABC123", "direction": "IN", "gate_location": "Main Gate"}
-    - Form: qr_code=ABC123
-    - Plain text: ABC123
-
-    InfoWedge TCP/IP Output typically sends plain text.
-    """
-    ip_address = request.remote_addr
-    if not _is_local_ip(ip_address):
-        return jsonify({"success": False, "message": "Local network only"}), 403
-    qr_code = None
-    content_type = request.headers.get("Content-Type", "")
-
-    # Handle JSON
-    if "application/json" in content_type:
-        data = request.get_json() or {}
-        qr_code = data.get("qr_code") or data.get("code") or data.get("barcode")
-    # Handle form data
-    elif "application/x-www-form-urlencoded" in content_type:
-        qr_code = (
-            request.form.get("qr_code")
-            or request.form.get("code")
-            or request.form.get("barcode")
-        )
-    # Handle plain text (InfoWedge TCP output)
-    else:
-        qr_code = request.get_data(as_text=True).strip()
-
-    if not qr_code:
-        return jsonify(
-            {"success": False, "message": "qr_code required", "open_gate": False}
-        ), 400
-
-    # Normalize the code
-    qr_hash = qr_code.strip()
-    if qr_hash.startswith("{") and qr_hash.endswith("}"):
-        pass
-    else:
-        qr_hash = qr_hash.upper()
-
-    # Get direction/gate_location from JSON if available
-    if "application/json" in content_type:
-        data = request.get_json() or {}
-        direction = data.get("direction", "IN")
-        gate_location = data.get("gate_location", "Main Gate")
-    else:
-        direction = "IN"
-        gate_location = "Main Gate"
-
-    _ensure_device_exists(ip_address)
-
-    scanned_by = "info-wedge"
-
-    # Process the scan
-    result = _process_qr_scan(
-        qr_hash, direction, gate_location, scanned_by, ip_address, "HTTP Scanner"
-    )
-
-    # Emit to web clients
-    socketio.emit(
-        "scan_result",
-        {
-            "success": result["access_granted"],
-            "message": result["denial_reason"],
-            "entity_type": result["entity_type"],
-            "entity_name": result["entity_name"],
-            "direction": direction,
-            "scanner": "http",
-        },
-    )
-
-    return jsonify(
-        {
-            "success": result["access_granted"],
-            "message": result["denial_reason"] or "Access granted",
-            "entity_type": result["entity_type"],
-            "entity_name": result["entity_name"],
-            "direction": direction,
-            "open_gate": result["access_granted"],
-            "status": "approved" if result["access_granted"] else "denied",
-        }
-    )
-
-
 # ═══════════════════════════════════════════════════════════════════════
 # RFID SCAN ENDPOINTS
 # ═══════════════════════════════════════════════════════════════════════
-
-
-@app.route("/api/scan_rfid", methods=["POST"])
-@require_api_key
-def scan_rfid():
-    """RFID tag scan endpoint for hardware RFID readers.
-
-    Accepts RFID tag data from TCP/IP connected RFID scanners.
-    Scanner config: IP 192.168.0.187, Port 58628, Protocol TCP
-
-    JSON body format:
-    {
-        "rfid_tag": "E20034150200108022001F6D",
-        "direction": "IN",
-        "gate_location": "Main Gate",
-        "reader_id": "RFID-001"
-    }
-    """
-    data = request.get_json() or {}
-
-    # Extract RFID tag data
-    rfid_tag = (
-        data.get("rfid_tag", "").strip().upper() if data.get("rfid_tag") else None
-    )
-    direction = data.get("direction", "IN")
-    gate_location = data.get("gate_location", "RFID Gate")
-    reader_id = data.get("reader_id", "unknown")
-    ip_address = request.remote_addr
-    user_agent = request.headers.get("User-Agent", "RFID Reader")
-
-    if not rfid_tag:
-        return jsonify(
-            {
-                "success": False,
-                "message": "No RFID tag data provided",
-                "open_gate": False,
-                "status": "denied",
-            }
-        ), 400
-
-    # Basic RFID data formatting and validation
-    # Support multiple RFID formats: EPC Gen2, ISO 14443, etc.
-    formatted_tag = _format_rfid_tag(rfid_tag)
-
-    # Process RFID scan using shared logic
-    result = _process_rfid_scan(
-        formatted_tag, direction, gate_location, reader_id, ip_address, user_agent
-    )
-
-    # Log scan result
-    found_in = "none"
-    if result["entity_type"] == "employee":
-        found_in = "employees"
-    elif result["entity_type"] == "vehicle":
-        found_in = "vehicles"
-    elif result["entity_type"] == "visitor":
-        found_in = "visitors"
-    elif result["entity_type"] == "equipment":
-        found_in = "equipment"
-
-    print(
-        f"RFID SCAN: {{ 'tag': '{formatted_tag}', 'foundIn': '{found_in}', 'granted': {result['access_granted']}, 'entity': '{result['entity_name']}', 'direction': '{direction}', 'type': '{result['entity_type']}' }}",
-        flush=True,
-    )
-
-    # Emit to web clients for real-time updates
-    try:
-        socketio.emit(
-            "rfid_scan_result",
-            {
-                "success": result["access_granted"],
-                "entity_name": result.get("entity_name", ""),
-                "message": result.get("denial_reason", ""),
-                "rfid_tag": formatted_tag,
-                "scanner": reader_id,
-                "protocol": "RFID-TCP",
-            },
-        )
-    except Exception:
-        pass
-
-    scan_status = "approved" if result["access_granted"] else "denied"
-
-    return jsonify(
-        {
-            "success": result["access_granted"],
-            "message": result["denial_reason"]
-            or ("Access granted" if result["access_granted"] else "Access denied"),
-            "name": result["entity_name"] or "Unknown",
-            "entity_type": result["entity_type"],
-            "entity_name": result["entity_name"],
-            "rfid_tag": formatted_tag,
-            "direction": result.get("direction", direction),
-            "open_gate": result["access_granted"],
-            "status": scan_status,
-            "denial_reason": result["denial_reason"],
-            "is_unknown": result["entity_name"] == "Unknown"
-            or "Unassigned" in str(result["entity_name"]),
-        }
-    )
 
 
 @app.route("/api/rfid_ingest", methods=["POST", "GET"])
@@ -4628,8 +2475,13 @@ def _process_rfid_scan(
 
     # Auto-direction logic (same as QR scan)
     if entity_id and entity_type:
+        # PERFORMANCE: noload('*') prevents lazy-loading relationships
+        # when we only need the direction column.
+        from sqlalchemy.orm import noload as _noload
+
         last_log = (
             db_session.query(GateLog)
+            .options(_noload("*"))
             .filter(
                 GateLog.entity_id == entity_id,
                 GateLog.access_type == entity_type,
@@ -4694,6 +2546,12 @@ def _process_rfid_scan(
     db_session.add(gate_log)
     db_session.commit()
 
+    # Invalidate caches since gate log data changed
+    from routes.dashboard import invalidate_dashboard_cache
+    from routes.monitoring import invalidate_monitoring_cache
+    invalidate_dashboard_cache()
+    invalidate_monitoring_cache()
+
     return {
         "access_granted": access_granted,
         "denial_reason": denial_reason,
@@ -4703,182 +2561,6 @@ def _process_rfid_scan(
         "direction": direction,
         "rfid_tag": rfid_tag,
     }
-
-
-@app.route("/api/verify-qr", methods=["POST"])
-@require_api_key
-def verify_qr_mobile():
-    """Mobile app QR verification endpoint - mirrors scan_qr_code with mobile-compatible response format."""
-    data = request.get_json()
-
-    # Extract and normalize fields from mobile app request
-    qr_hash_raw = (data.get("qr_data") or data.get("qr_code", "")).strip()
-    if qr_hash_raw.startswith("{") and qr_hash_raw.endswith("}"):
-        qr_hash = qr_hash_raw
-    else:
-        qr_hash = qr_hash_raw.upper()
-
-    device_info = data.get("device_info", "Mobile Scanner")
-    direction = "IN"
-    scanned_by = f"mobile-{request.remote_addr}"
-    ip_address = request.remote_addr
-    user_agent = request.headers.get("User-Agent", "")
-
-    # Parse QR data for extraction
-    parsed_qr = (
-        decode_qr_data(qr_hash) if qr_hash else {"format": "none", "raw_data": None}
-    )
-
-    # Replicate scan_qr_code logic
-    entity = None
-    entity_type = None
-    entity_id = None
-    entity_name = None
-    access_granted = False
-    denial_reason = None
-
-    # Try to look up by QR code hash first
-    employee = db_session.query(Employee).filter_by(qr_code=qr_hash).first()
-
-    # If not found, try to parse text-based QR (e.g., "ID: 0002235597081")
-    if not employee and qr_hash:
-        import re
-
-        # Extract ID number from text format: "ID: 0002235597081" or "ID:0002235597081"
-        id_match = re.search(r"ID[:\s]*(\d+)", qr_hash)
-        if id_match:
-            extracted_id = id_match.group(1)
-            employee = (
-                db_session.query(Employee)
-                .filter(
-                    (Employee.emp_code == extracted_id)
-                    | (Employee.id_number == extracted_id)
-                )
-                .first()
-            )
-
-    # Check expiry dates first - BEFORE status check (expiredcert supersedes status)
-    def is_expired(expiry_date):
-        if expiry_date is None:
-            return False
-        return expiry_date < _utcnow()
-
-
-    if employee:
-        entity = employee
-        entity_type = "employee"
-        entity_id = employee.id
-        entity_name = f"{employee.first_name} {employee.surname}".strip()
-
-        # Check expiry dates FIRST - deny regardless of status if expired
-        if is_expired(employee.medical_expiry):
-            access_granted = False
-            denial_reason = "Medical certificate expired"
-        elif is_expired(employee.induction_expiry):
-            access_granted = False
-            denial_reason = "Induction expired"
-        elif employee.status == "Active":
-            access_granted = True
-        else:
-            denial_reason = "Employee not active"
-
-    if not entity:
-        vehicle = db_session.query(Vehicle).filter_by(qr_code=qr_hash).first()
-        if vehicle:
-            entity = vehicle
-            entity_type = "vehicle"
-            entity_id = vehicle.id
-            entity_name = vehicle.fleet_id
-
-            # Check registration expiry BEFORE status check
-            if vehicle.registration_expiry and vehicle.registration_expiry < _utcnow():
-                access_granted = False
-                denial_reason = "Registration expired"
-            elif vehicle.status == "Active":
-                access_granted = True
-            else:
-                denial_reason = "Vehicle not active"
-
-    if not entity:
-        visitor = db_session.query(Visitor).filter_by(qr_code=qr_hash).first()
-        if visitor:
-            entity = visitor
-            entity_type = "visitor"
-            entity_id = visitor.id
-            entity_name = visitor.name
-            if direction == "IN":
-                if visitor.status == "Checked In":
-                    access_granted = True
-                else:
-                    denial_reason = "Visitor not checked in"
-            elif direction == "OUT":
-                if visitor.status == "Checked In":
-                    access_granted = True
-                else:
-                    denial_reason = "Visitor already checked out"
-
-    # NOT IN SYSTEM - deny immediately regardless of other factors
-    if not entity:
-        access_granted = False
-        denial_reason = "Not registered in system"
-        entity_name = "Unknown"
-
-    # Log the scan
-    gate_log = GateLog(
-        access_type=entity_type,
-        entity_id=entity_id,
-        entity_name=entity_name,
-        direction=direction,
-        qr_data=qr_hash,
-        access_granted=access_granted,
-        denial_reason=denial_reason,
-        gate_location=device_info,
-        scanned_by=scanned_by,
-        ip_address=ip_address,
-        user_agent=user_agent,
-        parsed_qr_data=json.dumps(parsed_qr) if parsed_qr else None,
-        employee_id=entity_id if entity_type == "employee" else None,
-        vehicle_id=entity_id if entity_type == "vehicle" else None,
-        visitor_id=entity_id if entity_type == "visitor" else None,
-    )
-    db_session.add(gate_log)
-
-    if entity_type == "visitor" and access_granted and direction == "OUT":
-        visitor.check_out_time = _utcnow()
-        visitor.status = "Checked Out"
-        db_session.commit()
-    else:
-        db_session.commit()
-
-    # Emit to dashboard via socketio
-    socketio.emit(
-        "gate_scan",
-        {
-            "type": entity_type,
-            "name": entity_name,
-            "direction": direction,
-            "granted": access_granted,
-            "reason": denial_reason,
-            "gate": device_info,
-            "time": datetime.now().strftime("%H:%M:%S"),
-        },
-    )
-
-    # Return mobile-compatible response format
-    return jsonify(
-        {
-            "valid": access_granted,
-            "message": "Access granted" if access_granted else denial_reason,
-            "is_unknown": entity_name == "Unknown" or "Unassigned" in str(entity_name),
-            "parsed_data": parsed_qr,
-            "data": {
-                "entity_type": entity_type,
-                "entity_name": entity_name,
-                "direction": direction,
-                "open_gate": access_granted,
-            },
-        }
-    )
 
 
 @app.route("/api/verify-visitor", methods=["POST"])
@@ -4965,6 +2647,12 @@ def verify_visitor_mobile():
     db_session.add(gate_log)
     db_session.commit()
 
+    # Invalidate caches since gate log data changed
+    from routes.dashboard import invalidate_dashboard_cache
+    from routes.monitoring import invalidate_monitoring_cache
+    invalidate_dashboard_cache()
+    invalidate_monitoring_cache()
+
     # Emit to dashboard
     socketio.emit(
         "gate_scan",
@@ -5000,24 +2688,43 @@ def verify_visitor_mobile():
 @login_required
 def api_gate_logs():
     limit = request.args.get("limit", 100, type=int)
+    limit = min(limit, 1000)  # cap to prevent excessive memory use
+    page = request.args.get("page", 1, type=int)
+    page = max(1, page)
+
+    # PERFORMANCE: noload('*') prevents lazy-loading of relationships.
+    from sqlalchemy.orm import noload as _noload
+
     logs = (
-        db_session.query(GateLog).order_by(GateLog.scanned_at.desc()).limit(limit).all()
+        db_session.query(GateLog)
+        .options(_noload("*"))
+        .order_by(GateLog.scanned_at.desc())
+        .offset((page - 1) * limit)
+        .limit(limit)
+        .all()
     )
+    total = db_session.query(GateLog).count()
     return jsonify(
-        [
-            {
-                "id": log.id,
-                "type": log.access_type,
-                "name": log.entity_name,
-                "direction": log.direction,
-                "granted": log.access_granted,
-                "reason": log.denial_reason,
-                "gate": log.gate_location,
-                "scanned_by": log.scanned_by,
-                "time": log.scanned_at.strftime("%Y-%m-%d %H:%M:%S"),
-            }
-            for log in logs
-        ]
+        {
+            "logs": [
+                {
+                    "id": log.id,
+                    "type": log.access_type,
+                    "name": log.entity_name,
+                    "direction": log.direction,
+                    "granted": log.access_granted,
+                    "reason": log.denial_reason,
+                    "gate": log.gate_location,
+                    "scanned_by": log.scanned_by,
+                    "time": log.scanned_at.strftime("%Y-%m-%d %H:%M:%S"),
+                }
+                for log in logs
+            ],
+            "page": page,
+            "limit": limit,
+            "total": total,
+            "total_pages": max(1, (total + limit - 1) // limit),
+        }
     )
 
 
@@ -5027,8 +2734,12 @@ def api_recent_activity():
     try:
         today = datetime.now().date()
         today_start = datetime.combine(today, datetime.min.time())
+        # PERFORMANCE: noload('*') prevents lazy-loading relationships.
+        from sqlalchemy.orm import noload as _noload
+
         logs = (
             db_session.query(GateLog)
+            .options(_noload("*"))
             .filter(GateLog.scanned_at >= today_start)
             .order_by(GateLog.scanned_at.desc())
             .limit(10)
@@ -5068,12 +2779,44 @@ def health_check():
 @login_required
 @role_required(["admin"])
 def export_gate_logs_excel():
-    logs = (
-        db_session.query(GateLog).order_by(GateLog.scanned_at.desc()).limit(50000).all()
-    )
-    wb = openpyxl.Workbook()
-    ws = wb.active
-    ws.title = "Gate Logs"
+    access_type = request.args.get("type", "")
+    direction = request.args.get("direction", "")
+    status = request.args.get("status", "")
+    gate = request.args.get("gate", "")
+    date_from = request.args.get("date_from", "")
+    date_to = request.args.get("date_to", "")
+
+    # PERFORMANCE: noload('*') prevents lazy-loading of relationships.
+    # NOTE: Streaming opportunity — for very large datasets, replace .all()
+    # with yield_per() + server-side cursor to avoid loading all 50k rows
+    # into memory at once.
+    from sqlalchemy.orm import noload as _noload
+
+    query = db_session.query(GateLog).order_by(GateLog.scanned_at.desc())
+
+    if access_type:
+        query = query.filter(GateLog.access_type == access_type)
+    if direction:
+        query = query.filter(GateLog.direction == direction)
+    if status == "granted":
+        query = query.filter(GateLog.access_granted.is_(True))
+    elif status == "denied":
+        query = query.filter(GateLog.access_granted.is_(False))
+    if gate:
+        query = query.filter(GateLog.gate_location == gate)
+    if date_from:
+        query = query.filter(
+            GateLog.scanned_at >= datetime.strptime(date_from, "%Y-%m-%d")
+        )
+    if date_to:
+        end_date = datetime.strptime(date_to, "%Y-%m-%d")
+        query = query.filter(
+            GateLog.scanned_at <= end_date.replace(hour=23, minute=59, second=59)
+        )
+
+    # Use write_only mode to optimize memory usage (P0 performance fix)
+    wb = openpyxl.Workbook(write_only=True)
+    ws = wb.create_sheet(title="Gate Logs")
     headers = [
         "ID",
         "Type",
@@ -5086,6 +2829,8 @@ def export_gate_logs_excel():
         "Time",
     ]
     ws.append(headers)
+
+    logs = query.options(_noload("*")).limit(50000).all()
     for log in logs:
         ws.append(
             [
@@ -5119,6 +2864,9 @@ def export_gate_logs_excel():
 @login_required
 @role_required(["admin", "manager"])
 def export_employees_excel():
+    # NOTE: Streaming opportunity — for very large employee datasets, use
+    # yield_per() with a server-side cursor to stream rows instead of
+    # loading all records into memory at once.
     employees = db_session.query(Employee).all()
     wb = openpyxl.Workbook()
     ws = wb.active
@@ -5179,7 +2927,14 @@ def export_employees_excel():
 @login_required
 @role_required(["admin", "manager"])
 def export_visitors_excel():
-    visitors = db_session.query(Visitor).all()
+    # PERFORMANCE: eager-load host relationship to avoid N+1 queries
+    # when accessing visitor.host.name for each row.
+    from sqlalchemy.orm import joinedload as _joinedload
+
+    # NOTE: Streaming opportunity — for very large visitor datasets, use
+    # yield_per() with a server-side cursor to stream rows instead of
+    # loading all records into memory at once.
+    visitors = db_session.query(Visitor).options(_joinedload(Visitor.host)).all()
     wb = openpyxl.Workbook()
     ws = wb.active
     ws.title = "Visitors"
@@ -5227,6 +2982,9 @@ def export_visitors_excel():
 @login_required
 @role_required(["admin", "manager"])
 def export_fleet_excel():
+    # NOTE: Streaming opportunity — for very large fleet datasets, use
+    # yield_per() with a server-side cursor to stream rows instead of
+    # loading all records into memory at once.
     vehicles = db_session.query(Vehicle).all()
     wb = openpyxl.Workbook()
     ws = wb.active
@@ -5249,6 +3007,9 @@ def export_fleet_excel():
 @login_required
 @role_required(["admin", "manager"])
 def export_fleet_pdf():
+    # NOTE: Streaming opportunity — for very large fleet datasets, use
+    # yield_per() with a server-side cursor to stream rows instead of
+    # loading all records into memory at once.
     vehicles = db_session.query(Vehicle).all()
 
     headers = ["Fleet ID"]
@@ -5270,6 +3031,9 @@ def export_fleet_pdf():
 @login_required
 @role_required(["admin", "manager"])
 def export_equipment_excel():
+    # NOTE: Streaming opportunity — for very large equipment datasets, use
+    # yield_per() with a server-side cursor to stream rows instead of
+    # loading all records into memory at once.
     items = db_session.query(Equipment).all()
     wb = openpyxl.Workbook()
     ws = wb.active
@@ -5292,6 +3056,9 @@ def export_equipment_excel():
 @login_required
 @role_required(["admin", "manager"])
 def export_equipment_pdf():
+    # NOTE: Streaming opportunity — for very large equipment datasets, use
+    # yield_per() with a server-side cursor to stream rows instead of
+    # loading all records into memory at once.
     items = db_session.query(Equipment).all()
 
     headers = ["Radio ID", "Status", "Registered On"]
@@ -5757,6 +3524,7 @@ def export_gate_logs_pdf():
     access_type = request.args.get("type", "")
     direction = request.args.get("direction", "")
     status = request.args.get("status", "")
+    gate = request.args.get("gate", "")
     date_from = request.args.get("date_from", "")
     date_to = request.args.get("date_to", "")
 
@@ -5767,9 +3535,11 @@ def export_gate_logs_pdf():
     if direction:
         query = query.filter(GateLog.direction == direction)
     if status == "granted":
-        query = query.filter(GateLog.access_granted)
+        query = query.filter(GateLog.access_granted.is_(True))
     elif status == "denied":
-        query = query.filter(not GateLog.access_granted)
+        query = query.filter(GateLog.access_granted.is_(False))
+    if gate:
+        query = query.filter(GateLog.gate_location == gate)
     if date_from:
         query = query.filter(
             GateLog.scanned_at >= datetime.strptime(date_from, "%Y-%m-%d")
@@ -5780,7 +3550,13 @@ def export_gate_logs_pdf():
             GateLog.scanned_at <= end_date.replace(hour=23, minute=59, second=59)
         )
 
-    logs = query.limit(50000).all()
+    # PERFORMANCE: noload('*') prevents lazy-loading of relationships.
+    # NOTE: Streaming opportunity — for very large datasets, replace .all()
+    # with yield_per() + server-side cursor to avoid loading all 50k rows
+    # into memory at once.
+    from sqlalchemy.orm import noload as _noload
+
+    logs = query.options(_noload("*")).limit(50000).all()
 
     headers = [
         "ID",
@@ -5839,6 +3615,9 @@ def export_employees_pdf():
     if status:
         query = query.filter(Employee.status == status)
 
+    # NOTE: Streaming opportunity — for very large employee datasets, use
+    # yield_per() with a server-side cursor to stream rows instead of
+    # loading all records into memory at once.
     employees = query.all()
 
     headers = [
@@ -5910,7 +3689,14 @@ def export_visitors_pdf():
             Visitor.check_in_time <= end_date.replace(hour=23, minute=59, second=59)
         )
 
-    visitors = query.all()
+    # PERFORMANCE: eager-load host relationship to avoid N+1 queries
+    # when accessing visitor.host.name for each row.
+    from sqlalchemy.orm import joinedload as _joinedload
+
+    # NOTE: Streaming opportunity — for very large visitor datasets, use
+    # yield_per() with a server-side cursor to stream rows instead of
+    # loading all records into memory at once.
+    visitors = query.options(_joinedload(Visitor.host)).all()
 
     headers = [
         "ID",
@@ -6330,157 +4116,6 @@ def download_import_template(entity_type):
     )
 
 
-# ------------------- AI Assistant -------------------
-@app.route("/ai/chat")
-@login_required
-def ai_chat_page():
-    """Render the AI chat interface."""
-    return render_template("chat.html")
-
-
-def get_system_context():
-    """Build system context with live data for the AI assistant."""
-    stats = {
-        "employees": db_session.query(Employee).count(),
-        "vehicles": db_session.query(Vehicle).count(),
-        "visitors": db_session.query(Visitor).filter_by(status="Checked In").count(),
-        "pending_approvals": db_session.query(Approval)
-        .filter_by(status="Pending")
-        .count(),
-    }
-    return (
-        f"You are a helpful assistant for an Arch-System site management platform. "
-        f"The current user is {session.get('username')} with role {session.get('role')}. "
-        f"Current system stats: Employees={stats['employees']}, Vehicles={stats['vehicles']}, "
-        f"Active Visitors={stats['visitors']}, Pending Approvals={stats['pending_approvals']}. "
-        f"Answer questions concisely and help with site operations."
-    )
-
-
-def _ollama_generate(prompt, system_ctx, stream=False, use_full=False):
-    """Call Ollama AI — routes to cloud or local based on provider.
-    use_full=True selects the 3B model for complex analysis."""
-    model = OLLAMA_MODEL_FULL if use_full else OLLAMA_MODEL
-
-    if _ollama_provider == "cloud":
-        payload = {
-            "model": model,
-            "messages": [
-                {"role": "system", "content": system_ctx},
-                {"role": "user", "content": prompt},
-            ],
-            "stream": stream,
-        }
-        resp = requests.post(
-            f"{OLLAMA_CLOUD_URL}/chat",
-            headers={
-                "Authorization": f"Bearer {OLLAMA_CLOUD_API_KEY}",
-                "Content-Type": "application/json",
-            },
-            json=payload,
-            stream=stream,
-            timeout=120,
-        )
-    else:
-        payload = {
-            "model": model,
-            "prompt": prompt,
-            "system": system_ctx,
-            "stream": stream,
-            "keep_alive": "10m",
-        }
-        resp = requests.post(
-            f"{OLLAMA_BASE_URL}/api/generate",
-            json=payload,
-            stream=stream,
-            timeout=120,
-        )
-    resp.raise_for_status()
-    return resp
-
-
-@app.route("/api/ai/chat", methods=["POST"])
-@login_required
-@limiter.limit("20 per minute")
-def ai_chat():
-    """API endpoint for AI chat - returns full response (non-streaming fallback)."""
-    global _ollama_checked
-    if not _ollama_available:
-        _ollama_checked = False  # Allow re-check
-        _check_ollama()
-    if not _ollama_available:
-        return jsonify({"error": "AI offline. Start Ollama with: ollama serve"}), 503
-
-    data = request.get_json()
-    user_prompt = data.get("prompt", "").strip()
-    if not user_prompt:
-        return jsonify({"error": "No prompt provided"}), 400
-
-    try:
-        resp = _ollama_generate(user_prompt, get_system_context(), stream=False)
-        result = resp.json()
-        if _ollama_provider == "cloud":
-            return jsonify({"response": result.get("message", {}).get("content", "")})
-        return jsonify({"response": result.get("response", "")})
-    except requests.exceptions.ConnectionError:
-        return jsonify(
-            {"error": "Cannot reach Ollama. Is it running? (ollama serve)"}
-        ), 503
-    except Exception as e:
-        return jsonify({"error": f"AI error: {str(e)[:200]}"}), 500
-
-
-@app.route("/api/ai/chat/stream", methods=["POST"])
-@login_required
-@limiter.limit("20 per minute")
-def ai_chat_stream():
-    """Streaming endpoint for real-time AI chat responses via Ollama."""
-    global _ollama_checked
-    if not _ollama_available:
-        _ollama_checked = False  # Allow re-check
-        _check_ollama()
-    if not _ollama_available:
-        return jsonify({"error": "AI offline. Start Ollama with: ollama serve"}), 503
-
-    data = request.get_json()
-    user_prompt = data.get("prompt", "").strip()
-    if not user_prompt:
-        return jsonify({"error": "No prompt provided"}), 400
-
-    # Capture context before entering generator (session not available inside)
-    system_context = get_system_context()
-
-    def generate():
-        """Generator: stream Ollama NDJSON → SSE data: lines."""
-        try:
-            resp = _ollama_generate(user_prompt, system_context, stream=True)
-            for line in resp.iter_lines():
-                if line:
-                    chunk = json.loads(line)
-                    if _ollama_provider == "cloud":
-                        text = chunk.get("message", {}).get("content", "")
-                    else:
-                        text = chunk.get("response", "")
-                    if text:
-                        yield f"data: {text}\n\n"
-                    if chunk.get("done"):
-                        break
-            yield "data: [DONE]\n\n"
-        except requests.exceptions.ConnectionError:
-            yield "data: [ERROR] Cannot reach Ollama. Is it running?\n\n"
-        except Exception as e:
-            yield f"data: [ERROR] AI error: {str(e)[:200]}\n\n"
-
-    return Response(
-        generate(),
-        mimetype="text/event-stream",
-        headers={
-            "Cache-Control": "no-cache",
-            "X-Accel-Buffering": "no",
-        },
-    )
-
-
 def get_local_ip():
     """Get the local IP address for network access."""
     try:
@@ -6535,6 +4170,14 @@ def is_port_available(port):
 
 def kill_process_on_port(port):
     """Kill any process using the specified port."""
+    try:
+        port = int(port)
+        if not (1 <= port <= 65535):
+            raise ValueError(f"Invalid port: {port}")
+    except (TypeError, ValueError):
+        print(f"Invalid port value: {port!r}")
+        return
+
     try:
         import signal
         import time
@@ -6639,21 +4282,6 @@ def print_qr_code(url):
 
 
 # ------------------- System Monitoring -------------------
-from collections import deque
-
-# In-memory metrics storage (resets on restart)
-metrics_history = {
-    "cpu": deque(maxlen=60),
-    "memory": deque(maxlen=60),
-    "requests": deque(maxlen=60),
-    "timestamps": deque(maxlen=60),
-    "endpoints": {},
-    "scan_stats": {"total": 0, "granted": 0, "denied": 0, "in": 0, "out": 0},
-    "recent_logs": deque(maxlen=50),
-}
-
-# Track request counts for rate calculation
-request_timestamps = deque(maxlen=1000)
 
 
 @app.before_request
@@ -6666,232 +4294,6 @@ def track_request():
     if endpoint not in metrics_history["endpoints"]:
         metrics_history["endpoints"][endpoint] = 0
     metrics_history["endpoints"][endpoint] += 1
-
-
-@app.route("/monitoring")
-@login_required
-@role_required(["admin"])
-def monitoring():
-    """System monitoring dashboard with real-time graphs."""
-    return render_template("monitoring.html")
-
-
-@app.route("/api/monitoring/stats")
-@login_required
-@role_required(["admin"])
-def api_monitoring_stats():
-    """Get current system stats for monitoring dashboard."""
-    try:
-        # Get system stats with fallback if psutil not available
-        if PSUTIL_AVAILABLE:
-            cpu_percent = psutil.cpu_percent(interval=0.1)
-            memory = psutil.virtual_memory()
-            disk = psutil.disk_usage("/")
-            sys_stats = {
-                "cpu": cpu_percent,
-                "memory_percent": memory.percent,
-                "memory_used": round(memory.used / (1024**3), 2),
-                "memory_total": round(memory.total / (1024**3), 2),
-                "disk_percent": disk.percent,
-                "disk_used": round(disk.used / (1024**3), 2),
-                "disk_total": round(disk.total / (1024**3), 2),
-                "uptime": get_system_uptime(),
-            }
-        else:
-            sys_stats = {
-                "cpu": 0,
-                "memory_percent": 0,
-                "memory_used": 0,
-                "memory_total": 0,
-                "disk_percent": 0,
-                "disk_used": 0,
-                "disk_total": 0,
-                "uptime": "N/A (psutil not installed)",
-            }
-
-        # Calculate requests per second
-        now = time.time()
-        recent_requests = [ts for ts in request_timestamps if now - ts < 60]
-        req_per_sec = len(recent_requests) / 60.0 if recent_requests else 0
-
-        # Update history
-        metrics_history["cpu"].append(sys_stats["cpu"])
-        metrics_history["memory"].append(sys_stats["memory_percent"])
-        metrics_history["requests"].append(req_per_sec)
-        metrics_history["timestamps"].append(datetime.now().strftime("%H:%M:%S"))
-
-        # Get database stats
-        today = datetime.now().date()
-        today_start = datetime.combine(today, datetime.min.time())
-
-        stats = {
-            "system": sys_stats,
-            "app": {
-                "requests_per_sec": round(req_per_sec, 2),
-                "total_requests": len(request_timestamps),
-                "endpoints": dict(
-                    sorted(
-                        metrics_history["endpoints"].items(),
-                        key=lambda x: x[1],
-                        reverse=True,
-                    )[:10]
-                ),
-            },
-            "database": {
-                "employees": db_session.query(Employee).count(),
-                "vehicles": db_session.query(Vehicle).count(),
-                "visitors": db_session.query(Visitor)
-                .filter_by(status="Checked In")
-                .count(),
-                "pending_approvals": db_session.query(Approval)
-                .filter_by(status="Pending")
-                .count(),
-                "today_scans": db_session.query(GateLog)
-                .filter(GateLog.scanned_at >= today_start)
-                .count(),
-                "today_granted": db_session.query(GateLog)
-                .filter(
-                    GateLog.scanned_at >= today_start, GateLog.access_granted
-                )
-                .count(),
-                "today_denied": db_session.query(GateLog)
-                .filter(
-                    GateLog.scanned_at >= today_start, not GateLog.access_granted
-                )
-                .count(),
-            },
-            "scan_stats": dict(metrics_history["scan_stats"]),
-            "history": {
-                "cpu": list(metrics_history["cpu"]),
-                "memory": list(metrics_history["memory"]),
-                "requests": list(metrics_history["requests"]),
-                "timestamps": list(metrics_history["timestamps"]),
-            },
-        }
-        return jsonify(stats)
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-
-
-@app.route("/api/monitoring/logs")
-@login_required
-@role_required(["admin"])
-def api_monitoring_logs():
-    """Get recent server logs."""
-    log_file = os.path.join(os.path.dirname(__file__), "server.log")
-    logs = []
-
-    try:
-        if os.path.exists(log_file):
-            with open(log_file, errors="replace") as f:
-                lines = f.readlines()
-                # Get last 100 lines
-                for line in lines[-100:]:
-                    line = line.strip()
-                    if line:
-                        logs.append(parse_log_line(line))
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-
-    return jsonify({"logs": logs[-50:]})
-
-
-@app.route("/api/monitoring/health")
-@login_required
-def api_health_check():
-    """Health check endpoint for all major services."""
-    checks = []
-
-    # Database check
-    try:
-        db_session.query(Employee).first()
-        checks.append({"name": "Database", "status": "healthy", "response_time": 0})
-    except Exception as e:
-        checks.append({"name": "Database", "status": "unhealthy", "error": str(e)})
-
-    # Key endpoints check
-    endpoints = ["/", "/dashboard", "/employees", "/gate_logs"]
-    for endpoint in endpoints:
-        try:
-            start = time.time()
-            # Use test client for internal checks
-            with app.test_client() as client:
-                response = client.get(endpoint, follow_redirects=False)
-            elapsed = (time.time() - start) * 1000
-            checks.append(
-                {
-                    "name": f"Endpoint {endpoint}",
-                    "status": "healthy"
-                    if response.status_code in [200, 302]
-                    else "degraded",
-                    "response_time": round(elapsed, 2),
-                    "status_code": response.status_code,
-                }
-            )
-        except Exception as e:
-            checks.append(
-                {"name": f"Endpoint {endpoint}", "status": "unhealthy", "error": str(e)}
-            )
-
-    return jsonify({"checks": checks, "timestamp": datetime.now().isoformat()})
-
-
-@app.route("/api/time/sync")
-def api_time_sync():
-    """Time sync endpoint - returns current server time for web/client synchronization."""
-
-    now = datetime.now(UTC)
-    return jsonify(
-        {
-            "utc_timestamp": now.isoformat(),
-            "unix_timestamp": now.timestamp(),
-            "server_time": now.strftime("%Y-%m-%d %H:%M:%S UTC"),
-            "timezone": "UTC",
-        }
-    )
-
-
-@app.route("/api/time/status")
-@login_required
-def api_time_status():
-    """Detailed time status for monitoring dashboard."""
-
-    now = datetime.now(UTC)
-
-    # Get system time info
-    try:
-        import subprocess
-
-        result = subprocess.run(
-            ["timedatectl", "status"], capture_output=True, text=True
-        )
-        system_time_info = result.stdout
-    except Exception:
-        system_time_info = "timedatectl not available"
-
-    return jsonify(
-        {
-            "server_utc": now.isoformat(),
-            "server_local": datetime.now().isoformat(),
-            "system_time_info": system_time_info,
-            "sync_enabled": True,
-            "timezone": "UTC",
-        }
-    )
-
-
-def get_system_uptime():
-    """Get system uptime in human readable format."""
-    if not PSUTIL_AVAILABLE:
-        return "N/A"
-    try:
-        boot_time = datetime.fromtimestamp(psutil.boot_time())
-        uptime = datetime.now() - boot_time
-        hours, remainder = divmod(int(uptime.total_seconds()), 3600)
-        minutes, seconds = divmod(remainder, 60)
-        return f"{hours}h {minutes}m"
-    except Exception:
-        return "Unknown"
 
 
 def parse_log_line(line):
@@ -6926,60 +4328,6 @@ def parse_log_line(line):
             result["status_code"] = int(http_match.group(3))
 
     return result
-
-
-# ------------------- Health Check -------------------
-@app.route("/healthz")
-def healthz():
-    """Lightweight health-check endpoint for load balancers and uptime monitors."""
-    try:
-        db_session.execute(__import__("sqlalchemy").text("SELECT 1"))
-        db_ok = True
-    except Exception:
-        db_ok = False
-    status = "ok" if db_ok else "degraded"
-    code = 200 if db_ok else 503
-    return jsonify(
-        {"status": status, "version": __version__, "db": "ok" if db_ok else "error"}
-    ), code
-
-
-# ------------------- Database Backup -------------------
-@app.route("/admin/backup/download")
-@login_required
-@role_required(["admin"])
-def backup_download():
-    """Download a live SQLite backup of the database."""
-    import tempfile
-
-    from database import database_path
-
-    backup_tmp = tempfile.NamedTemporaryFile(suffix=".db", delete=False)
-    backup_tmp.close()
-    try:
-        import sqlite3
-
-        src_conn = sqlite3.connect(database_path)
-        dst_conn = sqlite3.connect(backup_tmp.name)
-        src_conn.backup(dst_conn)
-        src_conn.close()
-        dst_conn.close()
-        timestamp = _utcnow().strftime("%Y%m%d_%H%M%S")
-        log_audit(
-            "backup",
-            "database",
-            None,
-            f"Database backup downloaded by {session.get('username')}",
-        )
-        return send_file(
-            backup_tmp.name,
-            as_attachment=True,
-            download_name=f"mine_management_backup_{timestamp}.db",
-            mimetype="application/octet-stream",
-        )
-    except Exception as e:
-        logger.error(f"Backup download failed: {e}")
-        return jsonify({"error": "Backup failed", "message": str(e)}), 500
 
 
 # ------------------- Teardown -------------------
@@ -7670,6 +5018,32 @@ def start_network_listener():
         )
     except Exception as e:
         print(f"✗ Failed to start discovery service: {e}")
+
+
+# Register blueprints
+from routes.admin import admin_bp
+from routes.ai import ai_bp
+from routes.auth import auth_bp
+from routes.dashboard import dashboard_bp
+from routes.devices import devices_bp
+from routes.equipment import equipment_bp
+from routes.employees import employees_bp
+from routes.fleet import fleet_bp
+from routes.monitoring import monitoring_bp
+from routes.scanning import scanning_bp
+from routes.visitors import visitors_bp
+
+app.register_blueprint(admin_bp)
+app.register_blueprint(ai_bp)
+app.register_blueprint(auth_bp)
+app.register_blueprint(dashboard_bp)
+app.register_blueprint(devices_bp)
+app.register_blueprint(equipment_bp)
+app.register_blueprint(employees_bp)
+app.register_blueprint(fleet_bp)
+app.register_blueprint(monitoring_bp)
+app.register_blueprint(scanning_bp)
+app.register_blueprint(visitors_bp)
 
 
 # ------------------- Main -------------------

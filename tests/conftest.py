@@ -46,7 +46,8 @@ def db_cleanup():
 
 @pytest.fixture
 def authenticated_client(test_app, db_cleanup):
-    user = User(username="admin", password="admin", role="admin")
+    user = User(username="admin", role="admin")
+    user.set_password("admin")
     db_session.add(user)
     db_session.commit()
     user_id = user.id

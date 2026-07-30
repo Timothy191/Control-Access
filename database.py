@@ -1,3 +1,8 @@
+# Database setup and session management
+# SECURITY: All raw SQL in this file uses hardcoded string literals with no user input
+# interpolation. SQL injection is not possible here. User data flows through SQLAlchemy
+# ORM queries which use parameterized statements automatically.
+
 from sqlalchemy import create_engine, event
 from sqlalchemy.orm import scoped_session, sessionmaker
 from sqlalchemy.ext.declarative import declarative_base
@@ -82,6 +87,13 @@ def init_db():
         print("Default visitor request PIN configured")
         if _default_pin == "1234":
             print("WARNING: Visitor PIN is set to default '1234'. Change it in Admin > Visitors.")
+
+    # Check for users with legacy plain-text passwords
+    all_users = db_session.query(User).all()
+    legacy_users = [u for u in all_users if not u.password.startswith(("pbkdf2:", "scrypt:"))]
+    if legacy_users:
+        print(f"WARNING: {len(legacy_users)} user(s) have legacy plain-text passwords: {', '.join(u.username for u in legacy_users)}")
+        print("These will be automatically hashed on next successful login.")
 
 
 @event.listens_for(engine, "close")

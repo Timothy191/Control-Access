@@ -14,7 +14,6 @@ YELLOW='\033[1;33m'
 RED='\033[0;31m'
 BLUE='\033[0;34m'
 CYAN='\033[0;36m'
-MAGENTA='\033[0;35m'
 NC='\033[0m'
 BOLD='\033[1m'
 DIM='\033[2m'
@@ -84,7 +83,7 @@ if command -v adb >/dev/null 2>&1; then
     ADB_AVAILABLE=true
     
     # Check for connected devices
-    DEVICES=$(adb devices | grep -v "List of devices" | grep -v "^$" | wc -l)
+    DEVICES=$(adb devices | grep -v "List of devices" | grep -cv "^$")
     if [ "$DEVICES" -gt 0 ]; then
         DEVICE_SERIAL=$(adb devices | grep -v "List of devices" | grep -v "^$" | head -1 | awk '{print $1}')
         status ok "C66 device detected: $DEVICE_SERIAL"

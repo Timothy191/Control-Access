@@ -21,7 +21,7 @@
         <div class="grid-2">
             <div>
                 <h4><i class="ti ti-circle-plus"></i> Add New Mapping</h4>
-                <form method="POST" action="{{ url_for('add_gate_mapping') }}">
+                <form method="POST" action="{{ url_for('admin.add_gate_mapping') }}">
                     <div class="form-group">
                         <label>IP Address</label>
                         <input type="text" name="ip_address" class="form-control" placeholder="192.168.0.160" required>
@@ -55,7 +55,7 @@
                                 <td><code>{{ device.ip }}</code></td>
                                 <td>{{ device.scanned_by[:30] }}...</td>
                                 <td>
-                                    <form method="POST" action="{{ url_for('add_gate_mapping') }}" style="display:inline">
+                                    <form method="POST" action="{{ url_for('admin.add_gate_mapping') }}" style="display:inline">
                                         <input type="hidden" name="ip_address" value="{{ device.ip }}">
                                         <input type="text" name="gate_name" placeholder="Gate name" size="15" required>
                                         <button type="submit" class="btn btn-sm btn-success">Map</button>
@@ -101,10 +101,10 @@
                             </span>
                         </td>
                         <td>
-                            <a href="{{ url_for('toggle_gate_mapping', id=mapping.id) }}" class="btn btn-sm btn-outline">
+                            <a href="{{ url_for('admin.toggle_gate_mapping', id=mapping.id) }}" class="btn btn-sm btn-outline">
                                 {{ 'Disable' if mapping.is_active else 'Enable' }}
                             </a>
-                            <a href="{{ url_for('delete_gate_mapping', id=mapping.id) }}" class="btn btn-sm btn-danger" onclick="return confirm('Delete this mapping?')">
+                            <a href="{{ url_for('admin.delete_gate_mapping', id=mapping.id) }}" class="btn btn-sm btn-danger" onclick="return confirm('Delete this mapping?')">
                                 <i class="ti ti-trash"></i>
                             </a>
                         </td>

@@ -4,7 +4,7 @@
 
 {% block breadcrumb %}
 <i class="ti ti-home"></i>
-<a href="{{ url_for('dashboard') }}">Dashboard</a>
+<a href="{{ url_for('dashboard.dashboard') }}">Dashboard</a>
 <i class="ti ti-chevron-right"></i>
 <span>Generate QR</span>
 {% endblock %}
@@ -47,7 +47,7 @@
                             {% endif %}
                         </td>
                         <td>
-                            <a href="{{ url_for('generate_qr_code', entity_type='employee', entity_id=emp.id) }}" class="btn btn-sm btn-primary">
+                            <a href="{{ url_for('scanning.generate_qr_code', entity_type='employee', entity_id=emp.id) }}" class="btn btn-sm btn-primary">
                                 <i class="ti ti-qrcode"></i> Generate
                             </a>
                         </td>
@@ -93,7 +93,7 @@
                             {% endif %}
                         </td>
                         <td>
-                            <a href="{{ url_for('generate_qr_code', entity_type='vehicle', entity_id=vehicle.id) }}" class="btn btn-sm btn-primary">
+                            <a href="{{ url_for('scanning.generate_qr_code', entity_type='vehicle', entity_id=vehicle.id) }}" class="btn btn-sm btn-primary">
                                 <i class="ti ti-qrcode"></i> Generate
                             </a>
                         </td>
@@ -139,7 +139,7 @@
                             {% endif %}
                         </td>
                         <td>
-                            <a href="{{ url_for('generate_qr_code', entity_type='visitor', entity_id=visitor.id) }}" class="btn btn-sm btn-primary">
+                            <a href="{{ url_for('scanning.generate_qr_code', entity_type='visitor', entity_id=visitor.id) }}" class="btn btn-sm btn-primary">
                                 <i class="ti ti-qrcode"></i> Generate
                             </a>
                         </td>

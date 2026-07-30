@@ -14,7 +14,8 @@ class TestImportEmployees:
 
     def test_import_employees_requires_manager(self, test_app, db_cleanup):
         """Regular users cannot import."""
-        user = User(username="regular_imp", password="pass123", role="user")
+        user = User(username="regular_imp", role="user")
+        user.set_password("pass123")
         db_session.add(user)
         db_session.commit()
 
@@ -197,7 +198,8 @@ class TestImportVehicles:
 
     def test_import_vehicles_requires_manager(self, test_app, db_cleanup):
         """Regular users cannot import."""
-        user = User(username="regular_veh", password="pass123", role="user")
+        user = User(username="regular_veh", role="user")
+        user.set_password("pass123")
         db_session.add(user)
         db_session.commit()
 
@@ -272,7 +274,8 @@ class TestDownloadTemplates:
 
     def test_download_employees_template_requires_manager(self, test_app, db_cleanup):
         """Regular users cannot download templates."""
-        user = User(username="regular_tpl", password="pass123", role="user")
+        user = User(username="regular_tpl", role="user")
+        user.set_password("pass123")
         db_session.add(user)
         db_session.commit()
 

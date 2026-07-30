@@ -10,14 +10,14 @@ import argparse
 from pathlib import Path
 
 
-def run_command(cmd, description):
+def run_command(cmd_args, description):
     """Run a command and print results."""
     print(f"\n{'='*60}")
     print(f"Running: {description}")
-    print(f"Command: {cmd}")
+    print(f"Command: {' '.join(cmd_args)}")
     print('='*60)
     
-    result = subprocess.run(cmd, shell=True, capture_output=False, text=True)
+    result = subprocess.run(cmd_args, capture_output=False, text=True)
     return result.returncode
 
 
@@ -117,8 +117,8 @@ Examples:
         pytest_args.append('tests/')
     
     # Run tests
-    cmd = f"{sys.executable} -m pytest {' '.join(pytest_args)}"
-    exit_code = run_command(cmd, "Test Suite")
+    cmd_args = [sys.executable, "-m", "pytest"] + pytest_args
+    exit_code = run_command(cmd_args, "Test Suite")
     
     # Summary
     print(f"\n{'='*60}")

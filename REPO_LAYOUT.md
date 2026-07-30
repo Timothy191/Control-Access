@@ -6,10 +6,10 @@
 arch-system/
 │
 ├── app.py                      Main Flask application
-│   ├── 100+ routes             Employees, fleet, visitors, equipment, approvals, gate logs, AI, exports
-│   ├── 10 SQLAlchemy models    User, Employee, Vehicle, Equipment, Visitor, GateLog, Approval, SiteSetting, AuditLog, Device
+│   ├── 111 routes              Employees, fleet, visitors, equipment, approvals, gate logs, AI, exports
+│   ├── 11 SQLAlchemy models    User, Employee, Vehicle, Equipment, Visitor, GateLog, Approval, SiteSetting, AuditLog, Device, GateMapping
 │   ├── Ollama AI               Local + Cloud dual-mode
-│   └── 6256 lines
+│   └── 7755 lines
 │
 ├── models.py                   SQLAlchemy model definitions
 ├── database.py                 DB init, session, WAL mode
@@ -28,7 +28,7 @@ arch-system/
 ├── REPO_LAYOUT.md               This file
 └── README.md                    Project documentation
 │
-├── templates/                   21 Jinja2 HTML templates
+├── templates/                   23 Jinja2 HTML templates
 │   ├── base.html               Shared layout (sidebar nav, theme CSS, Tabler icons, Chart.js)
 │   ├── login.html              Auth page
 │   ├── dashboard.html           Main dashboard (Chart.js bar chart, stat cards, WebGL charts)
@@ -58,13 +58,21 @@ arch-system/
 │       ├── main.js             Client-side logic (Socket.IO, AJAX, CSV export)
 │       └── dashboard-gl.js     Legacy WebGL sparkline charts (8KB)
 │
-├── tests/                      5 pytest test files
+├── tests/                      14 pytest test files (conftest + 13 modules)
 │   ├── conftest.py             Shared fixtures (auth_client, sample_employee, sample_vehicle, sample_visitor)
+│   ├── test_admin.py           User management, audit logs, gate mappings
+│   ├── test_approvals.py       Approval workflow (pending/approve/reject)
 │   ├── test_auth.py            Login, logout, protected routes
 │   ├── test_employee.py        Employee CRUD, listing, filtering
+│   ├── test_equipment.py       Equipment/radio device management
+│   ├── test_export.py          Excel/PDF/QR ZIP exports
+│   ├── test_gate_logs.py       Gate logs filtering, pagination, API
+│   ├── test_import.py          CSV/Excel import functionality
+│   ├── test_load.py            Load/stress tests, concurrency
+│   ├── test_monitoring.py      System health, stats, diagnostics
+│   ├── test_qr_scan.py         QR scan API (12 cases: valid/inactive employee, vehicle, visitor, expiry, gate logs)
 │   ├── test_vehicle.py         Vehicle CRUD, listing
-│   ├── test_visitor.py         Visitor check-in/out, listing
-│   └── test_qr_scan.py         QR scan API (12 cases: valid/inactive employee, vehicle, visitor, expiry, gate logs)
+│   └── test_visitor.py         Visitor check-in/out, listing
 │
 ├── scripts/
 │   └── single-deployment/

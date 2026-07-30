@@ -35,7 +35,13 @@ Site access control, employee/fleet/visitor management, QR code scanning, and AI
 │  ├── Chart.js (bar, line, pie charts)               │
 │  └── REST API                                       │
 ├─────────────────────────────────────────────────────┤
-│  Arch-System Flask App (app.py)                     │
+│  Arch-System Flask App                              │
+│  ├── app.py (5096 lines, core logic + 113 routes)   │
+│  ├── routes/ (11 Blueprints, 2318 lines)            │
+│  │   admin, ai, auth, dashboard, devices,           │
+│  │   employees, equipment, fleet, monitoring,       │
+│  │   scanning, visitors                             │
+│  ├── models.py (11 SQLAlchemy models)               │
 │  ├── SQLAlchemy ORM + SQLite (WAL mode)             │
 │  ├── Flask-SocketIO (real-time events)              │
 │  ├── Flask-Compress (gzip)                          │
@@ -123,17 +129,29 @@ Check AI status at `GET /api/ai/status` — returns `{provider: "local"|"cloud"|
 
 ```text
 arch-system/
-├── app.py                  ← Main Flask application (6256 lines, 100+ routes)
-├── models.py               ← SQLAlchemy models (10 tables)
+├── app.py                  ← Main Flask application (5096 lines, 113 routes)
+├── routes/                 ← 11 Blueprint modules (2318 lines total)
+│   ├── admin.py            ← Admin panel, user management, settings (262 lines)
+│   ├── ai.py               ← AI chat endpoints, streaming (204 lines)
+│   ├── auth.py             ← Login/logout/session (37 lines)
+│   ├── dashboard.py        ← Dashboard views + stats API (189 lines)
+│   ├── devices.py          ← Device/scanner management (73 lines)
+│   ├── employees.py        ← Employee CRUD + certificates (226 lines)
+│   ├── equipment.py        ← Equipment management (78 lines)
+│   ├── fleet.py            ← Vehicle/fleet management (72 lines)
+│   ├── monitoring.py       ← System monitoring + metrics (286 lines)
+│   ├── scanning.py         ← QR/RFID scan processing (701 lines)
+│   └── visitors.py         ← Visitor management + approvals (190 lines)
+├── models.py               ← SQLAlchemy models (11 tables)
 ├── database.py             ← DB setup with SQLite WAL
 ├── monitor.py              ← Health monitor + auto-restart (Rich TUI)
 ├── log_viewer.py           ← Grafana-style terminal dashboard (rich + plotext)
 ├── deploy-full-server.sh   ← Primary deployment (tmux, 3 windows)
-├── requirements.txt        ← 91 Python dependencies
+├── requirements.txt        ← 84 Python dependencies
 ├── test_requirements.txt   ← Test dependencies
 ├── pytest.ini              ← pytest configuration
 │
-├── templates/              ← 21 Jinja2 HTML templates
+├── templates/              ← 23 Jinja2 HTML templates
 │   ├── base.html           ← Shared layout (sidebar, nav, CSS)
 │   ├── login.html          ← Auth page
 │   ├── dashboard.html      ← Main dashboard with Chart.js
@@ -151,7 +169,7 @@ arch-system/
 │   │   └── dashboard-gl.js ← WebGL sparklines (legacy)
 │   └── downloads/           ← Generated QR codes / reports
 │
-├── tests/                  ← 5 pytest test files + conftest
+├── tests/                  ← 15 pytest test files (conftest + 14 modules)
 │   ├── conftest.py         ← Shared fixtures
 │   ├── test_auth.py        ← Login/logout/permissions
 │   ├── test_employee.py    ← Employee CRUD

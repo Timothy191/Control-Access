@@ -4,7 +4,7 @@
 
 {% block breadcrumb %}
 <i class="ti ti-home"></i>
-<a href="{{ url_for('dashboard') }}">Dashboard</a>
+<a href="{{ url_for('dashboard.dashboard') }}">Dashboard</a>
 <i class="ti ti-chevron-right"></i>
 <span>Users</span>
 {% endblock %}
@@ -42,7 +42,7 @@
                         <i class="ti ti-edit"></i>
                     </button>
                     {% if user.username != 'admin' %}
-                    <form method="POST" action="{{ url_for('delete_user', id=user.id) }}" style="display:inline" onsubmit="return confirm('Delete user {{ user.username }}?')">
+                    <form method="POST" action="{{ url_for('admin.delete_user', id=user.id) }}" style="display:inline" onsubmit="return confirm('Delete user {{ user.username }}?')">
                         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                         <button type="submit" class="btn btn-sm btn-danger" title="Delete user">
                             <i class="ti ti-trash"></i>
@@ -63,7 +63,7 @@
             <h3>Add New User</h3>
             <span class="close" onclick="document.getElementById('addUserModal').classList.remove('active')">&times;</span>
         </div>
-        <form method="POST" action="{{ url_for('add_user') }}">
+        <form method="POST" action="{{ url_for('admin.add_user') }}">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <div class="modal-body">
                 <div class="form-group">

@@ -4,7 +4,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Mine management system built with Flask, SQLAlchemy, and SocketIO. Manages employees, vehicles, visitors, gate access control with QR codes, and includes an AI chat assistant.
+Mine management system built with Flask, SQLAlchemy, and SocketIO. Manages employees,
+vehicles, visitors, gate access control with QR codes, and includes an AI chat assistant.
 
 ## Commands
 
@@ -12,7 +13,7 @@ Mine management system built with Flask, SQLAlchemy, and SocketIO. Manages emplo
 # Run the application
 python app.py
 
-# The app runs on http://localhost:5000
+# The app runs on http://localhost:8080
 # Default credentials: admin / admin
 
 # Run tests
@@ -29,7 +30,8 @@ pytest --cov=app --cov-report=html
 
 **Core Files:**
 
-- `app.py` - Main Flask application with all routes (CRUD for employees/vehicles/visitors, approvals, QR generation, gate scanner API, AI chat)
+- `app.py` - Main Flask application with all routes (CRUD for employees/vehicles/visitors,
+  approvals, QR generation, gate scanner API, AI chat)
 - `models.py` - SQLAlchemy models: User, Employee, Vehicle, Visitor, GateLog, Approval, Device
 - `database.py` - Database setup with SQLite, session management, auto-creates admin user
 
@@ -40,7 +42,7 @@ pytest --cov=app --cov-report=html
 - QR code generation/scanning for access control
 - Hardware integration via `/api/scan_qr` endpoint (requires `X-API-Key` header)
 - Excel export for employees, visitors, fleet, and gate logs
-- AI chat assistant using Google Gemini API
+- AI chat assistant using Ollama (local + cloud dual-mode)
 
 **Database:** SQLite at `mine_management.db` (created automatically)
 

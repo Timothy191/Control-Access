@@ -1,8 +1,13 @@
 from database import Base
 from sqlalchemy import Column, Integer, String, Boolean, DateTime, ForeignKey, Text, Index
 from sqlalchemy.orm import relationship
-from datetime import datetime
+from datetime import datetime, timezone
 from werkzeug.security import generate_password_hash, check_password_hash
+
+
+def _utcnow_naive():
+    """Return naive UTC datetime (for SQLite compatibility)."""
+    return datetime.now(timezone.utc).replace(tzinfo=None)
 
 
 class User(Base):
@@ -12,13 +17,23 @@ class User(Base):
     username = Column(String(80), unique=True, nullable=False, index=True)
     password = Column(String(256), nullable=False)
     role = Column(String(20), default="user")  # admin, manager, security, user
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=_utcnow_naive)
 
     def set_password(self, raw_password):
         self.password = generate_password_hash(raw_password)
 
     def check_password(self, raw_password):
-        # Support legacy plain-text passwords during migration
+        # MIGRATION: Support legacy plain-text passwords during migration.
+        # Passwords not starting with 'pbkdf2:' or 'scrypt:' are treated as plain-text.
+        # On successful login, the password is automatically re-hashed (see routes/auth.py).
+        # 
+        # CAN BE REMOVED when:
+        #   1. All users have logged in at least once since hashing was implemented
+        #   2. OR a manual migration script has hashed all remaining plain-text passwords
+        #   3. OR the database is known to contain only hashed passwords
+        #
+        # SECURITY: Plain-text password comparison is vulnerable to timing attacks.
+        # This should be removed as soon as all passwords are migrated to hashed format.
         if not self.password.startswith(('pbkdf2:', 'scrypt:')):
             return self.password == raw_password
         return check_password_hash(self.password, raw_password)
@@ -32,10 +47,10 @@ class Device(Base):
     device_type = Column(String(50))  # C66, C70, C71, etc.
     mac_address = Column(String(50))
     ip_address = Column(String(50))
-    last_seen = Column(DateTime, default=datetime.utcnow)
+    last_seen = Column(DateTime, default=_utcnow_naive)
     status = Column(String(20), default="online")
     total_scans = Column(Integer, default=0)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=_utcnow_naive)
 
 
 class Employee(Base):
@@ -56,7 +71,7 @@ class Employee(Base):
     qr_code = Column(String(200), unique=True, nullable=True)
     rfid_tag = Column(String(100), unique=True, nullable=True, index=True)
     status = Column(String(20), default="Active")
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=_utcnow_naive)
 
     visitors = relationship("Visitor", back_populates="host")
     gate_logs = relationship("GateLog", back_populates="employee")
@@ -71,7 +86,7 @@ class Vehicle(Base):
     qr_code = Column(String(200), unique=True, nullable=True)
     rfid_tag = Column(String(100), unique=True, nullable=True, index=True)
     status = Column(String(20), default="Active")
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=_utcnow_naive)
 
     gate_logs = relationship("GateLog", back_populates="vehicle")
 
@@ -85,7 +100,7 @@ class Equipment(Base):
     qr_code = Column(String(200), unique=True, nullable=True)
     rfid_tag = Column(String(100), unique=True, nullable=True, index=True)
     status = Column(String(20), default="Active")
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=_utcnow_naive)
 
     gate_logs = relationship("GateLog", back_populates="equipment")
 
@@ -101,10 +116,10 @@ class Visitor(Base):
     qr_code = Column(String(200), unique=True, nullable=True)
     rfid_tag = Column(String(100), unique=True, nullable=True, index=True)
     host_id = Column(Integer, ForeignKey("employees.id"))
-    check_in_time = Column(DateTime, default=datetime.utcnow)
+    check_in_time = Column(DateTime, default=_utcnow_naive)
     check_out_time = Column(DateTime)
     status = Column(String(20), default="Checked In")
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=_utcnow_naive)
 
     host = relationship("Employee", back_populates="visitors")
     gate_logs = relationship("GateLog", back_populates="visitor")
@@ -122,7 +137,7 @@ class GateLog(Base):
     access_granted = Column(Boolean, default=True, index=True)
     denial_reason = Column(String(200))
     gate_location = Column(String(50))
-    scanned_at = Column(DateTime, default=datetime.utcnow, index=True)
+    scanned_at = Column(DateTime, default=_utcnow_naive, index=True)
     scanned_by = Column(String(100))
     ip_address = Column(String(50))
     user_agent = Column(String(200))
@@ -174,7 +189,7 @@ class Approval(Base):
     comments = Column(Text)
     target_table = Column(String(20), nullable=True)  # 'employees' or 'fleet'
     scanned_data = Column(Text, nullable=True)  # JSON string with scanned details
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=_utcnow_naive)
 
 
 class SiteSetting(Base):
@@ -195,7 +210,7 @@ class AuditLog(Base):
     entity_id = Column(Integer, nullable=True)
     details = Column(Text)
     ip_address = Column(String(50))
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=_utcnow_naive)
 
 
 class GateMapping(Base):
@@ -208,5 +223,5 @@ class GateMapping(Base):
     gate_name = Column(String(100), nullable=False)  # e.g., "Extension Gate 1"
     location_description = Column(String(200), nullable=True)
     is_active = Column(Boolean, default=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime, default=_utcnow_naive)
+    updated_at = Column(DateTime, default=_utcnow_naive, onupdate=_utcnow_naive)
