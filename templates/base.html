@@ -23,7 +23,7 @@
     <!-- Chart.js for enhanced charts -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
     <!-- Main styles -->
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}?v=1.0.15">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}?v=1.0.17">
     <style>
         /* ===== ADDITIONAL STYLES ===== */
         .menu-toggle {
@@ -832,18 +832,13 @@
                 });
             }
 
+            // Close on click outside or clicking background overlay
             if (sidebarOverlay) {
                 sidebarOverlay.addEventListener('click', () => {
                     closeSidebar();
                 });
             }
 
-            // Auto-close when mouse leaves sidebar area
-            sidebar.addEventListener('mouseleave', () => {
-                closeSidebar();
-            });
-
-            // Close on click outside
             document.addEventListener('click', (e) => {
                 if (!sidebar.contains(e.target) && (!toggle || !toggle.contains(e.target))) {
                     closeSidebar();
