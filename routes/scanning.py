@@ -8,8 +8,8 @@ from datetime import datetime
 import qrcode
 from flask import Blueprint, jsonify, render_template, request, send_file
 
+from services.listeners import _ensure_device_exists
 from app import (
-    _ensure_device_exists,
     _format_rfid_tag,
     _is_local_ip,
     _process_qr_scan,

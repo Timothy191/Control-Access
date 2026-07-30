@@ -1,0 +1,293 @@
+{
+  "runId": "wf_20b55208-c8b",
+  "workflowName": "codebase-improvement-sprint",
+  "scriptPath": "/home/timothy/Desktop/Control-Access/.qoder/sessions/0c448f99-6576-4045-9f74-c5f94ed3ae5c/workflows/scripts/codebase-improvement-sprint-wf_20b55208-c8b.js",
+  "source": "inline",
+  "meta": {
+    "name": "codebase-improvement-sprint",
+    "description": "Run 5 rounds of 3 parallel improvement tracks: scanning refactor, security audit, performance/Docker",
+    "phases": [
+      {
+        "title": "Round 1",
+        "detail": "Scanning extraction, security audit, performance baseline"
+      },
+      {
+        "title": "Round 2",
+        "detail": "Service layer, CSRF hardening, query optimization"
+      },
+      {
+        "title": "Round 3",
+        "detail": "Scan helpers, API key audit, caching"
+      },
+      {
+        "title": "Round 4",
+        "detail": "Integration tests, subprocess audit, Docker build"
+      },
+      {
+        "title": "Round 5",
+        "detail": "Final verification, rate limiting, Docker test"
+      }
+    ]
+  },
+  "createdAt": "2026-07-29T14:51:08.077Z",
+  "updatedAt": "2026-07-29T15:27:05.483Z",
+  "status": "completed",
+  "outputPath": "/home/timothy/Desktop/Control-Access/.qoder/sessions/0c448f99-6576-4045-9f74-c5f94ed3ae5c/workflows/runs/wf_20b55208-c8b/output.json",
+  "agents": [
+    {
+      "index": 1,
+      "label": "Track-A Round 1",
+      "phaseIndex": 1,
+      "phaseTitle": "Round 1",
+      "journalKey": "v2:28029fe7133c7fea1439acacad205e105234de1915c0a72b8f6d0afee461d894",
+      "agentId": "aworkflow-subagent-1f7cc3e3f001b009",
+      "agentType": "workflow-subagent",
+      "state": "done",
+      "attempts": 1,
+      "outputPath": "/tmp/qoder-cli-1000/-home-timothy-Desktop-Control-Access/0c448f99-6576-4045-9f74-c5f94ed3ae5c/tasks/aworkflow-subagent-1f7cc3e3f001b009.output",
+      "transcriptPath": "/home/timothy/.qoder/projects/-home-timothy-Desktop-Control-Access/0c448f99-6576-4045-9f74-c5f94ed3ae5c/subagents/agent-aworkflow-subagent-1f7cc3e3f001b009.jsonl",
+      "attemptTranscriptPaths": [
+        "/home/timothy/.qoder/projects/-home-timothy-Desktop-Control-Access/0c448f99-6576-4045-9f74-c5f94ed3ae5c/subagents/agent-aworkflow-subagent-1f7cc3e3f001b009.jsonl"
+      ],
+      "updatedAt": "2026-07-29T15:27:05.478Z"
+    },
+    {
+      "index": 2,
+      "label": "Track-B Round 1",
+      "phaseIndex": 1,
+      "phaseTitle": "Round 1",
+      "journalKey": "v2:e71f4f168949afc5659f4e436e853b077200fc1fe36944994e7eb4a9081a0043",
+      "agentId": "aworkflow-subagent-93dcd7327976580f",
+      "agentType": "workflow-subagent",
+      "state": "done",
+      "attempts": 1,
+      "outputPath": "/tmp/qoder-cli-1000/-home-timothy-Desktop-Control-Access/0c448f99-6576-4045-9f74-c5f94ed3ae5c/tasks/aworkflow-subagent-93dcd7327976580f.output",
+      "transcriptPath": "/home/timothy/.qoder/projects/-home-timothy-Desktop-Control-Access/0c448f99-6576-4045-9f74-c5f94ed3ae5c/subagents/agent-aworkflow-subagent-93dcd7327976580f.jsonl",
+      "attemptTranscriptPaths": [
+        "/home/timothy/.qoder/projects/-home-timothy-Desktop-Control-Access/0c448f99-6576-4045-9f74-c5f94ed3ae5c/subagents/agent-aworkflow-subagent-93dcd7327976580f.jsonl"
+      ],
+      "updatedAt": "2026-07-29T15:27:05.478Z"
+    },
+    {
+      "index": 3,
+      "label": "Track-C Round 1",
+      "phaseIndex": 1,
+      "phaseTitle": "Round 1",
+      "journalKey": "v2:719755c5c83135f69a61b5f224bc3816029e0f4d165077c55de5473b7f81be05",
+      "agentId": "aworkflow-subagent-a037510b74cfd403",
+      "agentType": "workflow-subagent",
+      "state": "done",
+      "attempts": 1,
+      "outputPath": "/tmp/qoder-cli-1000/-home-timothy-Desktop-Control-Access/0c448f99-6576-4045-9f74-c5f94ed3ae5c/tasks/aworkflow-subagent-a037510b74cfd403.output",
+      "transcriptPath": "/home/timothy/.qoder/projects/-home-timothy-Desktop-Control-Access/0c448f99-6576-4045-9f74-c5f94ed3ae5c/subagents/agent-aworkflow-subagent-a037510b74cfd403.jsonl",
+      "attemptTranscriptPaths": [
+        "/home/timothy/.qoder/projects/-home-timothy-Desktop-Control-Access/0c448f99-6576-4045-9f74-c5f94ed3ae5c/subagents/agent-aworkflow-subagent-a037510b74cfd403.jsonl"
+      ],
+      "updatedAt": "2026-07-29T15:27:05.478Z"
+    },
+    {
+      "index": 4,
+      "label": "Track-A Round 2",
+      "phaseIndex": 2,
+      "phaseTitle": "Round 2",
+      "journalKey": "v2:aa3c4d7a3c3c5cb6a7445596586982eabc390abe95e48123c25191a67fe0ef4b",
+      "agentId": "aworkflow-subagent-35e65f9aa3222596",
+      "agentType": "workflow-subagent",
+      "state": "done",
+      "attempts": 1,
+      "outputPath": "/tmp/qoder-cli-1000/-home-timothy-Desktop-Control-Access/0c448f99-6576-4045-9f74-c5f94ed3ae5c/tasks/aworkflow-subagent-35e65f9aa3222596.output",
+      "transcriptPath": "/home/timothy/.qoder/projects/-home-timothy-Desktop-Control-Access/0c448f99-6576-4045-9f74-c5f94ed3ae5c/subagents/agent-aworkflow-subagent-35e65f9aa3222596.jsonl",
+      "attemptTranscriptPaths": [
+        "/home/timothy/.qoder/projects/-home-timothy-Desktop-Control-Access/0c448f99-6576-4045-9f74-c5f94ed3ae5c/subagents/agent-aworkflow-subagent-35e65f9aa3222596.jsonl"
+      ],
+      "updatedAt": "2026-07-29T15:27:05.478Z"
+    },
+    {
+      "index": 5,
+      "label": "Track-B Round 2",
+      "phaseIndex": 2,
+      "phaseTitle": "Round 2",
+      "journalKey": "v2:b2153dff23f42eaefa70b4aad2892d65d2d77364a987de8f722eddf1d4ef9a65",
+      "agentId": "aworkflow-subagent-3f36973c2cb3b2aa",
+      "agentType": "workflow-subagent",
+      "state": "done",
+      "attempts": 1,
+      "outputPath": "/tmp/qoder-cli-1000/-home-timothy-Desktop-Control-Access/0c448f99-6576-4045-9f74-c5f94ed3ae5c/tasks/aworkflow-subagent-3f36973c2cb3b2aa.output",
+      "transcriptPath": "/home/timothy/.qoder/projects/-home-timothy-Desktop-Control-Access/0c448f99-6576-4045-9f74-c5f94ed3ae5c/subagents/agent-aworkflow-subagent-3f36973c2cb3b2aa.jsonl",
+      "attemptTranscriptPaths": [
+        "/home/timothy/.qoder/projects/-home-timothy-Desktop-Control-Access/0c448f99-6576-4045-9f74-c5f94ed3ae5c/subagents/agent-aworkflow-subagent-3f36973c2cb3b2aa.jsonl"
+      ],
+      "updatedAt": "2026-07-29T15:27:05.478Z"
+    },
+    {
+      "index": 6,
+      "label": "Track-C Round 2",
+      "phaseIndex": 2,
+      "phaseTitle": "Round 2",
+      "journalKey": "v2:368dfba64e3a70829e7762ba40297402e26984d94920d8937a888ffc3310c832",
+      "agentId": "aworkflow-subagent-12f3a8241377094c",
+      "agentType": "workflow-subagent",
+      "state": "done",
+      "attempts": 1,
+      "outputPath": "/tmp/qoder-cli-1000/-home-timothy-Desktop-Control-Access/0c448f99-6576-4045-9f74-c5f94ed3ae5c/tasks/aworkflow-subagent-12f3a8241377094c.output",
+      "transcriptPath": "/home/timothy/.qoder/projects/-home-timothy-Desktop-Control-Access/0c448f99-6576-4045-9f74-c5f94ed3ae5c/subagents/agent-aworkflow-subagent-12f3a8241377094c.jsonl",
+      "attemptTranscriptPaths": [
+        "/home/timothy/.qoder/projects/-home-timothy-Desktop-Control-Access/0c448f99-6576-4045-9f74-c5f94ed3ae5c/subagents/agent-aworkflow-subagent-12f3a8241377094c.jsonl"
+      ],
+      "updatedAt": "2026-07-29T15:27:05.478Z"
+    },
+    {
+      "index": 7,
+      "label": "Track-A Round 3",
+      "phaseIndex": 3,
+      "phaseTitle": "Round 3",
+      "journalKey": "v2:cf6e0b6a591f69cf8b30c1eb6505f367ffbea75663140af0d7b6e1a735dd32b4",
+      "agentId": "aworkflow-subagent-45ce8f2b769880be",
+      "agentType": "workflow-subagent",
+      "state": "done",
+      "attempts": 1,
+      "outputPath": "/tmp/qoder-cli-1000/-home-timothy-Desktop-Control-Access/0c448f99-6576-4045-9f74-c5f94ed3ae5c/tasks/aworkflow-subagent-45ce8f2b769880be.output",
+      "transcriptPath": "/home/timothy/.qoder/projects/-home-timothy-Desktop-Control-Access/0c448f99-6576-4045-9f74-c5f94ed3ae5c/subagents/agent-aworkflow-subagent-45ce8f2b769880be.jsonl",
+      "attemptTranscriptPaths": [
+        "/home/timothy/.qoder/projects/-home-timothy-Desktop-Control-Access/0c448f99-6576-4045-9f74-c5f94ed3ae5c/subagents/agent-aworkflow-subagent-45ce8f2b769880be.jsonl"
+      ],
+      "updatedAt": "2026-07-29T15:27:05.478Z"
+    },
+    {
+      "index": 8,
+      "label": "Track-B Round 3",
+      "phaseIndex": 3,
+      "phaseTitle": "Round 3",
+      "journalKey": "v2:3ed278347b1cf5f818c6a5d8dc7ef67703a78e6d365d2729d741fd842bb5977a",
+      "agentId": "aworkflow-subagent-875507e979cdee67",
+      "agentType": "workflow-subagent",
+      "state": "done",
+      "attempts": 1,
+      "outputPath": "/tmp/qoder-cli-1000/-home-timothy-Desktop-Control-Access/0c448f99-6576-4045-9f74-c5f94ed3ae5c/tasks/aworkflow-subagent-875507e979cdee67.output",
+      "transcriptPath": "/home/timothy/.qoder/projects/-home-timothy-Desktop-Control-Access/0c448f99-6576-4045-9f74-c5f94ed3ae5c/subagents/agent-aworkflow-subagent-875507e979cdee67.jsonl",
+      "attemptTranscriptPaths": [
+        "/home/timothy/.qoder/projects/-home-timothy-Desktop-Control-Access/0c448f99-6576-4045-9f74-c5f94ed3ae5c/subagents/agent-aworkflow-subagent-875507e979cdee67.jsonl"
+      ],
+      "updatedAt": "2026-07-29T15:27:05.478Z"
+    },
+    {
+      "index": 9,
+      "label": "Track-C Round 3",
+      "phaseIndex": 3,
+      "phaseTitle": "Round 3",
+      "journalKey": "v2:b31c2d040dda6c978af4b5c84adc5353360ee4f5cca21f7669cd453fd937c0b4",
+      "agentId": "aworkflow-subagent-c1e3e2ff6b6e40fd",
+      "agentType": "workflow-subagent",
+      "state": "done",
+      "attempts": 1,
+      "outputPath": "/tmp/qoder-cli-1000/-home-timothy-Desktop-Control-Access/0c448f99-6576-4045-9f74-c5f94ed3ae5c/tasks/aworkflow-subagent-c1e3e2ff6b6e40fd.output",
+      "transcriptPath": "/home/timothy/.qoder/projects/-home-timothy-Desktop-Control-Access/0c448f99-6576-4045-9f74-c5f94ed3ae5c/subagents/agent-aworkflow-subagent-c1e3e2ff6b6e40fd.jsonl",
+      "attemptTranscriptPaths": [
+        "/home/timothy/.qoder/projects/-home-timothy-Desktop-Control-Access/0c448f99-6576-4045-9f74-c5f94ed3ae5c/subagents/agent-aworkflow-subagent-c1e3e2ff6b6e40fd.jsonl"
+      ],
+      "updatedAt": "2026-07-29T15:27:05.478Z"
+    },
+    {
+      "index": 10,
+      "label": "Track-A Round 4",
+      "phaseIndex": 4,
+      "phaseTitle": "Round 4",
+      "journalKey": "v2:3448deeae1478da19fb8b8136500028d604b051d3051a02330261df4144a2d15",
+      "agentId": "aworkflow-subagent-c7473b7e7f7d6d3e",
+      "agentType": "workflow-subagent",
+      "state": "done",
+      "attempts": 1,
+      "outputPath": "/tmp/qoder-cli-1000/-home-timothy-Desktop-Control-Access/0c448f99-6576-4045-9f74-c5f94ed3ae5c/tasks/aworkflow-subagent-c7473b7e7f7d6d3e.output",
+      "transcriptPath": "/home/timothy/.qoder/projects/-home-timothy-Desktop-Control-Access/0c448f99-6576-4045-9f74-c5f94ed3ae5c/subagents/agent-aworkflow-subagent-c7473b7e7f7d6d3e.jsonl",
+      "attemptTranscriptPaths": [
+        "/home/timothy/.qoder/projects/-home-timothy-Desktop-Control-Access/0c448f99-6576-4045-9f74-c5f94ed3ae5c/subagents/agent-aworkflow-subagent-c7473b7e7f7d6d3e.jsonl"
+      ],
+      "updatedAt": "2026-07-29T15:27:05.478Z"
+    },
+    {
+      "index": 11,
+      "label": "Track-B Round 4",
+      "phaseIndex": 4,
+      "phaseTitle": "Round 4",
+      "journalKey": "v2:4b9ab6cfdae3206c9ed0fba1dcc7cb4f4b7dfcba6da27a54fae108c50f5442c9",
+      "agentId": "aworkflow-subagent-fd06d08eadcc96bb",
+      "agentType": "workflow-subagent",
+      "state": "done",
+      "attempts": 1,
+      "outputPath": "/tmp/qoder-cli-1000/-home-timothy-Desktop-Control-Access/0c448f99-6576-4045-9f74-c5f94ed3ae5c/tasks/aworkflow-subagent-fd06d08eadcc96bb.output",
+      "transcriptPath": "/home/timothy/.qoder/projects/-home-timothy-Desktop-Control-Access/0c448f99-6576-4045-9f74-c5f94ed3ae5c/subagents/agent-aworkflow-subagent-fd06d08eadcc96bb.jsonl",
+      "attemptTranscriptPaths": [
+        "/home/timothy/.qoder/projects/-home-timothy-Desktop-Control-Access/0c448f99-6576-4045-9f74-c5f94ed3ae5c/subagents/agent-aworkflow-subagent-fd06d08eadcc96bb.jsonl"
+      ],
+      "updatedAt": "2026-07-29T15:27:05.478Z"
+    },
+    {
+      "index": 12,
+      "label": "Track-C Round 4",
+      "phaseIndex": 4,
+      "phaseTitle": "Round 4",
+      "journalKey": "v2:00924c02b154fe15cb851073b50f7a23a24324fa4506eae3471a6f2e241c614b",
+      "agentId": "aworkflow-subagent-cc4a0568a9d1c8d0",
+      "agentType": "workflow-subagent",
+      "state": "done",
+      "attempts": 1,
+      "outputPath": "/tmp/qoder-cli-1000/-home-timothy-Desktop-Control-Access/0c448f99-6576-4045-9f74-c5f94ed3ae5c/tasks/aworkflow-subagent-cc4a0568a9d1c8d0.output",
+      "transcriptPath": "/home/timothy/.qoder/projects/-home-timothy-Desktop-Control-Access/0c448f99-6576-4045-9f74-c5f94ed3ae5c/subagents/agent-aworkflow-subagent-cc4a0568a9d1c8d0.jsonl",
+      "attemptTranscriptPaths": [
+        "/home/timothy/.qoder/projects/-home-timothy-Desktop-Control-Access/0c448f99-6576-4045-9f74-c5f94ed3ae5c/subagents/agent-aworkflow-subagent-cc4a0568a9d1c8d0.jsonl"
+      ],
+      "updatedAt": "2026-07-29T15:27:05.478Z"
+    },
+    {
+      "index": 13,
+      "label": "Track-A Round 5",
+      "phaseIndex": 5,
+      "phaseTitle": "Round 5",
+      "journalKey": "v2:a48dbbf4c8d841178510e925d59d55f7ee9b568c5df0d8b4fbc045e2a8b811e6",
+      "agentId": "aworkflow-subagent-5e71122823c026a4",
+      "agentType": "workflow-subagent",
+      "state": "done",
+      "attempts": 1,
+      "outputPath": "/tmp/qoder-cli-1000/-home-timothy-Desktop-Control-Access/0c448f99-6576-4045-9f74-c5f94ed3ae5c/tasks/aworkflow-subagent-5e71122823c026a4.output",
+      "transcriptPath": "/home/timothy/.qoder/projects/-home-timothy-Desktop-Control-Access/0c448f99-6576-4045-9f74-c5f94ed3ae5c/subagents/agent-aworkflow-subagent-5e71122823c026a4.jsonl",
+      "attemptTranscriptPaths": [
+        "/home/timothy/.qoder/projects/-home-timothy-Desktop-Control-Access/0c448f99-6576-4045-9f74-c5f94ed3ae5c/subagents/agent-aworkflow-subagent-5e71122823c026a4.jsonl"
+      ],
+      "updatedAt": "2026-07-29T15:27:05.478Z"
+    },
+    {
+      "index": 14,
+      "label": "Track-B Round 5",
+      "phaseIndex": 5,
+      "phaseTitle": "Round 5",
+      "journalKey": "v2:1c5bd781184272f9d9d38bf6183acbf49cbd99e48659bf75661a1dffc3b220a5",
+      "agentId": "aworkflow-subagent-622c4b7b29f1e110",
+      "agentType": "workflow-subagent",
+      "state": "done",
+      "attempts": 1,
+      "outputPath": "/tmp/qoder-cli-1000/-home-timothy-Desktop-Control-Access/0c448f99-6576-4045-9f74-c5f94ed3ae5c/tasks/aworkflow-subagent-622c4b7b29f1e110.output",
+      "transcriptPath": "/home/timothy/.qoder/projects/-home-timothy-Desktop-Control-Access/0c448f99-6576-4045-9f74-c5f94ed3ae5c/subagents/agent-aworkflow-subagent-622c4b7b29f1e110.jsonl",
+      "attemptTranscriptPaths": [
+        "/home/timothy/.qoder/projects/-home-timothy-Desktop-Control-Access/0c448f99-6576-4045-9f74-c5f94ed3ae5c/subagents/agent-aworkflow-subagent-622c4b7b29f1e110.jsonl"
+      ],
+      "updatedAt": "2026-07-29T15:27:05.478Z"
+    },
+    {
+      "index": 15,
+      "label": "Track-C Round 5",
+      "phaseIndex": 5,
+      "phaseTitle": "Round 5",
+      "journalKey": "v2:95a592a0fab9cc28a7626a2e67a8e65273ca30feefb1fdd820ecfa6d38ebfa63",
+      "agentId": "aworkflow-subagent-be774ad3adc6f5e3",
+      "agentType": "workflow-subagent",
+      "state": "done",
+      "attempts": 1,
+      "outputPath": "/tmp/qoder-cli-1000/-home-timothy-Desktop-Control-Access/0c448f99-6576-4045-9f74-c5f94ed3ae5c/tasks/aworkflow-subagent-be774ad3adc6f5e3.output",
+      "transcriptPath": "/home/timothy/.qoder/projects/-home-timothy-Desktop-Control-Access/0c448f99-6576-4045-9f74-c5f94ed3ae5c/subagents/agent-aworkflow-subagent-be774ad3adc6f5e3.jsonl",
+      "attemptTranscriptPaths": [
+        "/home/timothy/.qoder/projects/-home-timothy-Desktop-Control-Access/0c448f99-6576-4045-9f74-c5f94ed3ae5c/subagents/agent-aworkflow-subagent-be774ad3adc6f5e3.jsonl"
+      ],
+      "updatedAt": "2026-07-29T15:27:05.478Z"
+    }
+  ]
+}
