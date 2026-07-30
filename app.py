@@ -286,16 +286,13 @@ def json_500(error):
     return jsonify({"error": "Internal server error", "message": str(error)}), 500
 
 
-# ------------------- Ollama Local AI Configuration -------------------
+# ------------------- Ollama Local AI Configuration (100% Free Endpoint) -------------------
 ENABLE_AI_CHAT = os.environ.get("ENABLE_AI_CHAT", "true").lower() == "true"
 app.config["ENABLE_AI_CHAT"] = ENABLE_AI_CHAT
 OLLAMA_BASE_URL = os.environ.get("OLLAMA_URL", "http://localhost:11434")
 OLLAMA_MODEL = os.environ.get("OLLAMA_MODEL", "mine-assistant-fast")
 OLLAMA_MODEL_FULL = os.environ.get("OLLAMA_MODEL_FULL", "mine-assistant")
-OLLAMA_CLOUD_URL = os.environ.get("OLLAMA_CLOUD_URL", "https://cloud.ollama.ai/api")
-OLLAMA_CLOUD_API_KEY = os.environ.get("OLLAMA_CLOUD_API_KEY", "")
-OLLAMA_USE_CLOUD = os.environ.get("OLLAMA_USE_CLOUD", "false").lower() == "true"
-_ollama_provider = "local"  # "local", "cloud", "disabled", or "offline"
+_ollama_provider = "local"  # "local", "disabled", or "offline"
 _ollama_available = False
 _ollama_checked = False
 
@@ -319,7 +316,7 @@ request_timestamps = deque(maxlen=1000)
 
 
 def _check_ollama():
-    """Check Ollama availability — tries cloud first if enabled, then local."""
+    """Check Ollama local availability (100% free local endpoint)."""
     global _ollama_available, _ollama_checked, _ollama_provider
     if _ollama_checked:
         return _ollama_available
@@ -331,23 +328,6 @@ def _check_ollama():
         print("AI Assistant feature is disabled via ENABLE_AI_CHAT=false")
         return False
 
-    if OLLAMA_USE_CLOUD and OLLAMA_CLOUD_API_KEY:
-        try:
-            resp = requests.get(
-                f"{OLLAMA_CLOUD_URL}/tags",
-                headers={"Authorization": f"Bearer {OLLAMA_CLOUD_API_KEY}"},
-                timeout=10,
-            )
-            if resp.status_code == 200:
-                _ollama_provider = "cloud"
-                _ollama_available = True
-                print(f"Ollama Cloud AI initialized: model={OLLAMA_MODEL}")
-                return True
-        except Exception as e:
-            print(
-                f"WARNING: Ollama Cloud not reachable ({type(e).__name__}: {e}). Trying local..."
-            )
-
     try:
         resp = requests.get(f"{OLLAMA_BASE_URL}/api/tags", timeout=5)
         if resp.status_code == 200:
@@ -356,7 +336,7 @@ def _check_ollama():
                 _ollama_provider = "local"
                 _ollama_available = True
                 print(
-                    f"Ollama local AI initialized: model={OLLAMA_MODEL}, url={OLLAMA_BASE_URL}"
+                    f"Ollama local AI initialized (free endpoint): model={OLLAMA_MODEL}, url={OLLAMA_BASE_URL}"
                 )
             else:
                 print(

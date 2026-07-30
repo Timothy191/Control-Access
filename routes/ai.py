@@ -15,8 +15,6 @@ from flask import (
 
 from app import (
     OLLAMA_BASE_URL,
-    OLLAMA_CLOUD_API_KEY,
-    OLLAMA_CLOUD_URL,
     OLLAMA_MODEL,
     OLLAMA_MODEL_FULL,
     _check_ollama,
@@ -34,7 +32,7 @@ ai_bp = Blueprint("ai", __name__)
 @ai_bp.route("/api/ai/status")
 @login_required
 def ai_status():
-    """Return AI engine availability and model info."""
+    """Return AI engine availability and model info (100% free local endpoint)."""
     if not current_app.config.get("ENABLE_AI_CHAT", True):
         return jsonify({
             "available": False,
@@ -55,7 +53,7 @@ def ai_status():
             "provider": _ollama_provider,
             "model": OLLAMA_MODEL,
             "model_full": OLLAMA_MODEL_FULL,
-            "url": OLLAMA_CLOUD_URL if _ollama_provider == "cloud" else OLLAMA_BASE_URL,
+            "url": OLLAMA_BASE_URL,
         }
     )
 
@@ -89,43 +87,22 @@ def get_system_context():
 
 
 def _ollama_generate(prompt, system_ctx, stream=False, use_full=False):
-    """Call Ollama AI — routes to cloud or local based on provider.
+    """Call Ollama local AI — 100% free local endpoint.
     use_full=True selects the 3B model for complex analysis."""
     model = OLLAMA_MODEL_FULL if use_full else OLLAMA_MODEL
-
-    if _ollama_provider == "cloud":
-        payload = {
-            "model": model,
-            "messages": [
-                {"role": "system", "content": system_ctx},
-                {"role": "user", "content": prompt},
-            ],
-            "stream": stream,
-        }
-        resp = requests.post(
-            f"{OLLAMA_CLOUD_URL}/chat",
-            headers={
-                "Authorization": f"Bearer {OLLAMA_CLOUD_API_KEY}",
-                "Content-Type": "application/json",
-            },
-            json=payload,
-            stream=stream,
-            timeout=120,
-        )
-    else:
-        payload = {
-            "model": model,
-            "prompt": prompt,
-            "system": system_ctx,
-            "stream": stream,
-            "keep_alive": "10m",
-        }
-        resp = requests.post(
-            f"{OLLAMA_BASE_URL}/api/generate",
-            json=payload,
-            stream=stream,
-            timeout=120,
-        )
+    payload = {
+        "model": model,
+        "prompt": prompt,
+        "system": system_ctx,
+        "stream": stream,
+        "keep_alive": "10m",
+    }
+    resp = requests.post(
+        f"{OLLAMA_BASE_URL}/api/generate",
+        json=payload,
+        stream=stream,
+        timeout=120,
+    )
     resp.raise_for_status()
     return resp
 
@@ -154,8 +131,6 @@ def ai_chat():
     try:
         resp = _ollama_generate(user_prompt, get_system_context(), stream=False)
         result = resp.json()
-        if _ollama_provider == "cloud":
-            return jsonify({"response": result.get("message", {}).get("content", "")})
         return jsonify({"response": result.get("response", "")})
     except requests.exceptions.ConnectionError:
         return jsonify(
@@ -196,10 +171,7 @@ def ai_chat_stream():
             for line in resp.iter_lines():
                 if line:
                     chunk = json.loads(line)
-                    if _ollama_provider == "cloud":
-                        text = chunk.get("message", {}).get("content", "")
-                    else:
-                        text = chunk.get("response", "")
+                    text = chunk.get("response", "")
                     if text:
                         yield f"data: {text}\n\n"
                     if chunk.get("done"):
