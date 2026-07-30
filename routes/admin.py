@@ -16,7 +16,8 @@ from flask import (
     url_for,
 )
 
-from app import _utcnow, db_session, log_audit, logger, login_required, role_required
+from utils import _utcnow, db_session, log_audit, login_required, role_required
+from extensions import logger, __version__
 from database import database_path
 from models import AuditLog, GateLog, GateMapping, SiteSetting, User
 

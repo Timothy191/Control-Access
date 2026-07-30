@@ -4,7 +4,7 @@ from datetime import datetime
 
 from flask import Blueprint, flash, redirect, render_template, request, url_for
 
-from app import db_session, login_required, role_required
+from utils import db_session, login_required, role_required
 from models import Equipment
 from routes.dashboard import invalidate_dashboard_cache
 from routes.monitoring import invalidate_monitoring_cache

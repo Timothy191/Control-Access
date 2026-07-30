@@ -2,7 +2,8 @@
 
 from flask import Blueprint, redirect, render_template, request, session, url_for
 
-from app import db_session, limiter, log_audit
+from utils import db_session, log_audit
+from extensions import limiter
 from models import User
 
 auth_bp = Blueprint("auth", __name__)

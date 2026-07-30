@@ -13,16 +13,15 @@ from flask import (
     session,
 )
 
-from app import (
+from utils import db_session, login_required
+from extensions import (
     OLLAMA_BASE_URL,
     OLLAMA_MODEL,
     OLLAMA_MODEL_FULL,
-    _check_ollama,
     _ollama_available,
     _ollama_provider,
-    db_session,
+    _check_ollama,
     limiter,
-    login_required,
 )
 from models import Approval, Employee, Vehicle, Visitor
 

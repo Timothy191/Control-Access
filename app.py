@@ -36,10 +36,29 @@ from models import (
     Visitor,
 )
 
+# Import shared utilities and extensions to avoid circular imports
+from utils import _utcnow, login_required, role_required, require_api_key, log_audit
+from extensions import (
+    __version__,
+    ENABLE_AI_CHAT,
+    limiter,
+    socketio,
+    logger,
+    OLLAMA_BASE_URL,
+    OLLAMA_MODEL,
+    OLLAMA_MODEL_FULL,
+    _ollama_provider,
+    _ollama_available,
+    _ollama_checked,
+    _check_ollama,
+    PSUTIL_AVAILABLE,
+    metrics_history,
+    request_timestamps,
+    parse_log_line,
+)
 
-def _utcnow():
-    """Return current UTC as naive datetime (SQLite compat, no deprecation warning)."""
-    return datetime.now(UTC).replace(tzinfo=None)
+
+# _utcnow is imported from utils
 
 
 import hashlib
@@ -60,12 +79,7 @@ import requests
 from barcode.codex import Code128
 from barcode.writer import ImageWriter
 
-try:
-    import psutil
-
-    PSUTIL_AVAILABLE = True
-except ImportError:
-    PSUTIL_AVAILABLE = False
+# PSUTIL_AVAILABLE is imported from extensions
 import base64
 import re as _re
 
@@ -107,7 +121,7 @@ logging.basicConfig(
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
     datefmt="%Y-%m-%d %H:%M:%S",
 )
-logger = logging.getLogger("mine_system")
+# logger is imported from extensions
 
 if _LOG_FILE:
     _handler = logging.handlers.RotatingFileHandler(
@@ -193,7 +207,7 @@ def handle_csrf_error(e):
 def add_security_headers(response):
     """Add security headers to all responses."""
     # Content-Security-Policy (allow inline for CDN-loaded scripts)
-    csp = "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net https://cdn.socket.io https://cdnjs.cloudflare.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net https://cdnjs.cloudflare.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://cdn.socket.io"
+    csp = "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net https://cdn.socket.io https://cdnjs.cloudflare.com https://unpkg.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net https://cdnjs.cloudflare.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://cdn.socket.io"
     response.headers["Content-Security-Policy"] = csp
     response.headers["X-Frame-Options"] = "DENY"
     response.headers["X-Content-Type-Options"] = "nosniff"
@@ -215,9 +229,9 @@ from flask_limiter.util import get_remote_address
 _ratelimit_storage = os.environ.get("REDIS_URL") or os.environ.get(
     "RATELIMIT_STORAGE_URI", "memory://"
 )
-limiter = Limiter(
-    get_remote_address, app=app, default_limits=[], storage_uri=_ratelimit_storage
-)
+# Initialize limiter with app and custom storage
+limiter.init_app(app)
+limiter.storage_uri = _ratelimit_storage
 if _ratelimit_storage == "memory://":
     logger.warning(
         "Rate limiting uses in-memory storage (resets on restart). "
@@ -242,9 +256,8 @@ CORS(
     },
 )
 
-socketio = SocketIO(
-    app, cors_allowed_origins=_cors_origins.split(",") if _cors_origins != "*" else "*"
-)
+# Initialize SocketIO with app
+socketio.init_app(app, cors_allowed_origins=_cors_origins.split(",") if _cors_origins != "*" else "*")
 
 
 # Custom Jinja2 filters
@@ -287,67 +300,22 @@ def json_500(error):
 
 
 # ------------------- Ollama Local AI Configuration (100% Free Endpoint) -------------------
-ENABLE_AI_CHAT = os.environ.get("ENABLE_AI_CHAT", "true").lower() == "true"
+# ENABLE_AI_CHAT is imported from extensions
 app.config["ENABLE_AI_CHAT"] = ENABLE_AI_CHAT
-OLLAMA_BASE_URL = os.environ.get("OLLAMA_URL", "http://localhost:11434")
-OLLAMA_MODEL = os.environ.get("OLLAMA_MODEL", "mine-assistant-fast")
-OLLAMA_MODEL_FULL = os.environ.get("OLLAMA_MODEL_FULL", "mine-assistant")
-_ollama_provider = "local"  # "local", "disabled", or "offline"
-_ollama_available = False
-_ollama_checked = False
 
-__version__ = "2.1.0"
+# Initialize Ollama configuration from environment variables
+from extensions import init_ollama_config
+init_ollama_config(
+    base_url=os.environ.get("OLLAMA_URL", "http://localhost:11434"),
+    model=os.environ.get("OLLAMA_MODEL", "mine-assistant-fast"),
+    model_full=os.environ.get("OLLAMA_MODEL_FULL", "mine-assistant"),
+    provider="local",
+    available=False
+)
 
-# In-memory metrics storage for monitoring (resets on restart)
-from collections import deque
+# In-memory metrics storage and request tracking are imported from extensions
 
-metrics_history = {
-    "cpu": deque(maxlen=60),
-    "memory": deque(maxlen=60),
-    "requests": deque(maxlen=60),
-    "timestamps": deque(maxlen=60),
-    "endpoints": {},
-    "scan_stats": {"total": 0, "granted": 0, "denied": 0, "in": 0, "out": 0},
-    "recent_logs": deque(maxlen=50),
-}
-
-# Track request counts for rate calculation
-request_timestamps = deque(maxlen=1000)
-
-
-def _check_ollama():
-    """Check Ollama local availability (100% free local endpoint)."""
-    global _ollama_available, _ollama_checked, _ollama_provider
-    if _ollama_checked:
-        return _ollama_available
-    _ollama_checked = True
-
-    if not ENABLE_AI_CHAT:
-        _ollama_available = False
-        _ollama_provider = "disabled"
-        print("AI Assistant feature is disabled via ENABLE_AI_CHAT=false")
-        return False
-
-    try:
-        resp = requests.get(f"{OLLAMA_BASE_URL}/api/tags", timeout=5)
-        if resp.status_code == 200:
-            _models = [m["name"] for m in resp.json().get("models", [])]
-            if any(OLLAMA_MODEL in m for m in _models):
-                _ollama_provider = "local"
-                _ollama_available = True
-                print(
-                    f"Ollama local AI initialized (free endpoint): model={OLLAMA_MODEL}, url={OLLAMA_BASE_URL}"
-                )
-            else:
-                print(
-                    f"WARNING: Ollama running but model '{OLLAMA_MODEL}' not found. Available: {_models}"
-                )
-    except Exception as _ollama_err:
-        print(
-            f"WARNING: Ollama not reachable ({type(_ollama_err).__name__}: {_ollama_err}). AI is offline."
-        )
-    return _ollama_available
-
+# _check_ollama is imported from extensions
 
 # Try at startup (non-blocking if Ollama isn't ready yet)
 _check_ollama()
@@ -376,67 +344,7 @@ def init_all_scanner_listeners():
 
 
 # ------------------- Decorators -------------------
-def login_required(f):
-    @wraps(f)
-    def decorated_function(*args, **kwargs):
-        if not session.get("logged_in"):
-            return redirect(url_for("auth.login"))
-        return f(*args, **kwargs)
-
-    return decorated_function
-
-
-def role_required(allowed_roles):
-    def decorator(f):
-        @wraps(f)
-        def decorated_function(*args, **kwargs):
-            if not session.get("logged_in"):
-                return redirect(url_for("auth.login"))
-            if session.get("role") not in allowed_roles:
-                return "Access denied", 403
-            return f(*args, **kwargs)
-
-        return decorated_function
-
-    return decorator
-
-
-def require_api_key(f):
-    @wraps(f)
-    def decorated(*args, **kwargs):
-        key = request.headers.get("X-API-Key")
-        _hardware_key = os.environ.get("HARDWARE_API_KEY", "")
-        _mobile_key = os.environ.get("MOBILE_API_KEY", "")
-        valid_keys = [k for k in [_hardware_key, _mobile_key] if k]
-        if not valid_keys:
-            logger.error(
-                "API authentication not configured — rejecting request. "
-                "Set HARDWARE_API_KEY or MOBILE_API_KEY environment variable."
-            )
-            return jsonify({"error": "API authentication not configured"}), 500
-        if not key or not any(hmac.compare_digest(key, vk) for vk in valid_keys):
-            return jsonify({"error": "Invalid API key"}), 401
-        return f(*args, **kwargs)
-
-    return decorated
-
-
-# ------------------- Audit Logging Helper -------------------
-def log_audit(action, entity_type, entity_id=None, details=None):
-    """Log an admin/user action to the audit trail."""
-    try:
-        entry = AuditLog(
-            user=session.get("username", "system"),
-            action=action,
-            entity_type=entity_type,
-            entity_id=entity_id,
-            details=details,
-            ip_address=request.remote_addr if request else None,
-        )
-        db_session.add(entry)
-        db_session.commit()
-    except Exception:
-        db_session.rollback()
+# login_required, role_required, and require_api_key are imported from utils
 
 
 # ------------------- Public routes -------------------
@@ -3994,38 +3902,7 @@ def track_request():
     metrics_history["endpoints"][endpoint] += 1
 
 
-def parse_log_line(line):
-    """Parse a log line into structured format."""
-    result = {"raw": line, "type": "info", "timestamp": "", "message": line}
-
-    # Try to extract timestamp
-    ts_match = re.match(r"^(\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2})", line)
-    if ts_match:
-        result["timestamp"] = ts_match.group(1)
-
-    # Determine log type
-    if "ERROR" in line or "Exception" in line or "CRITICAL" in line:
-        result["type"] = "error"
-    elif "WARNING" in line or "WARN" in line:
-        result["type"] = "warning"
-    elif "SCAN" in line or "/api/scan_qr" in line:
-        result["type"] = "scan"
-        if "granted: True" in line or '"granted": true' in line.lower():
-            result["status"] = "granted"
-        elif "granted: False" in line or '"granted": false' in line.lower():
-            result["status"] = "denied"
-    elif any(method in line for method in ["GET", "POST", "PUT", "DELETE"]):
-        result["type"] = "http"
-        # Extract HTTP method and status
-        http_match = re.search(
-            r'"(GET|POST|PUT|DELETE|PATCH) ([^ ]+)[^"]*" (\d{3})', line
-        )
-        if http_match:
-            result["method"] = http_match.group(1)
-            result["path"] = http_match.group(2)
-            result["status_code"] = int(http_match.group(3))
-
-    return result
+# parse_log_line is imported from extensions
 
 
 # ------------------- Teardown -------------------

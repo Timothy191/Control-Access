@@ -4,7 +4,7 @@ from datetime import timedelta
 
 from flask import Blueprint, redirect, render_template, url_for
 
-from app import _utcnow, db_session
+from utils import _utcnow, db_session
 from models import Device
 
 devices_bp = Blueprint("devices", __name__)

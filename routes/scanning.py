@@ -8,20 +8,8 @@ from datetime import datetime
 import qrcode
 from flask import Blueprint, jsonify, render_template, request, send_file
 
-from app import (
-    _format_rfid_tag,
-    _is_local_ip,
-    _process_qr_scan,
-    _process_rfid_scan,
-    _utcnow,
-    db_session,
-    decode_qr_data,
-    limiter,
-    login_required,
-    require_api_key,
-    role_required,
-    socketio,
-)
+from utils import _utcnow, db_session, login_required, role_required, require_api_key
+from extensions import limiter, socketio
 from models import Approval, Employee, Equipment, GateLog, Vehicle, Visitor
 from routes.dashboard import invalidate_dashboard_cache
 from routes.monitoring import invalidate_monitoring_cache
@@ -41,6 +29,7 @@ def qr_scanner():
 @scanning_bp.route("/s/<qr_hash>")
 def universal_scan(qr_hash):
     """Visual feedback for any camera-based scanner (phone, 3rd-party app)."""
+    from app import _process_qr_scan
     ip_address = request.remote_addr
     user_agent = request.headers.get("User-Agent", "WebBrowser")
 
@@ -62,6 +51,7 @@ def universal_scan(qr_hash):
 @scanning_bp.route("/api/scan_qr", methods=["POST"])
 @require_api_key
 def scan_qr_code():
+    from app import _process_qr_scan
     data = request.get_json()
     # 1. Normalize input
     qr_hash_raw = data.get("qr_code", "").strip() if data.get("qr_code") else None
@@ -144,6 +134,7 @@ def scan_qr_code():
 @limiter.limit("120 per minute")
 def scan_qr_alt():
     """Alternative QR scanner endpoint - no API key required, local network only."""
+    from app import _is_local_ip, _process_qr_scan
     ip_address = request.remote_addr
     if not _is_local_ip(ip_address):
         return jsonify({"success": False, "message": "Local network only"}), 403
@@ -208,6 +199,7 @@ def scan_http():
 
     InfoWedge TCP/IP Output typically sends plain text.
     """
+    from app import _is_local_ip, _process_qr_scan
     ip_address = request.remote_addr
     if not _is_local_ip(ip_address):
         return jsonify({"success": False, "message": "Local network only"}), 403
@@ -325,6 +317,7 @@ def scan_rfid():
 
     # Basic RFID data formatting and validation
     # Support multiple RFID formats: EPC Gen2, ISO 14443, etc.
+    from app import _format_rfid_tag, _process_rfid_scan
     formatted_tag = _format_rfid_tag(rfid_tag)
 
     # Process RFID scan using shared logic
@@ -407,6 +400,7 @@ def verify_qr_mobile():
     user_agent = request.headers.get("User-Agent", "")
 
     # Parse QR data for extraction
+    from app import decode_qr_data, _process_qr_scan
     parsed_qr = (
         decode_qr_data(qr_hash) if qr_hash else {"format": "none", "raw_data": None}
     )

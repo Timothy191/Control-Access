@@ -5,17 +5,8 @@ from datetime import UTC, datetime
 
 from flask import Blueprint, jsonify, render_template
 
-from app import (
-    PSUTIL_AVAILABLE,
-    __version__,
-    app,
-    db_session,
-    login_required,
-    metrics_history,
-    parse_log_line,
-    request_timestamps,
-    role_required,
-)
+from utils import db_session, login_required, role_required
+from extensions import __version__, PSUTIL_AVAILABLE, metrics_history, request_timestamps, parse_log_line
 from models import Approval, Employee, GateLog, Vehicle, Visitor
 
 if PSUTIL_AVAILABLE:
@@ -190,6 +181,7 @@ def api_health_check():
     endpoints = ["/", "/dashboard", "/employees", "/gate_logs"]
     for endpoint in endpoints:
         try:
+            from app import app
             start = time.time()
             # Use test client for internal checks
             with app.test_client() as client:

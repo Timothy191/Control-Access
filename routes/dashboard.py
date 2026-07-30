@@ -4,7 +4,8 @@ from datetime import timedelta
 
 from flask import Blueprint, jsonify, render_template
 
-from app import __version__, _utcnow, db_session, login_required
+from utils import _utcnow, db_session, login_required
+from extensions import __version__
 from models import Approval, Employee, Equipment, GateLog, Vehicle, Visitor
 
 dashboard_bp = Blueprint("dashboard", __name__)

@@ -10,7 +10,8 @@ from flask import (
     url_for,
 )
 
-from app import _utcnow, db_session, log_audit, login_required, role_required, socketio
+from utils import _utcnow, db_session, log_audit, login_required, role_required
+from extensions import socketio
 from models import Employee
 from routes.dashboard import invalidate_dashboard_cache
 from routes.monitoring import invalidate_monitoring_cache
