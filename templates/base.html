@@ -629,10 +629,12 @@
                             <i class="ti ti-qrcode"></i>
                             <span>Generate QR</span>
                         </a>
+                        {% if config.get('ENABLE_AI_CHAT', True) %}
                         <a href="{{ url_for('ai.ai_chat_page') }}" class="nav-item {% if request.endpoint == 'ai.ai_chat_page' %}active{% endif %}">
                             <i class="ti ti-brain"></i>
                             <span>AI Assistant</span>
                         </a>
+                        {% endif %}
                     </div>
                 </div>
 

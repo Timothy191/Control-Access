@@ -214,13 +214,17 @@ from flask_limiter.util import get_remote_address
 #   1. An attacker can bypass rate limits by triggering app restarts (if they have access)
 #   2. Multi-worker deployments won't share rate limit state
 # For production with multiple workers, use Redis: storage_uri="redis://localhost:6379"
+_ratelimit_storage = os.environ.get("REDIS_URL") or os.environ.get(
+    "RATELIMIT_STORAGE_URI", "memory://"
+)
 limiter = Limiter(
-    get_remote_address, app=app, default_limits=[], storage_uri="memory://"
+    get_remote_address, app=app, default_limits=[], storage_uri=_ratelimit_storage
 )
-logger.warning(
-    "Rate limiting uses in-memory storage (resets on restart). "
-    "For production with multiple workers, configure Redis-backed rate limiting."
-)
+if _ratelimit_storage == "memory://":
+    logger.warning(
+        "Rate limiting uses in-memory storage (resets on restart). "
+        "For production with multiple workers, configure REDIS_URL or RATELIMIT_STORAGE_URI."
+    )
 
 # Enable CORS for API endpoints (required for mobile scanner access)
 # CORS configuration - restricted to production origins in production
@@ -285,13 +289,15 @@ def json_500(error):
 
 
 # ------------------- Ollama Local AI Configuration -------------------
+ENABLE_AI_CHAT = os.environ.get("ENABLE_AI_CHAT", "true").lower() == "true"
+app.config["ENABLE_AI_CHAT"] = ENABLE_AI_CHAT
 OLLAMA_BASE_URL = os.environ.get("OLLAMA_URL", "http://localhost:11434")
 OLLAMA_MODEL = os.environ.get("OLLAMA_MODEL", "mine-assistant-fast")
 OLLAMA_MODEL_FULL = os.environ.get("OLLAMA_MODEL_FULL", "mine-assistant")
 OLLAMA_CLOUD_URL = os.environ.get("OLLAMA_CLOUD_URL", "https://cloud.ollama.ai/api")
 OLLAMA_CLOUD_API_KEY = os.environ.get("OLLAMA_CLOUD_API_KEY", "")
 OLLAMA_USE_CLOUD = os.environ.get("OLLAMA_USE_CLOUD", "false").lower() == "true"
-_ollama_provider = "local"  # "local", "cloud", or "offline"
+_ollama_provider = "local"  # "local", "cloud", "disabled", or "offline"
 _ollama_available = False
 _ollama_checked = False
 
@@ -320,6 +326,12 @@ def _check_ollama():
     if _ollama_checked:
         return _ollama_available
     _ollama_checked = True
+
+    if not ENABLE_AI_CHAT:
+        _ollama_available = False
+        _ollama_provider = "disabled"
+        print("AI Assistant feature is disabled via ENABLE_AI_CHAT=false")
+        return False
 
     if OLLAMA_USE_CLOUD and OLLAMA_CLOUD_API_KEY:
         try:

@@ -4,8 +4,7 @@
 # ORM queries which use parameterized statements automatically.
 
 from sqlalchemy import create_engine, event
-from sqlalchemy.orm import scoped_session, sessionmaker
-from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import declarative_base, scoped_session, sessionmaker
 import os
 
 # Get the directory where this file is located

@@ -286,7 +286,7 @@ class TestEquipmentQRCode:
         assert response.status_code == 200
 
         # Verify QR code was assigned
-        sample_equipment = db_session.query(Equipment).get(sample_equipment.id)
+        sample_equipment = db_session.get(Equipment, sample_equipment.id)
         assert sample_equipment.qr_code is not None
         assert len(sample_equipment.qr_code) == 32  # SHA256[:32]
 
