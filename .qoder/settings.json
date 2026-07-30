@@ -1,0 +1,16 @@
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 -c \"import sys, json; data = json.load(sys.stdin); print(data.get('tool_input', {}).get('file_path', ''))\" | { read -r f; [ -n \"$f\" ] && [ \"${f##*.}\" = \"py\" ] && ruff format \"$f\"; } 2>/dev/null || true",
+            "timeout": 60
+          }
+        ]
+      }
+    ]
+  }
+}

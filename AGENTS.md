@@ -36,6 +36,13 @@ ruff format <file>
 - **Default login**: `admin` / `admin`
 - **Database**: SQLite at `mine_management.db` (auto-created on first run)
 
+## Conventions
+
+- **Branch naming** — Flexible: `type/description` (feature/add-login), `type/issue-description` (fix/123-auth-bug), or `developer/description` (timothy/add-login)
+- **Commit messages** — Imperative mood, no prefix: "Add login feature", "Fix authentication bug"
+- **PR workflow** — Require issue link, start as draft PR, require review before merge
+- **Testing** — Use factory-boy for fixtures, mock external services (Ollama, HTTP calls) with requests-mock, target 80%+ coverage on new code
+
 ## API Quirks
 
 - QR scanner endpoint: `POST /api/scan_qr` requires `X-API-Key` header (not session auth)
