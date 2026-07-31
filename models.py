@@ -135,6 +135,7 @@ class Employee(Base):
     # Deterministic hash of id_number for exact-match lookups (encryption is non-deterministic)
     id_number_hash = Column(String(64), unique=True, nullable=True, index=True)
     job_title = Column(String(100))
+    area = Column(String(100))
     induction = Column(String(200))
     induction_expiry = Column(DateTime, nullable=True)
     medical = Column(EncryptedString)

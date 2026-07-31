@@ -21,6 +21,43 @@ from typing import Optional
 logger = logging.getLogger(__name__)
 
 
+def _parse_date(date_str: str) -> Optional[datetime]:
+    """Parse a date string from SharePoint into a datetime object.
+
+    Handles ISO format, common SharePoint date formats, and null/empty values.
+    """
+    if not date_str or not date_str.strip():
+        return None
+
+    date_str = date_str.strip().replace("Z", "+00:00")
+
+    # List of formats to try, in order of preference
+    formats = [
+        None,  # ISO format (fromisoformat)
+        "%Y-%m-%dT%H:%M:%S",
+        "%Y-%m-%d %H:%M:%S",
+        "%Y-%m-%d",
+        "%d/%m/%Y",
+        "%m/%d/%Y",
+    ]
+
+    for fmt in formats:
+        if fmt is None:
+            try:
+                dt = datetime.fromisoformat(date_str)
+                return dt.replace(tzinfo=None) if dt.tzinfo else dt
+            except (ValueError, TypeError):
+                continue
+        else:
+            try:
+                return datetime.strptime(date_str, fmt)
+            except (ValueError, TypeError):
+                continue
+
+    logger.warning(f"Could not parse date string '{date_str}'")
+    return None
+
+
 class SharePointSync:
     """Handles synchronization between SharePoint lists and local database."""
 
@@ -62,6 +99,16 @@ class SharePointSync:
         This is a READ-ONLY sync. Data is pulled from SharePoint lists into
         the local SQLite database. We never push data back to SharePoint.
 
+        Fields pulled from SharePoint:
+        - Title -> emp_code (Employee Number)
+        - FirstName -> first_name
+        - LastName -> surname
+        - IdNumber/IDNumber -> id_number (encrypted at rest)
+        - JobTitle -> job_title
+        - Area -> area
+        - MedicalExpiry -> medical_expiry (datetime)
+        - InductionExpiry -> induction_expiry (datetime)
+
         Returns:
             dict with keys: 'success', 'added', 'updated', 'errors'
         """
@@ -91,31 +138,54 @@ class SharePointSync:
                     first_name = item.properties.get("FirstName", "")
                     last_name = item.properties.get("LastName", "")
                     job_title = item.properties.get("JobTitle", "")
+                    area = item.properties.get("Area", "")
+                    id_number = item.properties.get("IDNumber", "") or item.properties.get("IdNumber", "")
+                    medical_expiry = item.properties.get("MedicalExpiry", "")
+                    induction_expiry = item.properties.get("InductionExpiry", "")
 
                     if not emp_code:
                         errors.append(f"Skipped item with no Title/emp_code: {item.properties}")
                         continue
 
+                    # Parse date strings
+                    medical_expiry_date = _parse_date(medical_expiry)
+                    induction_expiry_date = _parse_date(induction_expiry)
+
                     # Check if employee already exists
                     existing = db_session.query(Employee).filter_by(emp_code=emp_code).first()
 
                     if existing:
-                        # Update existing employee with SharePoint data
+                        # Update existing employee with SharePoint data (read-only pull)
                         existing.first_name = first_name
                         existing.surname = last_name
                         existing.job_title = job_title
+                        existing.area = area
                         existing.initials = (first_name[:1] + last_name[:1]).upper() if first_name and last_name else ""
+                        if medical_expiry_date:
+                            existing.medical_expiry = medical_expiry_date
+                        if induction_expiry_date:
+                            existing.induction_expiry = induction_expiry_date
+                        # Store ID number using the model's encrypted field
+                        if id_number:
+                            existing.set_id_number(id_number)
                         updated += 1
                     else:
-                        # Create new employee from SharePoint data
+                        # Create new employee from SharePoint data (read-only pull)
                         employee = Employee(
                             emp_code=emp_code,
                             initials=(first_name[:1] + last_name[:1]).upper() if first_name and last_name else "",
                             first_name=first_name,
                             surname=last_name,
                             job_title=job_title,
+                            area=area,
                             status="Active",
                         )
+                        if id_number:
+                            employee.set_id_number(id_number)
+                        if medical_expiry_date:
+                            employee.medical_expiry = medical_expiry_date
+                        if induction_expiry_date:
+                            employee.induction_expiry = induction_expiry_date
                         db_session.add(employee)
                         added += 1
 
