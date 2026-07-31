@@ -16,7 +16,7 @@ from flask import (
     url_for,
 )
 
-from database import database_path
+from database import IS_SQLSERVER, database_path
 from extensions import logger
 from models import AuditLog, GateLog, GateMapping, SiteSetting, User
 from services.security_logger import (

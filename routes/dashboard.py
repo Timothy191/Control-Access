@@ -114,19 +114,20 @@ def dashboard_stats_history():
         and (_now - _dashboard_history_cache["ts"]) < 30
     ):
         return jsonify(_dashboard_history_cache["data"])
-    from sqlalchemy import extract, func
+    from sqlalchemy import Date, cast, extract, func
 
     now = _utcnow()
     seven_days_ago = now - timedelta(days=7)
 
+    day_col = cast(GateLog.scanned_at, Date)
     daily_logs = (
         db_session.query(
-            func.date(GateLog.scanned_at).label("day"),
+            day_col.label("day"),
             func.count(GateLog.id).label("cnt"),
         )
         .filter(GateLog.scanned_at >= seven_days_ago)
-        .group_by(func.date(GateLog.scanned_at))
-        .order_by(func.date(GateLog.scanned_at))
+        .group_by(day_col)
+        .order_by(day_col)
         .all()
     )
     day_map = {str(row.day): row.cnt for row in daily_logs}

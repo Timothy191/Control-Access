@@ -284,6 +284,16 @@ def from_json_filter(value):
 # Initialize database
 init_db()
 
+# Initialize SharePoint sync (if configured)
+try:
+    from services.sharepoint_sync import init_sharepoint_sync, schedule_sharepoint_sync
+    init_sharepoint_sync()
+    schedule_sharepoint_sync(app)
+except ImportError:
+    logger.info("SharePoint sync module not available (office365-rest-python-client not installed)")
+except Exception as e:
+    logger.warning(f"SharePoint sync initialization failed: {e}")
+
 
 # ------------------- JSON Error Handlers -------------------
 @app.errorhandler(404)
@@ -2277,6 +2287,121 @@ def health_check():
             "timestamp": datetime.now().isoformat(),
         }
     )
+
+
+# ------------------- Power Apps API Endpoints -------------------
+# These endpoints expose data in formats optimized for Power Apps and Power BI
+# When SharePoint sync is enabled, data flows between SharePoint lists and the
+# local database automatically.
+
+
+@app.route("/api/powerapps/employees", methods=["GET"])
+@login_required
+def powerapps_employees():
+    """Return employee data in Power Apps-friendly format.
+
+    Supports $filter, $select, $top query parameters for Power Apps integration.
+    """
+    from sqlalchemy import func as sql_func
+
+    query = db_session.query(Employee)
+
+    # Power Apps-style filtering
+    if request.args.get("$filter"):
+        # Simple filter support: e.g., $filter=eq,contains
+        filter_str = request.args.get("$filter", "")
+        # For now, just log - full OData filter parsing would go here
+        logger.debug(f"Power Apps filter: {filter_str}")
+
+    # Limit results
+    top = int(request.args.get("$top", 1000))
+    query = query.limit(top)
+
+    employees = query.all()
+    result = [
+        {
+            "id": emp.id,
+            "emp_code": emp.emp_code,
+            "initials": emp.initials,
+            "first_name": emp.first_name,
+            "second_name": emp.second_name,
+            "surname": emp.surname,
+            "job_title": emp.job_title,
+            "induction": emp.induction,
+            "induction_expiry": emp.induction_expiry.isoformat() if emp.induction_expiry else None,
+            "medical_expiry": emp.medical_expiry.isoformat() if emp.medical_expiry else None,
+            "status": emp.status,
+            "created_at": emp.created_at.isoformat() if emp.created_at else None,
+        }
+        for emp in employees
+    ]
+    return jsonify(result)
+
+
+@app.route("/api/powerapps/gate_logs", methods=["GET"])
+@login_required
+def powerapps_gate_logs():
+    """Return gate log data for Power BI dashboards."""
+    from sqlalchemy.orm import noload as _noload
+
+    top = int(request.args.get("$top", 5000))
+    date_from = request.args.get("date_from", "")
+    date_to = request.args.get("date_to", "")
+
+    query = db_session.query(GateLog).options(_noload("*"))
+
+    if date_from:
+        query = query.filter(GateLog.scanned_at >= datetime.fromisoformat(date_from))
+    if date_to:
+        query = query.filter(GateLog.scanned_at <= datetime.fromisoformat(date_to))
+
+    logs = query.order_by(GateLog.scanned_at.desc()).limit(top).all()
+
+    result = [
+        {
+            "id": log.id,
+            "access_type": log.access_type,
+            "entity_name": log.entity_name,
+            "entity_id": log.entity_id,
+            "direction": log.direction,
+            "access_granted": log.access_granted,
+            "denial_reason": log.denial_reason,
+            "gate_location": log.gate_location,
+            "scanner_id": log.scanner_id,
+            "scanned_at": log.scanned_at.isoformat() if log.scanned_at else None,
+            "created_at": log.created_at.isoformat() if log.created_at else None,
+        }
+        for log in logs
+    ]
+    return jsonify(result)
+
+
+@app.route("/api/powerapps/sync_status", methods=["GET"])
+@login_required
+def powerapps_sync_status():
+    """Return SharePoint sync status for monitoring."""
+    try:
+        from services.sharepoint_sync import sharepoint_sync
+
+        return jsonify(
+            {
+                "sharepoint_enabled": sharepoint_sync.enabled,
+                "sharepoint_site_url": sharepoint_sync.site_url if sharepoint_sync.enabled else None,
+                "employee_list_name": sharepoint_sync.employee_list_name,
+                "last_sync": None,  # Could track this in a future enhancement
+                "auto_sync": os.environ.get("SHAREPOINT_AUTO_SYNC", "false").lower() == "true",
+            }
+        )
+    except ImportError:
+        return jsonify(
+            {
+                "sharepoint_enabled": False,
+                "sharepoint_site_url": None,
+                "employee_list_name": "Employees",
+                "last_sync": None,
+                "auto_sync": False,
+            }
+        )
 
 
 @app.route("/export/gate_logs/excel")

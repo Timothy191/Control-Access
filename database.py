@@ -8,21 +8,51 @@ import os
 from sqlalchemy import create_engine, event
 from sqlalchemy.orm import declarative_base, scoped_session, sessionmaker
 
-# Get the directory where this file is located
+# --- Database URL resolution ---
+# Priority:
+#   1. DATABASE_URL environment variable (supports Azure SQL / SQL Server)
+#   2. SQLITE_DATABASE_URL environment variable (for local development fallback)
+#   3. Default SQLite path (local development)
+
+# Base directory & default SQLite database path (always defined for exports)
 base_dir = os.path.dirname(os.path.abspath(__file__))
 database_path = os.path.join(base_dir, "mine_management.db")
-DATABASE_URL = f"sqlite:///{database_path}"
 
-# Create engine - removed convert_unicode parameter, added connect_args for SQLite
-engine = create_engine(
-    DATABASE_URL,
-    connect_args={"check_same_thread": False, "timeout": 15},
-    pool_pre_ping=True,
-)
+DATABASE_URL = os.environ.get("DATABASE_URL")
+if DATABASE_URL:
+    # Azure SQL / SQL Server connection string
+    # Example: mssql+pyodbc://user:pass@server.database.windows.net/dbname?driver=ODBC+Driver+17+for+SQL+Server
+    _is_sqlserver = DATABASE_URL.startswith(("mssql+", "sqlserver+"))
+else:
+    # Fall back to SQLite for local development
+    DATABASE_URL = os.environ.get("SQLITE_DATABASE_URL", f"sqlite:///{database_path}")
+    _is_sqlserver = False
+
+IS_SQLSERVER = _is_sqlserver
+
+# Create engine with appropriate configuration per database type
+if _is_sqlserver:
+    engine = create_engine(
+        DATABASE_URL,
+        pool_pre_ping=True,
+        pool_recycle=300,
+        echo=False,
+    )
+else:
+    # SQLite configuration
+    engine = create_engine(
+        DATABASE_URL,
+        connect_args={"check_same_thread": False, "timeout": 15},
+        pool_pre_ping=True,
+    )
 
 
+# SQLite-specific pragmas (only applied when using SQLite)
 @event.listens_for(engine, "connect")
 def _set_sqlite_pragmas(dbapi_conn, connection_record):
+    """Apply SQLite performance pragmas only when using SQLite."""
+    if _is_sqlserver:
+        return
     cursor = dbapi_conn.cursor()
     cursor.execute("PRAGMA journal_mode=WAL")
     cursor.execute("PRAGMA synchronous=NORMAL")
@@ -56,8 +86,12 @@ def init_db():
         if table in inspector.get_table_names():
             cols = [c["name"] for c in inspector.get_columns(table)]
             if column_name not in cols:
+                # SQL Server uses ALTER TABLE t ADD col def (no COLUMN keyword and BIT for BOOLEAN)
+                target_def = column_def
+                if _is_sqlserver and "BOOLEAN" in column_def.upper():
+                    target_def = column_def.upper().replace("BOOLEAN", "BIT")
                 with engine.connect() as conn:
-                    conn.execute(text(f"ALTER TABLE {table} ADD COLUMN {column_name} {column_def}"))
+                    conn.execute(text(f"ALTER TABLE {table} ADD {column_name} {target_def}"))
                     conn.commit()
                 print(f"Migrated: added {column_name} column to {table} table")
 
@@ -122,11 +156,13 @@ def init_db():
         print("Legacy password migration completed successfully.")
 
 
-@event.listens_for(engine, "close")
-def _run_sqlite_optimize(dbapi_conn, connection_record):
-    cursor = dbapi_conn.cursor()
-    cursor.execute("PRAGMA optimize")
-    cursor.close()
+# SQLite-specific optimization hook (only runs for SQLite)
+if not _is_sqlserver:
+    @event.listens_for(engine, "close")
+    def _run_sqlite_optimize(dbapi_conn, connection_record):
+        cursor = dbapi_conn.cursor()
+        cursor.execute("PRAGMA optimize")
+        cursor.close()
 
 
 def _reencrypt_plaintext_pii():

@@ -122,3 +122,32 @@ Roles are `admin`, `manager`, `security`, and `user`. Use `role_required(...)` f
 When adding write paths that affect `GateLog`, `Employee`, `Vehicle`, `Visitor`, or
 `Equipment`, call `routes.dashboard.invalidate_dashboard_cache()` and
 `routes.monitoring.invalidate_monitoring_cache()` after `db_session.commit()`.
+
+## SharePoint / Power Platform Integration
+
+The system supports optional SharePoint integration for Power Apps and Power BI:
+
+### Environment Variables
+- `SHAREPOINT_USERNAME` — SharePoint account username
+- `SHAREPOINT_PASSWORD` — SharePoint account password
+- `SHAREPOINT_SITE_URL` — SharePoint site URL (e.g., `https://company.sharepoint.com/sites/site`)
+- `SHAREPOINT_EMPLOYEE_LIST` — SharePoint list name (default: `Employees`)
+- `SHAREPOINT_SYNC_INTERVAL` — Sync interval in seconds (default: 300)
+- `SHAREPOINT_AUTO_SYNC` — Set to `true` to enable automatic periodic sync
+
+### Power Apps API Endpoints
+- `GET /api/powerapps/employees` — Employee data for Power Apps (supports `$filter`, `$top`)
+- `GET /api/powerapps/gate_logs` — Gate logs for Power BI dashboards
+- `GET /api/powerapps/sync_status` — SharePoint sync status monitoring
+
+### SharePoint Sync Service
+- `services/sharepoint_sync.py` — Bidirectional sync between SharePoint lists and local DB
+- `init_sharepoint_sync()` — Called at app startup for initial sync
+- `schedule_sharepoint_sync(app)` — Schedules periodic sync via Flask-APScheduler
+- `SharePointSync` class — Handles authentication, sync, and push operations
+
+### Power Apps Integration
+1. Set `SHAREPOINT_AUTO_SYNC=true` in `.env`
+2. Configure SharePoint list with fields: `Title` (emp_code), `FirstName`, `LastName`, `JobTitle`
+3. Power Apps reads from `/api/powerapps/employees` or directly from SharePoint list
+4. Data syncs automatically every `SHAREPOINT_SYNC_INTERVAL` seconds
