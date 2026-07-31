@@ -125,7 +125,9 @@ When adding write paths that affect `GateLog`, `Employee`, `Vehicle`, `Visitor`,
 
 ## SharePoint / Power Platform Integration
 
-The system supports optional SharePoint integration for Power Apps and Power BI:
+The system supports optional SharePoint integration for Power Apps and Power BI.
+**Data flows read-only: SharePoint → local SQLite DB → Power Apps.**
+We never write data back to SharePoint.
 
 ### Environment Variables
 - `SHAREPOINT_USERNAME` — SharePoint account username
@@ -141,13 +143,13 @@ The system supports optional SharePoint integration for Power Apps and Power BI:
 - `GET /api/powerapps/sync_status` — SharePoint sync status monitoring
 
 ### SharePoint Sync Service
-- `services/sharepoint_sync.py` — Bidirectional sync between SharePoint lists and local DB
+- `services/sharepoint_sync.py` — Read-only sync from SharePoint lists to local DB
 - `init_sharepoint_sync()` — Called at app startup for initial sync
 - `schedule_sharepoint_sync(app)` — Schedules periodic sync via Flask-APScheduler
-- `SharePointSync` class — Handles authentication, sync, and push operations
+- `SharePointSync` class — Handles authentication and read-only sync operations
 
 ### Power Apps Integration
 1. Set `SHAREPOINT_AUTO_SYNC=true` in `.env`
 2. Configure SharePoint list with fields: `Title` (emp_code), `FirstName`, `LastName`, `JobTitle`
-3. Power Apps reads from `/api/powerapps/employees` or directly from SharePoint list
-4. Data syncs automatically every `SHAREPOINT_SYNC_INTERVAL` seconds
+3. Power Apps reads from `/api/powerapps/employees` (local DB) or directly from SharePoint list
+4. Data syncs automatically (read-only) every `SHAREPOINT_SYNC_INTERVAL` seconds

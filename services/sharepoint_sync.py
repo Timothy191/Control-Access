@@ -1,8 +1,8 @@
 """SharePoint integration for Power Apps and Power BI data synchronization.
 
-This module provides bidirectional sync between SharePoint lists and the local
-SQLite database. It reads employee data from SharePoint lists and can also
-push data back for Power Apps consumption.
+This module provides read-only sync from SharePoint lists to the local
+SQLite database. Data flows only one way: SharePoint -> local DB -> Power Apps.
+We never write data back to SharePoint.
 
 Configuration (environment variables):
     SHAREPOINT_USERNAME         - SharePoint username (e.g., user@company.com)
@@ -59,6 +59,9 @@ class SharePointSync:
     def sync_employees_from_sharepoint(self) -> dict:
         """Fetch employee data from SharePoint and sync to local database.
 
+        This is a READ-ONLY sync. Data is pulled from SharePoint lists into
+        the local SQLite database. We never push data back to SharePoint.
+
         Returns:
             dict with keys: 'success', 'added', 'updated', 'errors'
         """
@@ -73,7 +76,7 @@ class SharePointSync:
             from database import db_session
             from models import Employee
 
-            # Fetch all items from the SharePoint list
+            # Fetch all items from the SharePoint list (read-only)
             sp_list = ctx.web.lists.get_by_title(self.employee_list_name)
             items = sp_list.items.get().execute_query()
 
@@ -97,14 +100,14 @@ class SharePointSync:
                     existing = db_session.query(Employee).filter_by(emp_code=emp_code).first()
 
                     if existing:
-                        # Update existing employee
+                        # Update existing employee with SharePoint data
                         existing.first_name = first_name
                         existing.surname = last_name
                         existing.job_title = job_title
                         existing.initials = (first_name[:1] + last_name[:1]).upper() if first_name and last_name else ""
                         updated += 1
                     else:
-                        # Create new employee
+                        # Create new employee from SharePoint data
                         employee = Employee(
                             emp_code=emp_code,
                             initials=(first_name[:1] + last_name[:1]).upper() if first_name and last_name else "",
@@ -127,54 +130,6 @@ class SharePointSync:
         except Exception as e:
             logger.error(f"SharePoint sync error: {e}")
             return {"success": False, "added": 0, "updated": 0, "errors": [str(e)]}
-
-    def push_employee_to_sharepoint(self, employee) -> bool:
-        """Push an employee record to SharePoint (for Power Apps consumption).
-
-        Args:
-            employee: Employee model instance
-
-        Returns:
-            bool: True if successful
-        """
-        if not self.enabled:
-            return False
-
-        ctx = self._get_context()
-        if not ctx:
-            return False
-
-        try:
-            sp_list = ctx.web.lists.get_by_title(self.employee_list_name)
-
-            # Check if employee exists in SharePoint
-            existing_items = sp_list.items.filter(f"Title eq '{employee.emp_code}'").get().execute_query()
-
-            employee_data = {
-                "Title": employee.emp_code,
-                "FirstName": employee.first_name,
-                "LastName": employee.surname,
-                "JobTitle": employee.job_title,
-                "Status": employee.status,
-            }
-
-            if existing_items:
-                # Update existing item
-                item_id = existing_items[0].id
-                item = sp_list.get_item_by_id(item_id)
-                item.set_properties(employee_data)
-                item.update().execute_query()
-                logger.info(f"Updated SharePoint employee: {employee.emp_code}")
-            else:
-                # Create new item
-                sp_list.add_item(employee_data).execute_query()
-                logger.info(f"Created SharePoint employee: {employee.emp_code}")
-
-            return True
-
-        except Exception as e:
-            logger.error(f"Failed to push employee to SharePoint: {e}")
-            return False
 
     def get_sharepoint_list_schema(self) -> list:
         """Get the schema/fields of the configured SharePoint list.
@@ -205,7 +160,7 @@ sharepoint_sync = SharePointSync()
 def init_sharepoint_sync():
     """Initialize SharePoint sync if configured."""
     if sharepoint_sync.enabled:
-        logger.info("SharePoint sync enabled")
+        logger.info("SharePoint sync enabled (read-only: SharePoint -> DB)")
         # Perform initial sync
         result = sharepoint_sync.sync_employees_from_sharepoint()
         if result["success"]:
@@ -241,7 +196,7 @@ def schedule_sharepoint_sync(app, interval: int = 300):
             id="sharepoint_sync",
         )
         scheduler.start()
-        logger.info(f"Scheduled SharePoint sync every {interval} seconds")
+        logger.info(f"Scheduled SharePoint sync every {interval} seconds (read-only)")
     except ImportError:
         logger.warning("Flask-APScheduler not installed, cannot schedule SharePoint sync")
     except Exception as e:

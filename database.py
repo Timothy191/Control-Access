@@ -73,6 +73,7 @@ Base.query = db_session.query_property()
 
 def init_db():
     """Initialize the database by creating all tables"""
+    import models  # noqa: F401 - ensure models are registered in Base.metadata
 
     Base.metadata.create_all(bind=engine)
 

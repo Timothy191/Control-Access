@@ -24,6 +24,12 @@
             <a href="{{ url_for('export_employees_qr_zip') }}" class="btn btn-success" title="Export all QR codes as ZIP">
                 <i class="ti ti-qrcode"></i> QR Export
             </a>
+            <form action="{{ url_for('admin.sharepoint_sync_route') }}" method="POST" style="display:inline;">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                <button type="submit" class="btn btn-secondary" title="Sync employee records with SharePoint list">
+                    <i class="ti ti-refresh"></i> Sync SharePoint
+                </button>
+            </form>
             <button class="btn btn-secondary" id="importEmployeeBtn">
                 <i class="ti ti-upload"></i> Import
             </button>

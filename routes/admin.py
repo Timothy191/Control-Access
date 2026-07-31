@@ -277,3 +277,35 @@ def backup_download():
                 os.unlink(tmp_path)
             except OSError:
                 pass
+
+
+@admin_bp.route("/admin/sharepoint/sync", methods=["POST"])
+@login_required
+@role_required(["admin", "manager"])
+def sharepoint_sync_route():
+    """Trigger manual synchronization of employee data from SharePoint list."""
+    from services.sharepoint_sync import sharepoint_sync
+
+    result = sharepoint_sync.sync_employees_from_sharepoint()
+    if result["success"]:
+        flash(
+            f"SharePoint sync complete: {result['added']} added, {result['updated']} updated.",
+            "success",
+        )
+    else:
+        err_msg = ", ".join(result.get("errors", ["Unknown error"]))
+        flash(f"SharePoint sync failed: {err_msg}", "danger")
+    return redirect(url_for("employees.employees"))
+
+
+@admin_bp.route("/api/sharepoint/sync", methods=["POST"])
+@login_required
+@role_required(["admin", "manager"])
+def api_sharepoint_sync():
+    """API endpoint to trigger SharePoint employee sync."""
+    from services.sharepoint_sync import sharepoint_sync
+
+    result = sharepoint_sync.sync_employees_from_sharepoint()
+    status_code = 200 if result["success"] else 400
+    return jsonify(result), status_code
+
