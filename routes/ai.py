@@ -51,13 +51,15 @@ def ai_status():
 
     if _portkey_enabled:
         # Portkey is the active provider - all cached tokens route through it
+        portkey_ready = session.get("portkey_ready", False)
         return jsonify({
-            "available": True,
+            "available": portkey_ready,
             "provider": "portkey",
             "model": OLLAMA_MODEL,
             "model_full": OLLAMA_MODEL_FULL,
             "url": PORTKEY_BASE_URL,
             "portkey_enabled": _portkey_enabled,
+            "portkey_ready": portkey_ready,
         })
 
     import app

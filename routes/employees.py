@@ -67,7 +67,8 @@ def add_employee():
     emp_code = request.form.get("emp_code")
 
     if id_number:
-        existing = db_session.query(Employee).filter_by(id_number=id_number).first()
+        id_hash = Employee.hash_id_number(id_number)
+        existing = db_session.query(Employee).filter_by(id_number_hash=id_hash).first()
         if existing:
             db_session.rollback()
             return (
@@ -104,14 +105,14 @@ def add_employee():
             first_name=request.form.get("first_name"),
             second_name=request.form.get("second_name"),
             surname=request.form.get("surname"),
-            id_number=id_number,
             job_title=request.form.get("job_title"),
             induction=request.form.get("induction"),
-            medical=request.form.get("medical"),
             status=request.form.get("status", "Active"),
             medical_expiry=medical_expiry,
             induction_expiry=induction_expiry,
         )
+        employee.set_id_number(id_number)
+        employee.medical = request.form.get("medical")
         db_session.add(employee)
         db_session.commit()
         invalidate_dashboard_cache()
@@ -141,9 +142,10 @@ def edit_employee(id):
     new_emp_code = request.form.get("emp_code")
 
     if new_id_number:
+        new_id_hash = Employee.hash_id_number(new_id_number)
         existing = (
             db_session.query(Employee)
-            .filter(Employee.id_number == new_id_number, Employee.id != id)
+            .filter(Employee.id_number_hash == new_id_hash, Employee.id != id)
             .first()
         )
         if existing:
@@ -169,7 +171,7 @@ def edit_employee(id):
         employee.first_name = request.form.get("first_name")
         employee.second_name = request.form.get("second_name")
         employee.surname = request.form.get("surname")
-        employee.id_number = new_id_number
+        employee.set_id_number(new_id_number)
         employee.job_title = request.form.get("job_title")
         employee.induction = request.form.get("induction")
         employee.medical = request.form.get("medical")

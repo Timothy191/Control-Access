@@ -46,17 +46,40 @@ def init_db():
 
     Base.metadata.create_all(bind=engine)
 
-    # Auto-migrate: add meeting_person column to visitors table if missing
+    # Auto-migrate: add missing columns to existing tables
     from sqlalchemy import inspect as sa_inspect
     from sqlalchemy import text
+
     inspector = sa_inspect(engine)
-    if "visitors" in inspector.get_table_names():
-        cols = [c["name"] for c in inspector.get_columns("visitors")]
-        if "meeting_person" not in cols:
-            with engine.connect() as conn:
-                conn.execute(text("ALTER TABLE visitors ADD COLUMN meeting_person VARCHAR(100)"))
-                conn.commit()
-                print("Migrated: added meeting_person column to visitors table")
+
+    def _add_column(table, column_name, column_def):
+        if table in inspector.get_table_names():
+            cols = [c["name"] for c in inspector.get_columns(table)]
+            if column_name not in cols:
+                with engine.connect() as conn:
+                    conn.execute(text(f"ALTER TABLE {table} ADD COLUMN {column_name} {column_def}"))
+                    conn.commit()
+                print(f"Migrated: added {column_name} column to {table} table")
+
+    _add_column("visitors", "meeting_person", "VARCHAR(100)")
+    _add_column("users", "totp_secret", "VARCHAR(256)")
+    _add_column("users", "mfa_enabled", "BOOLEAN DEFAULT 0")
+    _add_column("users", "mfa_backup_codes", "TEXT")
+    _add_column("employees", "id_number_hash", "VARCHAR(64)")
+
+    # Create notifications table if missing (Base.metadata.create_all should handle it,
+    # but ensure idempotency for older DBs without it)
+    if "notifications" not in inspector.get_table_names():
+        Base.metadata.create_all(bind=engine, tables=[Base.metadata.tables["notifications"]])
+
+    # Re-encrypt plaintext PII values that were stored before field-level encryption.
+    # This runs only when an encryption key is available and there are unencrypted rows.
+    try:
+        from models import Employee, Visitor
+
+        _reencrypt_plaintext_pii()
+    except Exception as e:
+        print(f"PII re-encryption check skipped: {e}")
 
     # Create default admin user or ensure its password matches ADMIN_PASSWORD/admin
     from models import User
@@ -104,6 +127,56 @@ def _run_sqlite_optimize(dbapi_conn, connection_record):
     cursor = dbapi_conn.cursor()
     cursor.execute("PRAGMA optimize")
     cursor.close()
+
+
+def _reencrypt_plaintext_pii():
+    """One-time migration: encrypt legacy plaintext PII fields in-place.
+
+    Only re-encrypts rows whose values do not start with the encrypted marker.
+    This is safe to run repeatedly because encrypted values are skipped.
+    """
+    from models import EncryptedString, Employee, Visitor
+
+    from database import db_session
+
+    key = os.environ.get("FIELD_ENCRYPTION_KEY")
+    if not key and os.environ.get("SECRET_KEY"):
+        # Derive key same way as EncryptedString for development
+        import base64
+        import hashlib
+
+        derived = hashlib.sha256(os.environ.get("SECRET_KEY").encode()).digest()
+        key = base64.urlsafe_b64encode(derived).decode("ascii")
+    if not key:
+        return
+
+    reencrypted_count = {"employees": 0, "visitors": 0}
+
+    employees = db_session.query(Employee).all()
+    for emp in employees:
+        changed = False
+        if emp.id_number and not str(emp.id_number).startswith(EncryptedString.MARKER):
+            # Set via the model so both id_number and id_number_hash are updated
+            emp.set_id_number(emp.id_number)
+            changed = True
+        if emp.medical and not str(emp.medical).startswith(EncryptedString.MARKER):
+            emp.medical = emp.medical
+            changed = True
+        if changed:
+            reencrypted_count["employees"] += 1
+
+    visitors = db_session.query(Visitor).all()
+    for visitor in visitors:
+        if visitor.name and not str(visitor.name).startswith(EncryptedString.MARKER):
+            visitor.name = visitor.name
+            reencrypted_count["visitors"] += 1
+
+    if any(reencrypted_count.values()):
+        db_session.commit()
+        print(
+            f"Re-encrypted plaintext PII: {reencrypted_count['employees']} employees, "
+            f"{reencrypted_count['visitors']} visitors"
+        )
 
 
 def shutdown_session(exception=None):

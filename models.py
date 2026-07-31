@@ -1,5 +1,7 @@
+import os
 from datetime import UTC, datetime
 
+from cryptography.fernet import Fernet
 from sqlalchemy import (
     Boolean,
     Column,
@@ -8,11 +10,77 @@ from sqlalchemy import (
     Integer,
     String,
     Text,
+    TypeDecorator,
 )
 from sqlalchemy.orm import relationship
 from werkzeug.security import check_password_hash, generate_password_hash
 
 from database import Base
+
+
+def _get_encryption_key():
+    """Return a 32-byte URL-safe base64-encoded key for field-level encryption."""
+    key = os.environ.get("FIELD_ENCRYPTION_KEY")
+    if key:
+        return key
+    # In development, derive a deterministic key from SECRET_KEY so data remains
+    # readable across restarts. In production the env var must be set explicitly.
+    secret = os.environ.get("SECRET_KEY")
+    if secret:
+        import base64
+        import hashlib
+
+        derived = hashlib.sha256(secret.encode()).digest()
+        return base64.urlsafe_b64encode(derived).decode("ascii")
+    return None
+
+
+class EncryptedString(TypeDecorator):
+    """SQLAlchemy column type that stores strings encrypted at rest.
+
+    Reads transparently decrypt values. If a legacy plaintext value is found
+    (not prefixed with the ciphertext marker), it is returned as-is so existing
+    databases keep working until a migration re-encrypts them.
+    """
+
+    impl = Text
+    cache_ok = True
+    MARKER = "enc:"
+
+    def _fernet(self):
+        key = _get_encryption_key()
+        if not key:
+            return None
+        return Fernet(key)
+
+    def process_bind_param(self, value, dialect):
+        if value is None:
+            return None
+        fernet = self._fernet()
+        if fernet is None:
+            return value
+        plaintext = str(value)
+        # Avoid double-encryption
+        if plaintext.startswith(self.MARKER):
+            return plaintext
+        return self.MARKER + fernet.encrypt(plaintext.encode()).decode("ascii")
+
+    def process_result_value(self, value, dialect):
+        if value is None:
+            return None
+        if not isinstance(value, str):
+            value = str(value)
+        if not value.startswith(self.MARKER):
+            return value
+        fernet = self._fernet()
+        if fernet is None:
+            # Ciphertext present but no key: cannot decrypt. Return marker value.
+            return value
+        try:
+            ciphertext = value[len(self.MARKER) :]
+            return fernet.decrypt(ciphertext.encode()).decode("utf-8")
+        except Exception:
+            return value
 
 
 def _utcnow_naive():
@@ -27,6 +95,10 @@ class User(Base):
     username = Column(String(80), unique=True, nullable=False, index=True)
     password = Column(String(256), nullable=False)
     role = Column(String(20), default="user")  # admin, manager, security, user
+    totp_secret = Column(String(256), nullable=True)
+    mfa_enabled = Column(Boolean, default=False)
+    # Store hashed backup codes; space-separated for easy lookup
+    mfa_backup_codes = Column(Text, nullable=True)
     created_at = Column(DateTime, default=_utcnow_naive)
 
     def set_password(self, raw_password):
@@ -59,11 +131,13 @@ class Employee(Base):
     first_name = Column(String(100), nullable=False)
     second_name = Column(String(100))
     surname = Column(String(100), nullable=False)
-    id_number = Column(String(50), unique=True, nullable=True)
+    id_number = Column(EncryptedString, unique=True, nullable=True)
+    # Deterministic hash of id_number for exact-match lookups (encryption is non-deterministic)
+    id_number_hash = Column(String(64), unique=True, nullable=True, index=True)
     job_title = Column(String(100))
     induction = Column(String(200))
     induction_expiry = Column(DateTime, nullable=True)
-    medical = Column(String(200))
+    medical = Column(EncryptedString)
     medical_expiry = Column(DateTime, nullable=True)
     qr_code = Column(String(200), unique=True, nullable=True)
     rfid_tag = Column(String(100), unique=True, nullable=True, index=True)
@@ -72,6 +146,18 @@ class Employee(Base):
 
     visitors = relationship("Visitor", back_populates="host")
     gate_logs = relationship("GateLog", back_populates="employee")
+
+    @staticmethod
+    def hash_id_number(value):
+        if not value:
+            return None
+        import hashlib
+
+        return hashlib.sha256(str(value).strip().encode("utf-8")).hexdigest()
+
+    def set_id_number(self, value):
+        self.id_number = value
+        self.id_number_hash = self.hash_id_number(value)
 
 
 class Vehicle(Base):
@@ -106,7 +192,7 @@ class Visitor(Base):
     __tablename__ = "visitors"
 
     id = Column(Integer, primary_key=True)
-    name = Column(String(100), nullable=False)
+    name = Column(EncryptedString, nullable=False)
     company = Column(String(100))
     purpose = Column(Text)
     meeting_person = Column(String(100))
@@ -195,6 +281,18 @@ class SiteSetting(Base):
     id = Column(Integer, primary_key=True)
     key = Column(String(100), unique=True, nullable=False)
     value = Column(String(500))
+
+
+class Notification(Base):
+    __tablename__ = "notifications"
+
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    type = Column(String(50), nullable=False)  # expiry, approval, device, security
+    message = Column(Text, nullable=False)
+    read = Column(Boolean, default=False)
+    link = Column(String(255), nullable=True)
+    created_at = Column(DateTime, default=_utcnow_naive)
 
 
 class AuditLog(Base):

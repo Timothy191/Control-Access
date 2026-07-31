@@ -1032,15 +1032,18 @@ def approve_request(id):
                     emp_code=emp_id_from_scan,
                     first_name=first_name,
                     surname=surname,
-                    id_number=scanned_data.get("id_number")
-                    or form_data.get("id_number")
-                    or emp_id_from_scan,
                     job_title=scanned_data.get("position")
                     or form_data.get("position")
                     or "Unknown",
                     status="Active",
                     qr_code=original_qr_code,  # Use original QR so next scan matches
                 )
+                new_id_number = (
+                    scanned_data.get("id_number")
+                    or form_data.get("id_number")
+                    or emp_id_from_scan
+                )
+                new_employee.set_id_number(new_id_number)
                 db_session.add(new_employee)
                 db_session.flush()  # Get the ID
 
@@ -3329,21 +3332,23 @@ def import_employees():
                     if pd.notna(row.get("second_name"))
                     else None,
                     surname=surname,
-                    id_number=id_number,
                     job_title=str(row.get("job_title", "")).strip()
                     if pd.notna(row.get("job_title"))
                     else None,
                     induction=str(row.get("induction", "")).strip()
                     if pd.notna(row.get("induction"))
                     else None,
-                    medical=str(row.get("medical", "")).strip()
-                    if pd.notna(row.get("medical"))
-                    else None,
                     induction_expiry=induction_expiry,
                     medical_expiry=medical_expiry,
                     status=str(row.get("status", "Active")).strip()
                     if pd.notna(row.get("status"))
                     else "Active",
+                )
+                employee.set_id_number(id_number)
+                employee.medical = (
+                    str(row.get("medical", "")).strip()
+                    if pd.notna(row.get("medical"))
+                    else None
                 )
 
                 db_session.add(employee)

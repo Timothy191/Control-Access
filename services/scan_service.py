@@ -81,11 +81,13 @@ def _lookup_employee_by_qr(qr_hash):
                 extracted_id = id_match.group(1)
 
         if extracted_id:
+            extracted_id_str = str(extracted_id)
+            id_hash = Employee.hash_id_number(extracted_id_str)
             employee = (
                 db_session.query(Employee)
                 .filter(
-                    (Employee.emp_code == str(extracted_id))
-                    | (Employee.id_number == str(extracted_id))
+                    (Employee.emp_code == extracted_id_str)
+                    | (Employee.id_number_hash == id_hash)
                 )
                 .first()
             )
@@ -101,10 +103,11 @@ def _lookup_employee_by_qr(qr_hash):
             and len(qr_hash) <= 50
             and " " not in qr_hash
         ):
+            id_hash = Employee.hash_id_number(qr_hash)
             employee = (
                 db_session.query(Employee)
                 .filter(
-                    (Employee.emp_code == qr_hash) | (Employee.id_number == qr_hash)
+                    (Employee.emp_code == qr_hash) | (Employee.id_number_hash == id_hash)
                 )
                 .first()
             )
@@ -650,8 +653,8 @@ def _handle_denial(
                     job_title=position or "Unknown",
                     status="Pending",
                     qr_code=qr_hash,
-                    id_number=str(employee_id),
                 )
+                new_employee.set_id_number(str(employee_id))
                 db_session.add(new_employee)
                 db_session.flush()
 
@@ -738,13 +741,13 @@ def _handle_denial(
                 emp_code=placeholder_id,
                 first_name=placeholder_first,
                 surname=placeholder_surname,
-                id_number=placeholder_id,
                 job_title="Pending Assignment",
                 status="Pending",
                 qr_code=qr_hash if qr_hash else placeholder_id,
                 medical_expiry=None,
                 induction_expiry=None,
             )
+            new_placeholder.set_id_number(placeholder_id)
             db_session.add(new_placeholder)
             db_session.flush()
 

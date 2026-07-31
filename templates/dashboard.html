@@ -397,7 +397,7 @@
                 }
             }
         });
-    }
+        }
 
     async function checkAIStatus() {
         const badge = document.getElementById('aiStatus');
@@ -405,7 +405,13 @@
         try {
             const resp = await fetch('/api/ai/status');
             const data = await resp.json();
-            badge.textContent = data.available ? `${data.model} ✓` : 'Offline';
+            if (data.portkey_enabled) {
+                badge.textContent = data.portkey_ready
+                    ? `Portkey (${data.model}) ✓`
+                    : 'Portkey (offline)';
+            } else {
+                badge.textContent = data.available ? `${data.model} ✓` : 'Offline';
+            }
             badge.classList.add(data.available ? 'success' : 'danger');
         } catch (e) {
             badge.textContent = 'Offline';
