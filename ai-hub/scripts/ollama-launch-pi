@@ -1,9 +1,0 @@
-#!/bin/bash
-# Ollama Launcher - Pi Model
-echo "=== Launching Ollama Pi Model ==="
-if command -v ollama &> /dev/null; then
-  ollama run pi "$@"
-else
-  echo "Ollama not installed. Need root to install."
-  echo "Run: curl -fsSL https://ollama.com/install.sh | sh"
-fi
