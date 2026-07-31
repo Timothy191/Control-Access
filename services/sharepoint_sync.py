@@ -21,6 +21,46 @@ from typing import Optional
 logger = logging.getLogger(__name__)
 
 
+def discover_tenant_id(sharepoint_domain: str) -> Optional[str]:
+    """Discover Azure AD tenant ID from a SharePoint domain name.
+    
+    For example, 'plantcorminingza' becomes 'plantcorminingza.onmicrosoft.com'
+    and we query the OpenID config to get the GUID tenant ID.
+    
+    Args:
+        sharepoint_domain: The SharePoint site prefix (e.g., 'plantcorminingza')
+        
+    Returns:
+        Tenant ID as GUID string, or None if discovery fails
+    """
+    if not sharepoint_domain:
+        return None
+        
+    tenant_domain = f"{sharepoint_domain}.onmicrosoft.com"
+    openid_url = f"https://login.microsoftonline.com/{tenant_domain}/.well-known/openid-configuration"
+    
+    try:
+        import requests
+        resp = requests.get(openid_url, timeout=10)
+        if resp.status_code != 200:
+            return None
+            
+        config = resp.json()
+        issuer = config.get("issuer", "")
+        
+        # Extract GUID from issuer URL
+        # Format: https://sts.windows.net/{tenant-id}/ or https://login.microsoftonline.com/{tenant-id}/v2.0
+        import re
+        match = re.search(r'/([a-f0-9\-]{36})/', issuer)
+        if match:
+            return match.group(1)
+            
+        return None
+    except Exception as e:
+        logger.warning(f"Failed to discover tenant ID: {e}")
+        return None
+
+
 def _parse_date(date_str: str) -> Optional[datetime]:
     """Parse a date string from SharePoint into a datetime object.
 
@@ -70,6 +110,20 @@ class SharePointSync:
         self.client_id = os.environ.get("SHAREPOINT_CLIENT_ID", "")
         self.client_secret = os.environ.get("SHAREPOINT_CLIENT_SECRET", "")
         self.tenant_id = os.environ.get("SHAREPOINT_TENANT_ID", "")
+        
+        # Auto-discover tenant ID from SharePoint domain if not explicitly set
+        if not self.tenant_id and self.site_url:
+            try:
+                from urllib.parse import urlparse
+                domain = urlparse(self.site_url).netloc
+                # Extract subdomain from plantcorminingza.sharepoint.com
+                subdomain = domain.split(".")[0]
+                discovered = discover_tenant_id(subdomain)
+                if discovered:
+                    self.tenant_id = discovered
+                    logger.info(f"Auto-discovered tenant ID: {self.tenant_id}")
+            except Exception:
+                pass
         self.enabled = bool(self.site_url and (
             (self.username and self.password) or
             (self.client_id and self.client_secret and self.tenant_id)
@@ -330,4 +384,5 @@ __all__ = [
     "sharepoint_sync",
     "init_sharepoint_sync",
     "schedule_sharepoint_sync",
+    "discover_tenant_id",
 ]
