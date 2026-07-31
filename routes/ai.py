@@ -118,13 +118,15 @@ def _ollama_generate(prompt, system_ctx, stream=False, use_full=False):
 
     if _portkey_enabled:
         # Route through Portkey AI gateway — all cached tokens go here
+        # Portkey uses x-portkey-api-key header for authentication (not Bearer tokens)
         headers = {
-            "Authorization": f"Bearer {PORTKEY_API_KEY}",
             "Content-Type": "application/json",
         }
-        # Use virtual key if provided (Portkey virtual keys route to specific providers)
+        # Portkey authentication: use virtual key if provided, otherwise API key
         if PORTKEY_VIRTUAL_KEY:
             headers["x-portkey-api-key"] = PORTKEY_VIRTUAL_KEY
+        else:
+            headers["x-portkey-api-key"] = PORTKEY_API_KEY
 
         payload = {
             "model": model,

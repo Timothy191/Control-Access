@@ -38,6 +38,7 @@ _ollama_checked = False
 # Portkey configuration (AI gateway for routing all cached tokens)
 PORTKEY_API_KEY = os.environ.get("PORTKEY_API_KEY", "")
 PORTKEY_BASE_URL = os.environ.get("PORTKEY_BASE_URL", "https://api.portkey.ai/v1")
+PORTKEY_CHAT_COMPLETIONS_PATH = "/chat/completions"
 PORTKEY_VIRTUAL_KEY = os.environ.get("PORTKEY_VIRTUAL_KEY", "")
 _portkey_enabled = bool(PORTKEY_API_KEY)
 
