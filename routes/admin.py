@@ -19,6 +19,10 @@ from flask import (
 from database import database_path
 from extensions import logger
 from models import AuditLog, GateLog, GateMapping, SiteSetting, User
+from services.security_logger import (
+    log_config_change,
+    log_privilege_change,
+)
 from utils import _utcnow, db_session, log_audit, login_required, role_required
 
 admin_bp = Blueprint("admin", __name__)
@@ -34,11 +38,18 @@ def update_visitor_pin():
     pin_setting = (
         db_session.query(SiteSetting).filter_by(key="visitor_request_pin").first()
     )
+    old_pin = pin_setting.value if pin_setting else None
     if pin_setting:
         pin_setting.value = new_pin
     else:
         db_session.add(SiteSetting(key="visitor_request_pin", value=new_pin))
     db_session.commit()
+    log_config_change(
+        setting="visitor_request_pin",
+        old_value="***",
+        new_value="***",
+        performed_by=session.get("username"),
+    )
     return redirect(url_for("visitors.visitors"))
 
 
@@ -77,6 +88,11 @@ def add_user():
     db_session.add(user)
     db_session.commit()
     log_audit("create", "user", user.id, f"Created user: {username} (role: {role})")
+    log_privilege_change(
+        target_user=username,
+        action=f"created with role {role}",
+        performed_by=session.get("username"),
+    )
     return redirect(url_for("admin.manage_users"))
 
 

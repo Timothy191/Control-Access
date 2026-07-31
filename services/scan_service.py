@@ -11,6 +11,7 @@ from datetime import datetime, timedelta
 
 from database import db_session
 from models import Approval, Employee, Equipment, GateLog, Vehicle, Visitor
+from services.security_logger import log_access_denied
 
 
 def _utcnow():
@@ -941,7 +942,17 @@ def process_qr_scan(
         socketio,
     )
 
-    # 5. Record gate log
+    # 5. Log security event for denied access
+    if not access_granted:
+        log_access_denied(
+            entity_type=entity_type,
+            entity_id=entity_id,
+            entity_name=entity_name or "Unknown",
+            reason=denial_reason or "Unknown",
+            gate=gate_location,
+        )
+
+    # 6. Record gate log
     parsed_qr = _record_gate_log(
         entity_type,
         entity_id,

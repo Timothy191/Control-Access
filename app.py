@@ -2432,6 +2432,7 @@ def export_employees_excel():
     output = io.BytesIO()
     wb.save(output)
     output.seek(0)
+    log_bulk_export(export_type="employees", record_count=len(employees))
     return send_file(
         output,
         as_attachment=True,
@@ -2487,6 +2488,7 @@ def export_visitors_excel():
     output = io.BytesIO()
     wb.save(output)
     output.seek(0)
+    log_bulk_export(export_type="visitors", record_count=len(visitors))
     return send_file(
         output,
         as_attachment=True,
@@ -2512,6 +2514,7 @@ def export_fleet_excel():
     output = io.BytesIO()
     wb.save(output)
     output.seek(0)
+    log_bulk_export(export_type="fleet", record_count=len(vehicles))
     return send_file(
         output,
         as_attachment=True,
