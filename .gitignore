@@ -25,10 +25,11 @@ venv/
 .venv/
 env/
 
-# IDE
+# IDE / AI tool metadata
 .vscode/
 .idea/
-.junie/
+.claude/
+.commandcode/
 *.swp
 *.swo
 
@@ -43,21 +44,10 @@ env/
 # Logs
 *.log
 server.log
-monitor.log
 
 # OS
 .DS_Store
 Thumbs.db
-
-# Mobile apps (large, built separately)
-QrMobile/
-MineGateScannerNative/
-*.apk
-*.apk_test
-
-# Tool/IDE metadata
-.opencode/
-.windsurf/
 
 # Test/coverage artifacts
 .pytest_cache/
@@ -76,8 +66,9 @@ coverage.xml
 cookies.txt
 ba.txt
 OpenMythos/
-radio_qrcodes/
-*.xlsx
+
+# Generated download artifacts
+static/downloads/
 
 # Node (if any JS tooling added)
 node_modules/

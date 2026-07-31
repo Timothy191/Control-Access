@@ -1,8 +1,0 @@
-#!/bin/bash
-# Ollama Launcher - Droid Model
-echo "=== Launching Ollama Droid Model ==="
-if command -v ollama &> /dev/null; then
-  ollama run droid "$@"
-else
-  echo "Ollama not installed. Need root to install."
-fi
