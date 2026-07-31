@@ -73,6 +73,13 @@ from models import (
 
 # Import shared utilities and extensions to avoid circular imports
 from utils import _utcnow, login_required, role_required
+from services.security_logger import (
+    log_bulk_export,
+    log_config_change,
+    log_csrf_failure,
+    log_privilege_change,
+    log_security_event,
+)
 
 # Sanitize strings for openpyxl (strip illegal XML characters)
 _ILLEGAL_XML_CHARS = _re.compile(
@@ -188,6 +195,7 @@ def csrf_protect_non_api():
 
 @app.errorhandler(CSRFError)
 def handle_csrf_error(e):
+    log_csrf_failure(endpoint=request.endpoint)
     return render_template(
         "login.html", error="Session expired. Please try again."
     ), 400
@@ -2326,6 +2334,7 @@ def export_gate_logs_excel():
     ]
     ws.append(headers)
 
+    total_count = query.count()
     logs = query.options(_noload("*")).limit(50000).all()
     for log in logs:
         ws.append(
@@ -2347,6 +2356,18 @@ def export_gate_logs_excel():
     output = io.BytesIO()
     wb.save(output)
     output.seek(0)
+    log_bulk_export(
+        export_type="gate_logs",
+        record_count=min(total_count, 50000),
+        filters={
+            "access_type": access_type,
+            "direction": direction,
+            "status": status,
+            "gate": gate,
+            "date_from": date_from,
+            "date_to": date_to,
+        },
+    )
     return send_file(
         output,
         as_attachment=True,
