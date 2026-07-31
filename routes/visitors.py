@@ -130,8 +130,7 @@ def approve_visitor(visitor_id):
     visitor = db_session.query(Visitor).filter_by(id=visitor_id).first()
     if not visitor:
         return jsonify({"success": False, "message": "Visitor not found"}), 404
-    visitor.status = "Checked In"
-    visitor.check_in_time = _utcnow()
+    visitor.status = "Approved"
     approval = (
         db_session.query(Approval)
         .filter_by(

@@ -116,35 +116,41 @@ def init_db():
     except Exception as e:
         print(f"PII re-encryption check skipped: {e}")
 
-    # Create default admin user or ensure its password matches ADMIN_PASSWORD/admin
+    # Create default admin user on first run
     from models import User
 
     admin = db_session.query(User).filter_by(username="admin").first()
     _admin_password = os.environ.get("ADMIN_PASSWORD", "admin")
+    _force_reset = os.environ.get("RESET_ADMIN_PASSWORD", "false").lower() == "true"
     if not admin:
         admin = User(username="admin", role="admin")
         admin.set_password(_admin_password)
         db_session.add(admin)
         db_session.commit()
         print("Default admin user created")
-    else:
-        # Sync password with environment variable
+    elif _force_reset:
         admin.set_password(_admin_password)
         db_session.commit()
-        print("Admin password updated/verified")
+        print("Admin password reset via RESET_ADMIN_PASSWORD=true")
 
-    # Seed default visitor request PIN if it doesn't exist
+    # Seed or update visitor request PIN from VISITOR_PIN environment variable
     from models import SiteSetting
 
     pin = db_session.query(SiteSetting).filter_by(key="visitor_request_pin").first()
+    env_pin = os.environ.get("VISITOR_PIN")
     if not pin:
-        _default_pin = os.environ.get("VISITOR_PIN", "1234")
-        pin = SiteSetting(key="visitor_request_pin", value=_default_pin)
+        active_pin = env_pin if env_pin else "1234"
+        pin = SiteSetting(key="visitor_request_pin", value=active_pin)
         db_session.add(pin)
         db_session.commit()
-        print("Default visitor request PIN configured")
-        if _default_pin == "1234":
-            print("WARNING: Visitor PIN is set to default '1234'. Change it in Admin > Visitors.")
+        print(f"Visitor request PIN initialized: {active_pin}")
+    elif env_pin and pin.value != env_pin:
+        pin.value = env_pin
+        db_session.commit()
+        print(f"Visitor request PIN synced from VISITOR_PIN environment variable.")
+
+    if pin and pin.value == "1234":
+        print("SECURITY WARNING: Visitor request PIN is set to insecure default '1234'. Set VISITOR_PIN in .env or update in Admin > Visitors.")
 
     # Migrate users with legacy plain-text passwords
     all_users = db_session.query(User).all()

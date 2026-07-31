@@ -360,10 +360,20 @@ def _determine_access(
         else:
             denial_reason = "Vehicle not active"
     elif entity_type == "visitor" and entity:
-        if entity.status == "Checked In":
+        if entity.status in ("Approved", "Checked In"):
             access_granted = True
+        elif entity.status == "Checked Out":
+            access_granted = False
+            denial_reason = "Visitor pass has already been checked out"
+        elif entity.status == "Pending Approval":
+            access_granted = False
+            denial_reason = "Visitor pass is pending management approval"
+        elif entity.status == "Rejected":
+            access_granted = False
+            denial_reason = "Visitor pass request was rejected"
         else:
-            denial_reason = "Visitor not checked in"
+            access_granted = False
+            denial_reason = f"Invalid visitor pass status: {entity.status}"
     elif entity_type == "equipment" and entity:
         if entity.status == "Active":
             access_granted = True
@@ -832,12 +842,17 @@ def _record_gate_log(
     )
     db_session.add(gate_log)
 
-    # Visitor check-out side effect
-    if entity_type == "visitor" and access_granted and direction == "OUT":
+    # Visitor status state transitions on gate scan
+    if entity_type == "visitor" and access_granted:
         visitor = db_session.query(Visitor).filter_by(id=entity_id).first()
         if visitor:
-            visitor.status = "Checked Out"
-            visitor.check_out_time = _utcnow()
+            if direction == "IN" and visitor.status != "Checked In":
+                visitor.status = "Checked In"
+                if not visitor.check_in_time:
+                    visitor.check_in_time = _utcnow()
+            elif direction == "OUT":
+                visitor.status = "Checked Out"
+                visitor.check_out_time = _utcnow()
 
     db_session.commit()
 

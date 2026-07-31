@@ -41,6 +41,7 @@
             <label for="statusFilter">Status:</label>
             <select id="statusFilter" name="status">
                 <option value="" {% if not selected_status %}selected{% endif %}>All</option>
+                <option value="Approved" {% if selected_status == 'Approved' %}selected{% endif %}>Approved (Awaiting Gate)</option>
                 <option value="Checked In" {% if selected_status == 'Checked In' %}selected{% endif %}>Checked In</option>
                 <option value="Checked Out" {% if selected_status == 'Checked Out' %}selected{% endif %}>Checked Out</option>
                 <option value="Pending Approval" {% if selected_status == 'Pending Approval' %}selected{% endif %}>Pending Approval</option>
@@ -95,7 +96,9 @@
                         <td>{{ visitor.purpose[:50] + '...' if visitor.purpose and visitor.purpose|length > 50 else visitor.purpose or '-' }}</td>
                         <td>{{ visitor.meeting_person or '-' }}</td>
                         <td>
-                            {% if visitor.status == 'Checked In' %}
+                            {% if visitor.status == 'Approved' %}
+                            <span class="status-badge info">Approved</span>
+                            {% elif visitor.status == 'Checked In' %}
                             <span class="status-badge warning">Checked In</span>
                             {% elif visitor.status == 'Checked Out' %}
                             <span class="status-badge success">Checked Out</span>

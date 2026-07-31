@@ -1,0 +1,45 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "control-access"
+version = "2.1.0"
+description = "Mine Site Access Control & Gate Operations System"
+readme = "README.md"
+requires-python = ">=3.10"
+authors = [
+    { name = "Plantcor Mining Team" }
+]
+dependencies = [
+    "Flask>=3.0.0",
+    "SQLAlchemy>=2.0.0",
+    "Flask-SocketIO>=5.3.0",
+    "Flask-Limiter>=3.0.0",
+    "gunicorn>=23.0.0",
+    "eventlet>=0.35.0",
+    "pydantic>=2.0.0",
+    "cryptography>=42.0.0",
+    "python-dotenv>=1.0.0"
+]
+
+[tool.pytest.ini_options]
+minversion = "8.0"
+testpaths = ["tests"]
+pythonpath = ["."]
+python_files = ["test_*.py"]
+python_functions = ["test_*"]
+python_classes = ["Test*"]
+addopts = "-v --tb=short"
+filterwarnings = [
+    "ignore::DeprecationWarning",
+    "ignore::PendingDeprecationWarning"
+]
+
+[tool.black]
+line-length = 100
+target-version = ['py310', 'py311', 'py312']
+
+[tool.isort]
+profile = "black"
+line_length = 100

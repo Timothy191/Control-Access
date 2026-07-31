@@ -1,0 +1,41 @@
+version: '3.8'
+
+services:
+  web:
+    build:
+      context: ../..
+      dockerfile: Dockerfile
+    container_name: control_access_prod_web
+    restart: always
+    ports:
+      - "8080:8080"
+    environment:
+      - FLASK_ENV=production
+      - REDIS_URL=redis://redis:6379/0
+      - HTTPS=true
+    env_file:
+      - ../../.env
+    volumes:
+      - prod_data:/app/instance
+      - prod_logs:/app/logs
+    depends_on:
+      redis:
+        condition: service_healthy
+
+  redis:
+    image: redis:7-alpine
+    container_name: control_access_prod_redis
+    restart: always
+    command: redis-server --appendonly yes
+    volumes:
+      - prod_redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  prod_data:
+  prod_logs:
+  prod_redis_data:

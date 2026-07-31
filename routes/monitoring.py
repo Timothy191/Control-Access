@@ -256,6 +256,8 @@ def api_time_status():
 
 
 @monitoring_bp.route("/healthz")
+@monitoring_bp.route("/health")
+@monitoring_bp.route("/api/health")
 def healthz():
     """Lightweight health-check endpoint for load balancers and uptime monitors."""
     try:

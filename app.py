@@ -225,9 +225,9 @@ def add_security_headers(response):
 _ratelimit_storage = os.environ.get("REDIS_URL") or os.environ.get(
     "RATELIMIT_STORAGE_URI", "memory://"
 )
-# Initialize limiter with app and custom storage
+app.config["RATELIMIT_STORAGE_URI"] = _ratelimit_storage
+# Initialize limiter with app
 limiter.init_app(app)
-limiter.storage_uri = _ratelimit_storage
 if _ratelimit_storage == "memory://":
     logger.warning(
         "Rate limiting uses in-memory storage (resets on restart). "

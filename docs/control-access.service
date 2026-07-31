@@ -1,0 +1,25 @@
+[Unit]
+Description=Control-Access Mine Site Access System
+After=network.target redis.service
+Wants=redis.service
+
+[Service]
+Type=simple
+User=accesscontrol
+Group=accesscontrol
+WorkingDirectory=/opt/control-access
+Environment="PATH=/opt/control-access/.venv/bin"
+EnvironmentFile=/opt/control-access/.env
+ExecStart=/opt/control-access/.venv/bin/gunicorn --worker-class eventlet -w 1 --bind 127.0.0.1:8080 app:app
+Restart=always
+RestartSec=5
+LimitNOFILE=65536
+
+# Security Hardening
+NoNewPrivileges=true
+ProtectSystem=full
+ProtectHome=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target
