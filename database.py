@@ -88,12 +88,15 @@ def init_db():
         if _default_pin == "1234":
             print("WARNING: Visitor PIN is set to default '1234'. Change it in Admin > Visitors.")
 
-    # Check for users with legacy plain-text passwords
+    # Migrate users with legacy plain-text passwords
     all_users = db_session.query(User).all()
     legacy_users = [u for u in all_users if not u.password.startswith(("pbkdf2:", "scrypt:"))]
     if legacy_users:
-        print(f"WARNING: {len(legacy_users)} user(s) have legacy plain-text passwords: {', '.join(u.username for u in legacy_users)}")
-        print("These will be automatically hashed on next successful login.")
+        print(f"Migrating {len(legacy_users)} user(s) with legacy plain-text passwords to hashed passwords...")
+        for u in legacy_users:
+            u.set_password(u.password)
+        db_session.commit()
+        print("Legacy password migration completed successfully.")
 
 
 @event.listens_for(engine, "close")

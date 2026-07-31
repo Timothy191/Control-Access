@@ -12,11 +12,11 @@ from flask import (
     url_for,
 )
 
-from utils import _utcnow, db_session, log_audit, login_required, role_required
 from extensions import socketio
 from models import Approval, Employee, GateLog, SiteSetting, Visitor
 from routes.dashboard import invalidate_dashboard_cache
 from routes.monitoring import invalidate_monitoring_cache
+from utils import _utcnow, db_session, log_audit, login_required, role_required
 
 visitors_bp = Blueprint("visitors", __name__)
 

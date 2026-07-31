@@ -8,12 +8,12 @@ from datetime import datetime
 import qrcode
 from flask import Blueprint, jsonify, render_template, request, send_file
 
-from utils import _utcnow, db_session, login_required, role_required, require_api_key
 from extensions import limiter, socketio
 from models import Approval, Employee, Equipment, GateLog, Vehicle, Visitor
 from routes.dashboard import invalidate_dashboard_cache
 from routes.monitoring import invalidate_monitoring_cache
 from services.listeners import _ensure_device_exists
+from utils import _utcnow, db_session, login_required, require_api_key, role_required
 
 scanning_bp = Blueprint("scanning", __name__)
 
@@ -384,10 +384,10 @@ def scan_rfid():
 @require_api_key
 @limiter.limit("60 per minute")
 def verify_qr_mobile():
-    """Mobile app QR verification endpoint - mirrors scan_qr_code with mobile-compatible response format."""
-    from datetime import datetime
+    """Mobile app QR verification endpoint - delegates to central scan pipeline."""
+    from app import _process_qr_scan
 
-    data = request.get_json()
+    data = request.get_json() or {}
 
     # Extract and normalize fields from mobile app request
     qr_hash_raw = (data.get("qr_data") or data.get("qr_code", "")).strip()
@@ -397,154 +397,22 @@ def verify_qr_mobile():
         qr_hash = qr_hash_raw.upper()
 
     device_info = data.get("device_info", "Mobile Scanner")
-    direction = "IN"
+    direction = "IN"  # Centralized service will automatically determine actual direction
     scanned_by = f"mobile-{request.remote_addr}"
     ip_address = request.remote_addr
     user_agent = request.headers.get("User-Agent", "")
 
-    # Parse QR data for extraction
-    from app import decode_qr_data, _process_qr_scan
-    parsed_qr = (
-        decode_qr_data(qr_hash) if qr_hash else {"format": "none", "raw_data": None}
+    # Process the scan using the centralized pipeline
+    result = _process_qr_scan(
+        qr_hash, direction, device_info, scanned_by, ip_address, user_agent
     )
 
-    # Replicate scan_qr_code logic
-    entity = None
-    entity_type = None
-    entity_id = None
-    entity_name = None
-    access_granted = False
-    denial_reason = None
-
-    # Try to look up by QR code hash first
-    employee = db_session.query(Employee).filter_by(qr_code=qr_hash).first()
-
-    # If not found, try to parse text-based QR (e.g., "ID: 0002235597081")
-    if not employee and qr_hash:
-        import re
-
-        # Extract ID number from text format: "ID: 0002235597081" or "ID:0002235597081"
-        id_match = re.search(r"ID[:\s]*(\d+)", qr_hash)
-        if id_match:
-            extracted_id = id_match.group(1)
-            employee = (
-                db_session.query(Employee)
-                .filter(
-                    (Employee.emp_code == extracted_id)
-                    | (Employee.id_number == extracted_id)
-                )
-                .first()
-            )
-
-    # Check expiry dates first - BEFORE status check (expiredcert supersedes status)
-    def is_expired(expiry_date):
-        if expiry_date is None:
-            return False
-        return expiry_date < _utcnow()
-
-    if employee:
-        entity = employee
-        entity_type = "employee"
-        entity_id = employee.id
-        entity_name = f"{employee.first_name} {employee.surname}".strip()
-
-        # Check expiry dates FIRST - deny regardless of status if expired
-        if is_expired(employee.medical_expiry):
-            access_granted = False
-            denial_reason = "Medical certificate expired"
-        elif is_expired(employee.induction_expiry):
-            access_granted = False
-            denial_reason = "Induction expired"
-        elif employee.status == "Active":
-            access_granted = True
-        else:
-            denial_reason = "Employee not active"
-
-    if not entity:
-        vehicle = db_session.query(Vehicle).filter_by(qr_code=qr_hash).first()
-        if vehicle:
-            entity = vehicle
-            entity_type = "vehicle"
-            entity_id = vehicle.id
-            entity_name = vehicle.fleet_id
-
-            # Check registration expiry BEFORE status check
-            if vehicle.registration_expiry and vehicle.registration_expiry < _utcnow():
-                access_granted = False
-                denial_reason = "Registration expired"
-            elif vehicle.status == "Active":
-                access_granted = True
-            else:
-                denial_reason = "Vehicle not active"
-
-    if not entity:
-        visitor = db_session.query(Visitor).filter_by(qr_code=qr_hash).first()
-        if visitor:
-            entity = visitor
-            entity_type = "visitor"
-            entity_id = visitor.id
-            entity_name = visitor.name
-            if direction == "IN":
-                if visitor.status == "Checked In":
-                    access_granted = True
-                else:
-                    denial_reason = "Visitor not checked in"
-            elif direction == "OUT":
-                if visitor.status == "Checked In":
-                    access_granted = True
-                else:
-                    denial_reason = "Visitor already checked out"
-
-    # NOT IN SYSTEM - deny immediately regardless of other factors
-    if not entity:
-        access_granted = False
-        denial_reason = "Not registered in system"
-        entity_name = "Unknown"
-
-    # Log the scan
-    gate_log = GateLog(
-        access_type=entity_type,
-        entity_id=entity_id,
-        entity_name=entity_name,
-        direction=direction,
-        qr_data=qr_hash,
-        access_granted=access_granted,
-        denial_reason=denial_reason,
-        gate_location=device_info,
-        scanned_by=scanned_by,
-        ip_address=ip_address,
-        user_agent=user_agent,
-        parsed_qr_data=json.dumps(parsed_qr) if parsed_qr else None,
-        employee_id=entity_id if entity_type == "employee" else None,
-        vehicle_id=entity_id if entity_type == "vehicle" else None,
-        visitor_id=entity_id if entity_type == "visitor" else None,
-    )
-    db_session.add(gate_log)
-
-    if entity_type == "visitor" and access_granted and direction == "OUT":
-        visitor.check_out_time = _utcnow()
-        visitor.status = "Checked Out"
-        db_session.commit()
-    else:
-        db_session.commit()
-
-    # Invalidate caches since gate log data changed
-    invalidate_dashboard_cache()
-    invalidate_monitoring_cache()
-
-    # Emit to dashboard via socketio
-    socketio.emit(
-        "gate_scan",
-        {
-            "type": entity_type,
-            "name": entity_name,
-            "direction": direction,
-            "granted": access_granted,
-            "reason": denial_reason,
-            "gate": device_info,
-            "time": datetime.now().strftime("%H:%M:%S"),
-        },
-    )
+    access_granted = result["access_granted"]
+    denial_reason = result["denial_reason"]
+    entity_name = result["entity_name"] or "Unknown"
+    entity_type = result["entity_type"]
+    resolved_direction = result.get("direction", "IN")
+    parsed_qr = result.get("parsed_qr")
 
     # Return mobile-compatible response format
     return jsonify(
@@ -556,7 +424,7 @@ def verify_qr_mobile():
             "data": {
                 "entity_type": entity_type,
                 "entity_name": entity_name,
-                "direction": direction,
+                "direction": resolved_direction,
                 "open_gate": access_granted,
             },
         }

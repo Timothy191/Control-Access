@@ -2,12 +2,32 @@ import eventlet
 
 eventlet.monkey_patch()
 
-import hmac
+# PSUTIL_AVAILABLE is imported from extensions
+import base64
+
+# _utcnow is imported from utils
+import hashlib
+import io
+import json
 import logging
 import logging.handlers
-from datetime import UTC, datetime, timedelta
-from functools import wraps
+import os
+import re
+import re as _re
+import select
+import socket
+import subprocess
+import sys
+import threading
+import time
+from datetime import datetime, timedelta
 
+import openpyxl
+import pandas as pd
+import qrcode
+import requests
+from barcode.codex import Code128
+from barcode.writer import ImageWriter
 from flask import (
     Flask,
     Response,
@@ -20,12 +40,26 @@ from flask import (
     url_for,
 )
 from flask_cors import CORS
-from flask_socketio import SocketIO, emit
+from flask_socketio import emit
+from reportlab.lib import colors
+from reportlab.lib.enums import TA_LEFT
+from reportlab.lib.pagesizes import inch, landscape, letter
+from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
+from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
+from sqlalchemy import func
 
 from database import db_session, init_db
+from extensions import (
+    ENABLE_AI_CHAT,
+    _check_ollama,
+    limiter,
+    logger,
+    metrics_history,
+    request_timestamps,
+    socketio,
+)
 from models import (
     Approval,
-    AuditLog,
     Device,
     Employee,
     Equipment,
@@ -37,59 +71,7 @@ from models import (
 )
 
 # Import shared utilities and extensions to avoid circular imports
-from utils import _utcnow, login_required, role_required, require_api_key, log_audit
-from extensions import (
-    __version__,
-    ENABLE_AI_CHAT,
-    limiter,
-    socketio,
-    logger,
-    OLLAMA_BASE_URL,
-    OLLAMA_MODEL,
-    OLLAMA_MODEL_FULL,
-    _ollama_provider,
-    _ollama_available,
-    _ollama_checked,
-    _check_ollama,
-    PSUTIL_AVAILABLE,
-    metrics_history,
-    request_timestamps,
-    parse_log_line,
-)
-
-
-# _utcnow is imported from utils
-
-
-import hashlib
-import io
-import json
-import os
-import re
-import select
-import socket
-import subprocess
-import sys
-import threading
-import time
-
-import openpyxl
-import qrcode
-import requests
-from barcode.codex import Code128
-from barcode.writer import ImageWriter
-
-# PSUTIL_AVAILABLE is imported from extensions
-import base64
-import re as _re
-
-import pandas as pd
-from reportlab.lib import colors
-from reportlab.lib.enums import TA_LEFT
-from reportlab.lib.pagesizes import inch, landscape, letter
-from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
-from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
-from sqlalchemy import func
+from utils import _utcnow, login_required, role_required
 
 # Sanitize strings for openpyxl (strip illegal XML characters)
 _ILLEGAL_XML_CHARS = _re.compile(
@@ -157,7 +139,7 @@ if not _hardware_key_check:
         raise RuntimeError(
             "HARDWARE_API_KEY environment variable is not set. "
             "This is required for production deployments. "
-            "Generate one with: python -c \"import secrets; print(secrets.token_urlsafe(32))\" "
+            'Generate one with: python -c "import secrets; print(secrets.token_urlsafe(32))" '
             "and add it to your .env file."
         )
     logger.warning(
@@ -225,8 +207,6 @@ def add_security_headers(response):
 
 
 # Rate Limiting
-from flask_limiter import Limiter
-from flask_limiter.util import get_remote_address
 
 # SECURITY NOTE: storage_uri="memory://" means rate limit counters are stored in-process
 # and reset on every app restart. In production, this means:
@@ -275,7 +255,9 @@ CORS(
 )
 
 # Initialize SocketIO with app
-socketio.init_app(app, cors_allowed_origins=_cors_origins.split(",") if _cors_origins != "*" else "*")
+socketio.init_app(
+    app, cors_allowed_origins=_cors_origins.split(",") if _cors_origins != "*" else "*"
+)
 
 
 # Custom Jinja2 filters
@@ -323,12 +305,13 @@ app.config["ENABLE_AI_CHAT"] = ENABLE_AI_CHAT
 
 # Initialize Ollama configuration from environment variables
 from extensions import init_ollama_config
+
 init_ollama_config(
     base_url=os.environ.get("OLLAMA_URL", "http://localhost:11434"),
     model=os.environ.get("OLLAMA_MODEL", "mine-assistant-fast"),
     model_full=os.environ.get("OLLAMA_MODEL_FULL", "mine-assistant"),
     provider="local",
-    available=False
+    available=False,
 )
 
 # In-memory metrics storage and request tracking are imported from extensions
@@ -354,8 +337,13 @@ from services.listeners import (
 
 def process_scan_data(qr_data, source_ip, protocol="UDP"):
     return _process_scan_data_listener(
-        qr_data, source_ip, protocol=protocol, process_qr_callback=_process_qr_scan, socketio_instance=socketio
+        qr_data,
+        source_ip,
+        protocol=protocol,
+        process_qr_callback=_process_qr_scan,
+        socketio_instance=socketio,
     )
+
 
 def init_all_scanner_listeners():
     _init_listeners(process_qr_callback=_process_qr_scan, socketio_instance=socketio)
@@ -398,7 +386,12 @@ def visitor_request():
         expected_pin = pin_setting.value if pin_setting else "1234"
         if submitted_pin != expected_pin:
             if request.headers.get("X-Requested-With") == "XMLHttpRequest":
-                return jsonify({"success": False, "error": "Invalid PIN. Contact your HOD or admin."})
+                return jsonify(
+                    {
+                        "success": False,
+                        "error": "Invalid PIN. Contact your HOD or admin.",
+                    }
+                )
             return render_template(
                 "visitor_request.html", error="Invalid PIN. Contact your HOD or admin."
             )
@@ -450,16 +443,18 @@ def visitor_request():
         qr_base64 = base64.b64encode(buf.getvalue()).decode("utf-8")
 
         if request.headers.get("X-Requested-With") == "XMLHttpRequest":
-            return jsonify({
-                "success": True,
-                "qr_base64": qr_base64,
-                "visitor": {
-                    "name": visitor.name,
-                    "company": visitor.company,
-                    "purpose": visitor.purpose,
-                    "meeting_person": visitor.meeting_person,
-                },
-            })
+            return jsonify(
+                {
+                    "success": True,
+                    "qr_base64": qr_base64,
+                    "visitor": {
+                        "name": visitor.name,
+                        "company": visitor.company,
+                        "purpose": visitor.purpose,
+                        "meeting_person": visitor.meeting_person,
+                    },
+                }
+            )
 
         return render_template(
             "visitor_request.html",
@@ -1520,7 +1515,6 @@ def decode_qr_data(raw_data):
     'Key: Value' line-based formats. Returns dict with keys like
     employee_id, name, position, department, company, area, raw_data, format.
     """
-    import re
     from urllib.parse import parse_qs
 
     result = {"raw_data": raw_data, "format": "unknown"}
@@ -2025,29 +2019,11 @@ def rfid_ingest():
 def _format_rfid_tag(raw_tag):
     """Format and normalize RFID tag data from various formats.
 
-    Supports:
-    - EPC Gen2 (96-bit): E20034150200108022001F6D
-    - ISO 14443A (MIFARE): 04:A2:3B:1C or 04A23B1C
-    - Raw hex with/without separators
+    Thin wrapper around services.scan_service.format_rfid_tag().
     """
-    if not raw_tag:
-        return None
+    from services.scan_service import format_rfid_tag
 
-    # Remove common separators and whitespace
-    tag = raw_tag.strip().upper()
-    tag = tag.replace(":", "").replace("-", "").replace(" ", "").replace(".", "")
-
-    # Remove any prefixes some readers add
-    prefixes_to_strip = ["EPC:", "UID:", "TAG:", "RFID:", "[", "]"]
-    for prefix in prefixes_to_strip:
-        tag = tag.replace(prefix, "")
-
-    # Validate hex content
-    if not all(c in "0123456789ABCDEF" for c in tag):
-        # Non-hex tag, keep original but normalized
-        return tag
-
-    return tag
+    return format_rfid_tag(raw_tag)
 
 
 def _process_rfid_scan(
@@ -2055,136 +2031,13 @@ def _process_rfid_scan(
 ):
     """Process an RFID tag scan and return entity info and access decision.
 
-    Similar to _process_qr_scan but looks up by rfid_tag field.
+    Thin wrapper around services.scan_service.process_rfid_scan().
     """
-    entity = None
-    entity_type = None
-    entity_id = None
-    entity_name = None
-    access_granted = False
-    denial_reason = None
+    from services.scan_service import process_rfid_scan
 
-    # Try to find entity by RFID tag
-    employee = db_session.query(Employee).filter_by(rfid_tag=rfid_tag).first()
-
-    if employee:
-        entity = employee
-        entity_type = "employee"
-        entity_id = employee.id
-        entity_name = f"{employee.first_name} {employee.surname}"
-
-    if not entity:
-        vehicle = db_session.query(Vehicle).filter_by(rfid_tag=rfid_tag).first()
-        if vehicle:
-            entity = vehicle
-            entity_type = "vehicle"
-            entity_id = vehicle.id
-            entity_name = vehicle.fleet_id
-
-    if not entity:
-        visitor = db_session.query(Visitor).filter_by(rfid_tag=rfid_tag).first()
-        if visitor:
-            entity = visitor
-            entity_type = "visitor"
-            entity_id = visitor.id
-            entity_name = visitor.name
-
-    if not entity:
-        equipment = db_session.query(Equipment).filter_by(rfid_tag=rfid_tag).first()
-        if equipment:
-            entity = equipment
-            entity_type = "equipment"
-            entity_id = equipment.id
-            entity_name = equipment.radio_id
-
-    # Auto-direction logic (same as QR scan)
-    if entity_id and entity_type:
-        # PERFORMANCE: noload('*') prevents lazy-loading relationships
-        # when we only need the direction column.
-        from sqlalchemy.orm import noload as _noload
-
-        last_log = (
-            db_session.query(GateLog)
-            .options(_noload("*"))
-            .filter(
-                GateLog.entity_id == entity_id,
-                GateLog.access_type == entity_type,
-                GateLog.access_granted,
-            )
-            .order_by(GateLog.scanned_at.desc())
-            .first()
-        )
-        if last_log and last_log.direction == "IN":
-            direction = "OUT"
-        else:
-            direction = "IN"
-    else:
-        direction = "IN"
-        entity_name = "Unknown"
-        entity_type = "unknown"
-
-    # Access decision logic
-    if entity:
-        if entity_type == "employee":
-            if entity.status != "Active":
-                access_granted = False
-                denial_reason = f"Employee status is {entity.status}"
-            else:
-                access_granted = True
-        elif entity_type == "vehicle":
-            if entity.status != "Active":
-                access_granted = False
-                denial_reason = f"Vehicle status is {entity.status}"
-            else:
-                access_granted = True
-        elif entity_type == "visitor":
-            if entity.status != "Checked In":
-                access_granted = False
-                denial_reason = f"Visitor status is {entity.status}"
-            else:
-                access_granted = True
-        elif entity_type == "equipment":
-            if entity.status != "Active":
-                access_granted = False
-                denial_reason = f"Equipment status is {entity.status}"
-            else:
-                access_granted = True
-    else:
-        access_granted = False
-        denial_reason = "RFID tag not registered"
-
-    # Create gate log entry
-    gate_log = GateLog(
-        access_type=entity_type or "unknown",
-        entity_id=entity_id,
-        entity_name=entity_name,
-        direction=direction,
-        qr_data=rfid_tag,  # Store RFID in qr_data field for compatibility
-        access_granted=access_granted,
-        denial_reason=denial_reason,
-        gate_location=gate_location,
-        scanned_by=scanned_by,
-        ip_address=ip_address,
-        user_agent=user_agent,
+    return process_rfid_scan(
+        rfid_tag, direction, gate_location, scanned_by, ip_address, user_agent
     )
-    db_session.add(gate_log)
-    db_session.commit()
-
-    # Invalidate caches since gate log data changed
-    from routes.dashboard import invalidate_dashboard_cache
-    from routes.monitoring import invalidate_monitoring_cache
-    invalidate_dashboard_cache()
-    invalidate_monitoring_cache()
-
-    return {
-        "access_granted": access_granted,
-        "denial_reason": denial_reason,
-        "entity_type": entity_type,
-        "entity_name": entity_name,
-        "entity_id": entity_id,
-        "direction": direction,
-        "rfid_tag": rfid_tag,
-    }
 
 
 @app.route("/api/verify-visitor", methods=["POST"])
@@ -2274,6 +2127,7 @@ def verify_visitor_mobile():
     # Invalidate caches since gate log data changed
     from routes.dashboard import invalidate_dashboard_cache
     from routes.monitoring import invalidate_monitoring_cache
+
     invalidate_dashboard_cache()
     invalidate_monitoring_cache()
 
@@ -3824,7 +3678,9 @@ def kill_process_on_port(port):
                         # If SIGTERM fails, try SIGKILL
                         try:
                             os.kill(int(pid), signal.SIGKILL)
-                            logger.info(f"Force killed process {pid} on port {port} (SIGKILL)")
+                            logger.info(
+                                f"Force killed process {pid} on port {port} (SIGKILL)"
+                            )
                             print(f"Force killed process {pid} on port {port}")
                         except Exception:
                             pass
@@ -3960,7 +3816,6 @@ def run_scanner_server(scanner_port, main_port):
     @scanner_app.route("/api/scan_qr", methods=["POST"])
     def scanner_api():
         """Forward scanner requests to the main app logic."""
-        import requests
 
         try:
             # Forward the request to the main app on the detected port

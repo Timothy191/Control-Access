@@ -827,7 +827,24 @@ def _record_gate_log(
         equipment_id=entity_id if entity_type == "equipment" else None,
     )
     db_session.add(gate_log)
+
+    # Visitor check-out side effect
+    if entity_type == "visitor" and access_granted and direction == "OUT":
+        visitor = db_session.query(Visitor).filter_by(id=entity_id).first()
+        if visitor:
+            visitor.status = "Checked Out"
+            visitor.check_out_time = _utcnow()
+
     db_session.commit()
+
+    # Invalidate dashboard and monitoring caches
+    try:
+        from routes.dashboard import invalidate_dashboard_cache
+        from routes.monitoring import invalidate_monitoring_cache
+        invalidate_dashboard_cache()
+        invalidate_monitoring_cache()
+    except Exception:
+        pass
 
     socketio.emit(
         "gate_scan",
@@ -943,5 +960,182 @@ def process_qr_scan(
         "entity_name": entity_name,
         "access_granted": access_granted,
         "denial_reason": denial_reason,
+        "direction": direction,
         "parsed_qr": parsed_qr,
+    }
+
+
+def format_rfid_tag(raw_tag):
+    """Format and normalize RFID tag data from various formats.
+
+    Supports:
+    - EPC Gen2 (96-bit): E20034150200108022001F6D
+    - ISO 14443A (MIFARE): 04:A2:3B:1C or 04A23B1C
+    - Raw hex with/without separators
+    """
+    if not raw_tag:
+        return None
+
+    # Remove common separators and whitespace
+    tag = raw_tag.strip().upper()
+    tag = tag.replace(":", "").replace("-", "").replace(" ", "").replace(".", "")
+
+    # Remove any prefixes some readers add
+    prefixes_to_strip = ["EPC:", "UID:", "TAG:", "RFID:", "[", "]"]
+    for prefix in prefixes_to_strip:
+        tag = tag.replace(prefix, "")
+
+    # Validate hex content
+    if not all(c in "0123456789ABCDEF" for c in tag):
+        # Non-hex tag, keep original but normalized
+        return tag
+
+    return tag
+
+
+def process_rfid_scan(
+    rfid_tag, direction, gate_location, scanned_by, ip_address, user_agent
+):
+    """Process an RFID tag scan and return entity info and access decision.
+
+    Similar to process_qr_scan but looks up by rfid_tag field.
+    """
+    entity = None
+    entity_type = None
+    entity_id = None
+    entity_name = None
+    access_granted = False
+    denial_reason = None
+
+    # Try to find entity by RFID tag
+    employee = db_session.query(Employee).filter_by(rfid_tag=rfid_tag).first()
+
+    if employee:
+        entity = employee
+        entity_type = "employee"
+        entity_id = employee.id
+        entity_name = f"{employee.first_name} {employee.surname}"
+
+    if not entity:
+        vehicle = db_session.query(Vehicle).filter_by(rfid_tag=rfid_tag).first()
+        if vehicle:
+            entity = vehicle
+            entity_type = "vehicle"
+            entity_id = vehicle.id
+            entity_name = vehicle.fleet_id
+
+    if not entity:
+        visitor = db_session.query(Visitor).filter_by(rfid_tag=rfid_tag).first()
+        if visitor:
+            entity = visitor
+            entity_type = "visitor"
+            entity_id = visitor.id
+            entity_name = visitor.name
+
+    if not entity:
+        equipment = db_session.query(Equipment).filter_by(rfid_tag=rfid_tag).first()
+        if equipment:
+            entity = equipment
+            entity_type = "equipment"
+            entity_id = equipment.id
+            entity_name = equipment.radio_id
+
+    # Auto-direction logic (same as QR scan)
+    if entity_id and entity_type:
+        # PERFORMANCE: noload('*') prevents lazy-loading relationships
+        # when we only need the direction column.
+        from sqlalchemy.orm import noload as _noload
+
+        last_log = (
+            db_session.query(GateLog)
+            .options(_noload("*"))
+            .filter(
+                GateLog.entity_id == entity_id,
+                GateLog.access_type == entity_type,
+                GateLog.access_granted,
+            )
+            .order_by(GateLog.scanned_at.desc())
+            .first()
+        )
+        if last_log and last_log.direction == "IN":
+            direction = "OUT"
+        else:
+            direction = "IN"
+    else:
+        direction = "IN"
+        entity_name = "Unknown"
+        entity_type = "unknown"
+
+    # Access decision logic
+    if entity:
+        if entity_type == "employee":
+            if entity.status != "Active":
+                access_granted = False
+                denial_reason = f"Employee status is {entity.status}"
+            else:
+                access_granted = True
+        elif entity_type == "vehicle":
+            if entity.status != "Active":
+                access_granted = False
+                denial_reason = f"Vehicle status is {entity.status}"
+            else:
+                access_granted = True
+        elif entity_type == "visitor":
+            if entity.status != "Checked In":
+                access_granted = False
+                denial_reason = f"Visitor status is {entity.status}"
+            else:
+                access_granted = True
+        elif entity_type == "equipment":
+            if entity.status != "Active":
+                access_granted = False
+                denial_reason = f"Equipment status is {entity.status}"
+            else:
+                access_granted = True
+    else:
+        access_granted = False
+        denial_reason = "RFID tag not registered"
+
+    # Create gate log entry
+    gate_log = GateLog(
+        access_type=entity_type or "unknown",
+        entity_id=entity_id,
+        entity_name=entity_name,
+        direction=direction,
+        qr_data=rfid_tag,  # Store RFID in qr_data field for compatibility
+        access_granted=access_granted,
+        denial_reason=denial_reason,
+        gate_location=gate_location,
+        scanned_by=scanned_by,
+        ip_address=ip_address,
+        user_agent=user_agent,
+    )
+    db_session.add(gate_log)
+
+    # Visitor check-out side effect
+    if entity_type == "visitor" and access_granted and direction == "OUT":
+        visitor = db_session.query(Visitor).filter_by(id=entity_id).first()
+        if visitor:
+            visitor.status = "Checked Out"
+            visitor.check_out_time = _utcnow()
+
+    db_session.commit()
+
+    # Invalidate caches since gate log data changed
+    try:
+        from routes.dashboard import invalidate_dashboard_cache
+        from routes.monitoring import invalidate_monitoring_cache
+        invalidate_dashboard_cache()
+        invalidate_monitoring_cache()
+    except Exception:
+        pass
+
+    return {
+        "access_granted": access_granted,
+        "denial_reason": denial_reason,
+        "entity_type": entity_type,
+        "entity_name": entity_name,
+        "entity_id": entity_id,
+        "direction": direction,
+        "rfid_tag": rfid_tag,
     }

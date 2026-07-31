@@ -4,10 +4,10 @@ from datetime import datetime
 
 from flask import Blueprint, redirect, render_template, request, url_for
 
-from utils import db_session, login_required, role_required
 from models import Vehicle
 from routes.dashboard import invalidate_dashboard_cache
 from routes.monitoring import invalidate_monitoring_cache
+from utils import db_session, login_required, role_required
 
 fleet_bp = Blueprint("fleet", __name__)
 

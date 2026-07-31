@@ -2,9 +2,9 @@
 
 from flask import Blueprint, redirect, render_template, request, session, url_for
 
-from utils import db_session, log_audit
 from extensions import limiter
 from models import User
+from utils import db_session, log_audit
 
 auth_bp = Blueprint("auth", __name__)
 
@@ -17,9 +17,6 @@ def login():
         password = request.form.get("password")
         user = db_session.query(User).filter_by(username=username).first()
         if user and user.check_password(password):
-            if not user.password.startswith(("pbkdf2:", "scrypt:")):
-                user.set_password(password)
-                db_session.commit()
             session.permanent = True
             session["logged_in"] = True
             session["username"] = user.username

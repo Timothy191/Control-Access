@@ -8,7 +8,6 @@ from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 from flask_socketio import SocketIO
 
-
 # Application version
 __version__ = "2.1.0"
 

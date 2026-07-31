@@ -1,12 +1,14 @@
 """Shared utilities to avoid circular imports."""
 import hmac
 import os
+from datetime import UTC, datetime
 from functools import wraps
-from flask import session, redirect, url_for, flash, request, jsonify
+
+from flask import flash, jsonify, redirect, request, session, url_for
+
 from database import db_session
-from models import AuditLog
-from datetime import datetime, UTC
 from extensions import logger
+from models import AuditLog
 
 
 def _utcnow():
@@ -48,14 +50,14 @@ def require_api_key(f):
         _mobile_key = os.environ.get("MOBILE_API_KEY", "")
         valid_keys = [k for k in [_hardware_key, _mobile_key] if k]
         client_ip = request.remote_addr
-        
+
         if not valid_keys:
             logger.error(
                 f"API authentication not configured — rejecting request from {client_ip}. "
                 "Set HARDWARE_API_KEY or MOBILE_API_KEY environment variable."
             )
             return jsonify({"error": "API authentication not configured"}), 500
-        
+
         if not key or not any(hmac.compare_digest(key, vk) for vk in valid_keys):
             # Log failed authentication attempts for security monitoring
             if key:
@@ -68,7 +70,7 @@ def require_api_key(f):
                     f"Missing API key attempt from {client_ip}"
                 )
             return jsonify({"error": "Invalid API key"}), 401
-        
+
         return f(*args, **kwargs)
 
     return decorated

@@ -33,19 +33,6 @@ class User(Base):
         self.password = generate_password_hash(raw_password)
 
     def check_password(self, raw_password):
-        # MIGRATION: Support legacy plain-text passwords during migration.
-        # Passwords not starting with 'pbkdf2:' or 'scrypt:' are treated as plain-text.
-        # On successful login, the password is automatically re-hashed (see routes/auth.py).
-        #
-        # CAN BE REMOVED when:
-        #   1. All users have logged in at least once since hashing was implemented
-        #   2. OR a manual migration script has hashed all remaining plain-text passwords
-        #   3. OR the database is known to contain only hashed passwords
-        #
-        # SECURITY: Plain-text password comparison is vulnerable to timing attacks.
-        # This should be removed as soon as all passwords are migrated to hashed format.
-        if not self.password.startswith(('pbkdf2:', 'scrypt:')):
-            return self.password == raw_password
         return check_password_hash(self.password, raw_password)
 
 

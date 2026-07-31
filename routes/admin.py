@@ -16,10 +16,10 @@ from flask import (
     url_for,
 )
 
-from utils import _utcnow, db_session, log_audit, login_required, role_required
-from extensions import logger, __version__
 from database import database_path
+from extensions import logger
 from models import AuditLog, GateLog, GateMapping, SiteSetting, User
+from utils import _utcnow, db_session, log_audit, login_required, role_required
 
 admin_bp = Blueprint("admin", __name__)
 

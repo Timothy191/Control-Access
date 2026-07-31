@@ -27,10 +27,15 @@ sniffer_running = False
 
 
 def optimize_socket_buffers():
-    """Apply socket buffer optimizations for high-throughput scanning."""
+    """Display socket buffer settings."""
+    print(f"✓ Socket buffer optimization prepared: {UDP_BUFFER_SIZE // 1024}KB")
+
+
+def optimize_socket(sock):
+    """Apply socket buffer optimizations to a socket."""
     try:
-        UDP_RCVBUF = 2 * 1024 * 1024  # 2MB
-        print(f"✓ Socket buffers configured: {UDP_RCVBUF // 1024}KB")
+        sock.setsockopt(socket.SOL_SOCKET, socket.SO_RCVBUF, UDP_BUFFER_SIZE)
+        sock.setsockopt(socket.SOL_SOCKET, socket.SO_SNDBUF, UDP_BUFFER_SIZE)
     except Exception as e:
         print(f"⚠ Socket optimization failed: {e}")
 
@@ -131,8 +136,7 @@ def start_udp_listener(port, process_qr_callback=None, socketio_instance=None):
     def udp_server():
         try:
             sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-            sock.setsockopt(socket.SOL_SOCKET, socket.SO_RCVBUF, UDP_BUFFER_SIZE)
-            sock.setsockopt(socket.SOL_SOCKET, socket.SO_SNDBUF, UDP_BUFFER_SIZE)
+            optimize_socket(sock)
             sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
             sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
             sock.settimeout(1.0)
@@ -150,7 +154,10 @@ def start_udp_listener(port, process_qr_callback=None, socketio_instance=None):
                     if data:
                         scan_data = data.decode("utf-8", errors="ignore").strip()
                         if scan_data:
-                            process_scan_data(scan_data, addr[0], "UDP", process_qr_callback, socketio_instance)
+                            try:
+                                process_scan_data(scan_data, addr[0], "UDP", process_qr_callback, socketio_instance)
+                            finally:
+                                db_session.remove()
                 except TimeoutError:
                     continue
                 except Exception:
@@ -171,6 +178,7 @@ def start_broadcast_listener(process_qr_callback=None, socketio_instance=None):
     def broadcast_server():
         try:
             sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            optimize_socket(sock)
             sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
             sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
             sock.settimeout(1.0)
@@ -189,7 +197,10 @@ def start_broadcast_listener(process_qr_callback=None, socketio_instance=None):
                         scan_data = data.decode("utf-8", errors="ignore").strip()
                         if scan_data:
                             print(f"BROADCAST from {addr[0]}: {scan_data}")
-                            process_scan_data(scan_data, addr[0], "BROADCAST", process_qr_callback, socketio_instance)
+                            try:
+                                process_scan_data(scan_data, addr[0], "BROADCAST", process_qr_callback, socketio_instance)
+                            finally:
+                                db_session.remove()
                 except TimeoutError:
                     continue
                 except Exception:
@@ -248,7 +259,10 @@ def start_packet_sniffer(process_qr_callback=None, socketio_instance=None):
                             for match in matches:
                                 if match and len(match) >= 4:
                                     print(f"PKT SNIFF: from {addr[0]}: {match}")
-                                    process_scan_data(match, addr[0], "SNIFFER", process_qr_callback, socketio_instance)
+                                    try:
+                                        process_scan_data(match, addr[0], "SNIFFER", process_qr_callback, socketio_instance)
+                                    finally:
+                                        db_session.remove()
 
                 except BlockingIOError:
                     continue

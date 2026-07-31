@@ -5,9 +5,15 @@ from datetime import UTC, datetime
 
 from flask import Blueprint, jsonify, render_template
 
-from utils import db_session, login_required, role_required
-from extensions import __version__, PSUTIL_AVAILABLE, metrics_history, request_timestamps, parse_log_line
+from extensions import (
+    PSUTIL_AVAILABLE,
+    __version__,
+    metrics_history,
+    parse_log_line,
+    request_timestamps,
+)
 from models import Approval, Employee, GateLog, Vehicle, Visitor
+from utils import db_session, login_required, role_required
 
 if PSUTIL_AVAILABLE:
     import psutil
