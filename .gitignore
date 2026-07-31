@@ -67,6 +67,9 @@ cookies.txt
 ba.txt
 OpenMythos/
 
+# Obsolete/backup module (logic now lives in services/scan_service.py)
+process_qr.py
+
 # Generated download artifacts
 static/downloads/
 
