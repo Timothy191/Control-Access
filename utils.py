@@ -9,6 +9,7 @@ from flask import flash, jsonify, redirect, request, session, url_for
 from database import db_session
 from extensions import logger
 from models import AuditLog
+from services.security_logger import log_api_key_failed
 
 
 def _utcnow():
@@ -65,10 +66,12 @@ def require_api_key(f):
                     f"Invalid API key attempt from {client_ip} "
                     f"(key prefix: {key[:8]}...)"
                 )
-            else:
-                logger.warning(
-                    f"Missing API key attempt from {client_ip}"
+                log_api_key_failed(
+                    reason="Invalid API key", key_prefix=key[:8] if len(key) >= 8 else key
                 )
+            else:
+                logger.warning(f"Missing API key attempt from {client_ip}")
+                log_api_key_failed(reason="Missing API key")
             return jsonify({"error": "Invalid API key"}), 401
 
         return f(*args, **kwargs)

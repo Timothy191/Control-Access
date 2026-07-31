@@ -1,0 +1,127 @@
+{% extends "base.html" %}
+
+{% block title %}MFA Setup — Arch-System{% endblock %}
+
+{% block content %}
+<style>
+    html, body { height: 100%; margin: 0; padding: 0; overflow: hidden; }
+    .auth-page { height: 100vh; overflow: hidden; }
+    .auth-page .app { display: block; height: 100%; }
+    .auth-page .menu-toggle, .auth-page .sidebar, .auth-page .sidebar-trigger-zone, .auth-page .sidebar-overlay { display: none !important; }
+    .auth-page .main-content { margin-left: 0 !important; padding-top: 0 !important; width: 100%; height: 100vh; display: flex; align-items: center; justify-content: center; overflow: auto; }
+    .mfa-card {
+        background: rgba(10,10,10,0.9);
+        border: 1px solid var(--steel);
+        border-radius: 24px;
+        padding: 2.5rem;
+        width: 100%;
+        max-width: 460px;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+    }
+    .mfa-card h2 {
+        text-align: center;
+        font-size: 1.5rem;
+        margin-bottom: 1.5rem;
+        text-transform: uppercase;
+        letter-spacing: 2px;
+    }
+    .qr-image {
+        text-align: center;
+        margin: 1.5rem 0;
+    }
+    .qr-image img {
+        background: white;
+        padding: 1rem;
+        border-radius: 16px;
+        max-width: 220px;
+    }
+    .secret-box {
+        background: rgba(255,255,255,0.05);
+        border: 1px solid var(--steel);
+        border-radius: 8px;
+        padding: 0.75rem;
+        font-family: var(--font-mono);
+        text-align: center;
+        word-break: break-all;
+        margin-bottom: 1.25rem;
+    }
+    .form-group { margin-bottom: 1.25rem; }
+    .form-group label { display: block; margin-bottom: 0.5rem; color: var(--text-secondary); font-size: 0.875rem; text-transform: uppercase; letter-spacing: 0.05em; }
+    .form-group input {
+        width: 100%;
+        background: #000;
+        border: 1px solid var(--steel);
+        border-radius: 8px;
+        padding: 0.75rem 1rem;
+        color: var(--text-primary);
+        font-family: var(--font-mono);
+        font-size: 1rem;
+        text-align: center;
+        letter-spacing: 0.2em;
+    }
+    .btn-login { width: 100%; background: var(--red-primary); border: none; border-radius: 8px; padding: 0.75rem; font-weight: 600; color: white; cursor: pointer; }
+    .error-message { background: rgba(225,6,0,0.15); border-left: 3px solid var(--red-primary); padding: 0.75rem 1rem; margin-bottom: 1.5rem; border-radius: 8px; color: var(--red-primary); }
+    .success-message { background: rgba(0,255,128,0.1); border-left: 3px solid #00ff80; padding: 0.75rem 1rem; margin-bottom: 1.5rem; border-radius: 8px; color: #00ff80; }
+    .backup-codes {
+        background: rgba(255,255,255,0.05);
+        border: 1px solid var(--steel);
+        border-radius: 8px;
+        padding: 1rem;
+        margin-top: 1rem;
+    }
+    .backup-codes code {
+        display: inline-block;
+        font-family: var(--font-mono);
+        background: rgba(0,0,0,0.5);
+        padding: 0.25rem 0.5rem;
+        border-radius: 4px;
+        margin: 0.25rem;
+    }
+</style>
+
+<div class="mfa-card">
+    <h2><i class="ti ti-shield-check"></i> Set Up MFA</h2>
+
+    {% if success %}
+    <div class="success-message">
+        <i class="ti ti-check"></i> MFA enabled successfully.
+    </div>
+    {% if backup_codes %}
+    <div class="backup-codes">
+        <p style="margin-bottom:0.5rem; color:var(--text-secondary);">Save these backup codes in a safe place. Each can be used once.</p>
+        {% for code in backup_codes %}
+        <code>{{ code }}</code>
+        {% endfor %}
+    </div>
+    {% endif %}
+    <p style="text-align:center; margin-top:1.5rem;">
+        <a href="{{ url_for('dashboard.dashboard') }}" class="btn-login" style="display:inline-block; text-decoration:none;">Continue to Dashboard</a>
+    </p>
+    {% else %}
+    {% if error %}
+    <div class="error-message"><i class="ti ti-alert-triangle"></i> {{ error }}</div>
+    {% endif %}
+
+    <p style="text-align:center; color:var(--text-secondary);">
+        Scan the QR code with an authenticator app (Google Authenticator, Authy, Bitwarden), then enter the 6-digit code to confirm.
+    </p>
+
+    {% if qr_b64 %}
+    <div class="qr-image">
+        <img src="data:image/png;base64,{{ qr_b64 }}" alt="MFA QR Code">
+    </div>
+    {% endif %}
+
+    <div class="secret-box">{{ secret }}</div>
+
+    <form method="POST" action="{{ url_for('auth.mfa_setup') }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <div class="form-group">
+            <label for="token">Verification Code</label>
+            <input type="text" id="token" name="token" maxlength="20" inputmode="numeric" autocomplete="one-time-code" autofocus required placeholder="000000">
+        </div>
+        <button type="submit" class="btn-login"><i class="ti ti-check"></i> Enable MFA</button>
+    </form>
+    {% endif %}
+</div>
+{% endblock %}

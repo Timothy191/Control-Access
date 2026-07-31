@@ -578,7 +578,7 @@
 </svg>
 {% endmacro %}
 
-<body {% if request.endpoint in ['login', 'auth.login'] %}class="auth-page"{% endif %}>
+<body {% if request.endpoint in ['login', 'auth.login', 'auth.mfa_challenge', 'auth.mfa_setup', 'mfa_challenge', 'mfa_setup'] %}class="auth-page"{% endif %}>
     <!-- Global Video Background -->
     <div class="global-video-bg-container">
         <video autoplay loop muted playsinline id="globalBgVideo">
