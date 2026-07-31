@@ -66,32 +66,72 @@ class SharePointSync:
         self.password = os.environ.get("SHAREPOINT_PASSWORD", "")
         self.site_url = os.environ.get("SHAREPOINT_SITE_URL", "")
         self.employee_list_name = os.environ.get("SHAREPOINT_EMPLOYEE_LIST", "Employees")
-        self.enabled = bool(self.username and self.password and self.site_url)
+        # App-only (client credentials) auth - required for MFA-enabled accounts
+        self.client_id = os.environ.get("SHAREPOINT_CLIENT_ID", "")
+        self.client_secret = os.environ.get("SHAREPOINT_CLIENT_SECRET", "")
+        self.tenant_id = os.environ.get("SHAREPOINT_TENANT_ID", "")
+        self.enabled = bool(self.site_url and (
+            (self.username and self.password) or
+            (self.client_id and self.client_secret and self.tenant_id)
+        ))
         self._ctx: Optional[object] = None
 
     def _get_context(self) -> Optional[object]:
-        """Authenticate and return a SharePoint client context."""
+        """Authenticate and return a SharePoint client context.
+
+        Supports two authentication methods:
+        1. Username/password (may fail with MFA-enabled accounts)
+        2. App-only (client credentials) - recommended for MFA
+
+        Returns the first working method.
+        """
         if not self.enabled:
             return None
 
         if self._ctx is not None:
             return self._ctx
 
-        try:
-            from office365.sharepoint.client_context import ClientContext
-            from office365.runtime.auth.authentication_context import AuthenticationContext
+        from office365.sharepoint.client_context import ClientContext
 
-            auth_ctx = AuthenticationContext(url=self.site_url)
-            if auth_ctx.acquire_token_for_user(username=self.username, password=self.password):
-                self._ctx = ClientContext(self.site_url, auth_ctx)
-                logger.info("SharePoint authentication successful")
+        # Try app-only (client credentials) auth first if configured
+        if self.client_id and self.client_secret and self.tenant_id:
+            try:
+                from office365.runtime.auth.client_credential import ClientCredential
+
+                credentials = ClientCredential(
+                    client_id=self.client_id,
+                    client_secret=self.client_secret,
+                )
+                # For app-only auth, need tenant-level authority
+                authority = f"https://login.microsoftonline.com/{self.tenant_id}"
+                client = ClientContext(self.site_url, credentials)
+                # Test connection
+                client.web.ensure_property("Title")
+                self._ctx = client
+                logger.info("SharePoint app-only authentication successful")
                 return self._ctx
-            else:
-                logger.error("SharePoint authentication failed")
+            except Exception as e:
+                logger.warning(f"SharePoint app-only auth failed: {e}")
+
+        # Fall back to username/password auth
+        if self.username and self.password:
+            try:
+                from office365.runtime.auth.authentication_context import AuthenticationContext
+
+                auth_ctx = AuthenticationContext(url=self.site_url)
+                if auth_ctx.acquire_token_for_user(username=self.username, password=self.password):
+                    self._ctx = ClientContext(self.site_url, auth_ctx)
+                    logger.info("SharePoint username/password authentication successful")
+                    return self._ctx
+                else:
+                    logger.error("SharePoint username/password authentication failed")
+                    return None
+            except Exception as e:
+                logger.error(f"SharePoint username/password auth error: {e}")
                 return None
-        except Exception as e:
-            logger.error(f"SharePoint authentication error: {e}")
-            return None
+
+        logger.error("No valid SharePoint credentials configured")
+        return None
 
     def sync_employees_from_sharepoint(self) -> dict:
         """Fetch employee data from SharePoint and sync to local database.
@@ -241,12 +281,15 @@ def init_sharepoint_sync():
         logger.info("SharePoint sync not configured (missing env vars)")
 
 
-def schedule_sharepoint_sync(app, interval: int = 300):
-    """Schedule periodic SharePoint sync using Flask-APScheduler.
+def schedule_sharepoint_sync(app, sync_hours=None):
+    """Schedule periodic SharePoint sync using APScheduler.
 
+    Data is pulled from SharePoint at the specified hours (read-only).
+    
     Args:
         app: Flask app instance
-        interval: Sync interval in seconds (default: 300)
+        sync_hours: List of hours (0-23) for sync schedule.
+                    Default: [0, 6, 12, 18] (midnight, 6am, noon, 6pm)
     """
     if not sharepoint_sync.enabled:
         return
@@ -255,20 +298,29 @@ def schedule_sharepoint_sync(app, interval: int = 300):
     if not auto_sync:
         return
 
+    if sync_hours is None:
+        sync_hours = [int(h) for h in os.environ.get("SHAREPOINT_SYNC_HOURS", "0,6,12,18").split(",")]
+
     try:
-        from flask_apscheduler import BackgroundScheduler
+        from apscheduler.schedulers.background import BackgroundScheduler
 
         scheduler = BackgroundScheduler()
-        scheduler.add_job(
-            func=sharepoint_sync.sync_employees_from_sharepoint,
-            trigger="interval",
-            seconds=interval,
-            id="sharepoint_sync",
-        )
+        
+        # Schedule sync at specific hours
+        for hour in sync_hours:
+            scheduler.add_job(
+                func=sharepoint_sync.sync_employees_from_sharepoint,
+                trigger="cron",
+                hour=hour,
+                minute=0,
+                id=f"sharepoint_sync_{hour}",
+            )
+            logger.info(f"Scheduled SharePoint sync at {hour:02d}:00 daily")
+
         scheduler.start()
-        logger.info(f"Scheduled SharePoint sync every {interval} seconds (read-only)")
+        logger.info(f"SharePoint auto-sync scheduled at hours: {sync_hours}")
     except ImportError:
-        logger.warning("Flask-APScheduler not installed, cannot schedule SharePoint sync")
+        logger.warning("APScheduler not installed, cannot schedule SharePoint sync")
     except Exception as e:
         logger.error(f"Failed to schedule SharePoint sync: {e}")
 

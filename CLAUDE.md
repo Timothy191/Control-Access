@@ -130,12 +130,37 @@ The system supports optional SharePoint integration for Power Apps and Power BI.
 We never write data back to SharePoint.
 
 ### Environment Variables
-- `SHAREPOINT_USERNAME` — SharePoint account username
-- `SHAREPOINT_PASSWORD` — SharePoint account password
+- `SHAREPOINT_USERNAME` — SharePoint account username (for user auth)
+- `SHAREPOINT_PASSWORD` — SharePoint account password (for user auth)
 - `SHAREPOINT_SITE_URL` — SharePoint site URL (e.g., `https://company.sharepoint.com/sites/site`)
 - `SHAREPOINT_EMPLOYEE_LIST` — SharePoint list name (default: `Employees`)
-- `SHAREPOINT_SYNC_INTERVAL` — Sync interval in seconds (default: 300)
-- `SHAREPOINT_AUTO_SYNC` — Set to `true` to enable automatic periodic sync
+- `SHAREPOINT_SYNC_HOURS` — Comma-separated hours for auto-sync (default: `0,6,12,18`)
+- `SHAREPOINT_AUTO_SYNC` — Set to `true` to enable automatic sync
+- `SHAREPOINT_CLIENT_ID` — App-only auth client ID (for MFA-enabled accounts)
+- `SHAREPOINT_CLIENT_SECRET` — App-only auth client secret
+- `SHAREPOINT_TENANT_ID` — Azure AD tenant ID (for app-only auth)
+
+### Authentication
+Two authentication methods are supported:
+1. **Username/password** — Works for accounts without MFA
+2. **App-only (client credentials)** — Required for MFA-enabled accounts
+   - Register an app in Azure AD with SharePoint API permissions
+   - Grant admin consent for `Sites.Read.All`
+
+### Sync Schedule
+Sync runs automatically at 00:00, 06:00, 12:00, and 18:00 daily (configurable via `SHAREPOINT_SYNC_HOURS`).
+
+### Field Mapping (SharePoint → Local DB)
+| SharePoint Field | Local DB Column | Description |
+|-----------------|-----------------|-------------|
+| `Title` | `emp_code` | Employee Number |
+| `FirstName` | `first_name` | First name |
+| `LastName` | `surname` | Surname |
+| `IDNumber` | `id_number` | ID number (encrypted at rest) |
+| `JobTitle` | `job_title` | Job title |
+| `Area` | `area` | Work area |
+| `MedicalExpiry` | `medical_expiry` | Medical expiry date |
+| `InductionExpiry` | `induction_expiry` | Induction expiry date |
 
 ### Power Apps API Endpoints
 - `GET /api/powerapps/employees` — Employee data for Power Apps (supports `$filter`, `$top`)
@@ -145,11 +170,11 @@ We never write data back to SharePoint.
 ### SharePoint Sync Service
 - `services/sharepoint_sync.py` — Read-only sync from SharePoint lists to local DB
 - `init_sharepoint_sync()` — Called at app startup for initial sync
-- `schedule_sharepoint_sync(app)` — Schedules periodic sync via Flask-APScheduler
-- `SharePointSync` class — Handles authentication and read-only sync operations
+- `schedule_sharepoint_sync(app)` — Schedules periodic sync via APScheduler (cron at 0,6,12,18)
+- `SharePointSync` class — Handles dual authentication (user/app-only) and read-only sync
 
 ### Power Apps Integration
 1. Set `SHAREPOINT_AUTO_SYNC=true` in `.env`
-2. Configure SharePoint list with fields: `Title` (emp_code), `FirstName`, `LastName`, `JobTitle`
-3. Power Apps reads from `/api/powerapps/employees` (local DB) or directly from SharePoint list
-4. Data syncs automatically (read-only) every `SHAREPOINT_SYNC_INTERVAL` seconds
+2. Configure SharePoint list with the field mapping above
+3. Power Apps reads from `/api/powerapps/employees` (local DB cache)
+4. Data syncs automatically (read-only) at 00:00, 06:00, 12:00, 18:00
