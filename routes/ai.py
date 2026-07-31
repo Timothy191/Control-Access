@@ -17,9 +17,13 @@ from extensions import (
     OLLAMA_BASE_URL,
     OLLAMA_MODEL,
     OLLAMA_MODEL_FULL,
+    PORTKEY_API_KEY,
+    PORTKEY_BASE_URL,
+    PORTKEY_VIRTUAL_KEY,
     _check_ollama,
     _ollama_available,
     _ollama_provider,
+    _portkey_enabled,
     limiter,
 )
 from models import Approval, Employee, Vehicle, Visitor
@@ -31,7 +35,10 @@ ai_bp = Blueprint("ai", __name__)
 @ai_bp.route("/api/ai/status")
 @login_required
 def ai_status():
-    """Return AI engine availability and model info (100% free local endpoint)."""
+    """Return AI engine availability and model info.
+
+    Reports Portkey gateway status when enabled, otherwise local Ollama.
+    """
     if not current_app.config.get("ENABLE_AI_CHAT", True):
         return jsonify({
             "available": False,
@@ -39,6 +46,18 @@ def ai_status():
             "model": "",
             "model_full": "",
             "url": "",
+            "portkey_enabled": _portkey_enabled,
+        })
+
+    if _portkey_enabled:
+        # Portkey is the active provider - all cached tokens route through it
+        return jsonify({
+            "available": True,
+            "provider": "portkey",
+            "model": OLLAMA_MODEL,
+            "model_full": OLLAMA_MODEL_FULL,
+            "url": PORTKEY_BASE_URL,
+            "portkey_enabled": _portkey_enabled,
         })
 
     import app
@@ -53,6 +72,7 @@ def ai_status():
             "model": OLLAMA_MODEL,
             "model_full": OLLAMA_MODEL_FULL,
             "url": OLLAMA_BASE_URL,
+            "portkey_enabled": _portkey_enabled,
         }
     )
 
@@ -86,9 +106,45 @@ def get_system_context():
 
 
 def _ollama_generate(prompt, system_ctx, stream=False, use_full=False):
-    """Call Ollama local AI — 100% free local endpoint.
-    use_full=True selects the 3B model for complex analysis."""
+    """Call AI provider — routes through Portkey when enabled, otherwise local Ollama.
+
+    When PORTKEY_API_KEY is set, ALL requests (including cached tokens) are sent
+    to Portkey's AI gateway. This ensures centralized observability, caching, and
+    routing for all AI traffic.
+
+    use_full=True selects the larger model for complex analysis.
+    """
     model = OLLAMA_MODEL_FULL if use_full else OLLAMA_MODEL
+
+    if _portkey_enabled:
+        # Route through Portkey AI gateway — all cached tokens go here
+        headers = {
+            "Authorization": f"Bearer {PORTKEY_API_KEY}",
+            "Content-Type": "application/json",
+        }
+        # Use virtual key if provided (Portkey virtual keys route to specific providers)
+        if PORTKEY_VIRTUAL_KEY:
+            headers["x-portkey-api-key"] = PORTKEY_VIRTUAL_KEY
+
+        payload = {
+            "model": model,
+            "messages": [
+                {"role": "system", "content": system_ctx},
+                {"role": "user", "content": prompt},
+            ],
+            "stream": stream,
+        }
+        resp = requests.post(
+            f"{PORTKEY_BASE_URL}/chat/completions",
+            json=payload,
+            headers=headers,
+            stream=stream,
+            timeout=120,
+        )
+        resp.raise_for_status()
+        return resp
+
+    # Default: local Ollama endpoint (100% free)
     payload = {
         "model": model,
         "prompt": prompt,
@@ -110,17 +166,22 @@ def _ollama_generate(prompt, system_ctx, stream=False, use_full=False):
 @login_required
 @limiter.limit("20 per minute")
 def ai_chat():
-    """API endpoint for AI chat - returns full response (non-streaming fallback)."""
+    """API endpoint for AI chat - returns full response (non-streaming fallback).
+
+    Routes through Portkey when enabled, otherwise uses local Ollama.
+    """
     if not current_app.config.get("ENABLE_AI_CHAT", True):
         return jsonify({"error": "AI chat is disabled via configuration"}), 403
 
-    import app
+    # When Portkey is enabled, we don't need local Ollama to be available
+    if not _portkey_enabled:
+        import app
 
-    if not _ollama_available:
-        app._ollama_checked = False  # Allow re-check
-        _check_ollama()
-    if not _ollama_available:
-        return jsonify({"error": "AI offline. Start Ollama with: ollama serve"}), 503
+        if not _ollama_available:
+            app._ollama_checked = False  # Allow re-check
+            _check_ollama()
+        if not _ollama_available:
+            return jsonify({"error": "AI offline. Start Ollama with: ollama serve"}), 503
 
     data = request.get_json()
     user_prompt = data.get("prompt", "").strip()
@@ -130,10 +191,17 @@ def ai_chat():
     try:
         resp = _ollama_generate(user_prompt, get_system_context(), stream=False)
         result = resp.json()
-        return jsonify({"response": result.get("response", "")})
+        if _portkey_enabled:
+            # Portkey/OpenAI-compatible response format
+            choices = result.get("choices", [])
+            response_text = choices[0].get("message", {}).get("content", "") if choices else ""
+        else:
+            # Ollama response format
+            response_text = result.get("response", "")
+        return jsonify({"response": response_text})
     except requests.exceptions.ConnectionError:
         return jsonify(
-            {"error": "Cannot reach Ollama. Is it running? (ollama serve)"}
+            {"error": "Cannot reach AI provider. Check Portkey/Ollama configuration."}
         ), 503
     except Exception as e:
         return jsonify({"error": f"AI error: {str(e)[:200]}"}), 500
@@ -143,17 +211,23 @@ def ai_chat():
 @login_required
 @limiter.limit("20 per minute")
 def ai_chat_stream():
-    """Streaming endpoint for real-time AI chat responses via Ollama."""
+    """Streaming endpoint for real-time AI chat responses.
+
+    Routes through Portkey when enabled, otherwise uses local Ollama.
+    All cached tokens are sent to Portkey when configured.
+    """
     if not current_app.config.get("ENABLE_AI_CHAT", True):
         return jsonify({"error": "AI chat is disabled via configuration"}), 403
 
-    import app
+    # When Portkey is enabled, we don't need local Ollama to be available
+    if not _portkey_enabled:
+        import app
 
-    if not _ollama_available:
-        app._ollama_checked = False  # Allow re-check
-        _check_ollama()
-    if not _ollama_available:
-        return jsonify({"error": "AI offline. Start Ollama with: ollama serve"}), 503
+        if not _ollama_available:
+            app._ollama_checked = False  # Allow re-check
+            _check_ollama()
+        if not _ollama_available:
+            return jsonify({"error": "AI offline. Start Ollama with: ollama serve"}), 503
 
     data = request.get_json()
     user_prompt = data.get("prompt", "").strip()
@@ -164,20 +238,44 @@ def ai_chat_stream():
     system_context = get_system_context()
 
     def generate():
-        """Generator: stream Ollama NDJSON → SSE data: lines."""
+        """Generator: stream AI response as SSE data: lines.
+
+        Handles both Portkey/OpenAI-compatible SSE format and Ollama NDJSON format.
+        """
         try:
             resp = _ollama_generate(user_prompt, system_context, stream=True)
-            for line in resp.iter_lines():
-                if line:
-                    chunk = json.loads(line)
-                    text = chunk.get("response", "")
-                    if text:
-                        yield f"data: {text}\n\n"
-                    if chunk.get("done"):
-                        break
-            yield "data: [DONE]\n\n"
+            if _portkey_enabled:
+                # Portkey/OpenAI-compatible: SSE with "data: {...}" lines
+                for line in resp.iter_lines():
+                    if line:
+                        if line.startswith(b"data: "):
+                            line = line[6:]
+                        if line.strip() == b"[DONE]":
+                            break
+                        try:
+                            chunk = json.loads(line)
+                            choices = chunk.get("choices", [])
+                            if choices:
+                                delta = choices[0].get("delta", {})
+                                text = delta.get("content", "")
+                                if text:
+                                    yield f"data: {text}\n\n"
+                        except json.JSONDecodeError:
+                            continue
+                yield "data: [DONE]\n\n"
+            else:
+                # Ollama NDJSON format
+                for line in resp.iter_lines():
+                    if line:
+                        chunk = json.loads(line)
+                        text = chunk.get("response", "")
+                        if text:
+                            yield f"data: {text}\n\n"
+                        if chunk.get("done"):
+                            break
+                yield "data: [DONE]\n\n"
         except requests.exceptions.ConnectionError:
-            yield "data: [ERROR] Cannot reach Ollama. Is it running?\n\n"
+            yield "data: [ERROR] Cannot reach AI provider. Check Portkey/Ollama configuration.\n\n"
         except Exception as e:
             yield f"data: [ERROR] AI error: {str(e)[:200]}\n\n"
 

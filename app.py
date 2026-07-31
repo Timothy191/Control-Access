@@ -52,6 +52,7 @@ from database import db_session, init_db
 from extensions import (
     ENABLE_AI_CHAT,
     _check_ollama,
+    _portkey_enabled,
     limiter,
     logger,
     metrics_history,
@@ -313,6 +314,20 @@ init_ollama_config(
     provider="local",
     available=False,
 )
+
+# Initialize Portkey configuration (AI gateway for routing all cached tokens)
+from extensions import init_portkey_config
+
+init_portkey_config(
+    api_key=os.environ.get("PORTKEY_API_KEY", ""),
+    base_url=os.environ.get("PORTKEY_BASE_URL", "https://api.portkey.ai/v1"),
+    virtual_key=os.environ.get("PORTKEY_VIRTUAL_KEY", ""),
+)
+
+if _portkey_enabled:
+    logger.info(
+        "Portkey AI gateway enabled - all AI requests routed through Portkey"
+    )
 
 # In-memory metrics storage and request tracking are imported from extensions
 

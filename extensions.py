@@ -35,6 +35,12 @@ _ollama_provider = "local"
 _ollama_available = False
 _ollama_checked = False
 
+# Portkey configuration (AI gateway for routing all cached tokens)
+PORTKEY_API_KEY = os.environ.get("PORTKEY_API_KEY", "")
+PORTKEY_BASE_URL = os.environ.get("PORTKEY_BASE_URL", "https://api.portkey.ai/v1")
+PORTKEY_VIRTUAL_KEY = os.environ.get("PORTKEY_VIRTUAL_KEY", "")
+_portkey_enabled = bool(PORTKEY_API_KEY)
+
 
 def init_ollama_config(base_url, model, model_full, provider, available):
     """Initialize Ollama configuration. Called from app.py."""
@@ -44,6 +50,19 @@ def init_ollama_config(base_url, model, model_full, provider, available):
     OLLAMA_MODEL_FULL = model_full
     _ollama_provider = provider
     _ollama_available = available
+
+
+def init_portkey_config(api_key, base_url, virtual_key):
+    """Initialize Portkey configuration. Called from app.py.
+
+    When enabled, all AI requests (including cached tokens) are routed
+    through Portkey's AI gateway.
+    """
+    global PORTKEY_API_KEY, PORTKEY_BASE_URL, PORTKEY_VIRTUAL_KEY, _portkey_enabled
+    PORTKEY_API_KEY = api_key
+    PORTKEY_BASE_URL = base_url
+    PORTKEY_VIRTUAL_KEY = virtual_key
+    _portkey_enabled = bool(api_key)
 
 
 def _check_ollama():
@@ -151,6 +170,11 @@ __all__ = [
     "_ollama_checked",
     "init_ollama_config",
     "_check_ollama",
+    "PORTKEY_API_KEY",
+    "PORTKEY_BASE_URL",
+    "PORTKEY_VIRTUAL_KEY",
+    "_portkey_enabled",
+    "init_portkey_config",
     "PSUTIL_AVAILABLE",
     "metrics_history",
     "request_timestamps",
