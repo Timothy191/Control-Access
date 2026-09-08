@@ -35,12 +35,34 @@ _ollama_provider = "local"
 _ollama_available = False
 _ollama_checked = False
 
+# Cloud AI Configuration (Google Gemini, OpenAI / OpenAI-compatible, Portkey)
+GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", os.environ.get("GOOGLE_API_KEY", ""))
+GEMINI_MODEL = os.environ.get("GEMINI_MODEL", "gemini-2.5-flash")
+
+OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "")
+OPENAI_BASE_URL = os.environ.get("OPENAI_BASE_URL", "https://api.openai.com/v1").rstrip("/")
+OPENAI_MODEL = os.environ.get("OPENAI_MODEL", "gpt-4o-mini")
+
 # Portkey configuration (AI gateway for routing all cached tokens)
 PORTKEY_API_KEY = os.environ.get("PORTKEY_API_KEY", "")
-PORTKEY_BASE_URL = os.environ.get("PORTKEY_BASE_URL", "https://api.portkey.ai/v1")
+PORTKEY_BASE_URL = os.environ.get("PORTKEY_BASE_URL", "https://api.portkey.ai/v1").rstrip("/")
 PORTKEY_CHAT_COMPLETIONS_PATH = "/chat/completions"
 PORTKEY_VIRTUAL_KEY = os.environ.get("PORTKEY_VIRTUAL_KEY", "")
 _portkey_enabled = bool(PORTKEY_API_KEY)
+
+
+def get_active_ai_provider():
+    """Determine the active AI provider and model based on configuration."""
+    if not ENABLE_AI_CHAT:
+        return "disabled", ""
+    if GEMINI_API_KEY:
+        return "gemini", GEMINI_MODEL
+    if OPENAI_API_KEY:
+        return "openai", OPENAI_MODEL
+    if _portkey_enabled:
+        return "portkey", OLLAMA_MODEL
+    return _ollama_provider, OLLAMA_MODEL
+
 
 
 def init_ollama_config(base_url, model, model_full, provider, available):
@@ -171,6 +193,12 @@ __all__ = [
     "_ollama_checked",
     "init_ollama_config",
     "_check_ollama",
+    "GEMINI_API_KEY",
+    "GEMINI_MODEL",
+    "OPENAI_API_KEY",
+    "OPENAI_BASE_URL",
+    "OPENAI_MODEL",
+    "get_active_ai_provider",
     "PORTKEY_API_KEY",
     "PORTKEY_BASE_URL",
     "PORTKEY_VIRTUAL_KEY",

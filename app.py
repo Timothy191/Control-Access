@@ -157,6 +157,7 @@ if not _hardware_key_check:
 
 app = Flask(__name__)
 app.secret_key = _secret_key
+app.config["HARDWARE_API_KEY"] = _hardware_key_check or ""
 app.permanent_session_lifetime = timedelta(minutes=30)
 app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
 app.config["SESSION_COOKIE_HTTPONLY"] = True

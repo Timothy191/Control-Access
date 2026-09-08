@@ -67,6 +67,11 @@ Roles are `admin`, `manager`, `security`, and `user`. Use `role_required(...)` f
 | `OLLAMA_USE_CLOUD` | `false` | Prefer Ollama Cloud when `true` |
 | `OLLAMA_CLOUD_API_KEY` | empty | Ollama Cloud API key |
 | `OLLAMA_CLOUD_URL` | `https://cloud.ollama.ai/api` | Ollama Cloud API base URL |
+| `GEMINI_API_KEY` | empty | Google Gemini API key (enables direct Gemini 2.5 Flash cloud AI) |
+| `GEMINI_MODEL` | `gemini-2.5-flash` | Gemini model name |
+| `OPENAI_API_KEY` | empty | OpenAI / OpenAI-compatible API key |
+| `OPENAI_BASE_URL` | `https://api.openai.com/v1` | OpenAI-compatible endpoint URL (Groq, OpenRouter, etc.) |
+| `OPENAI_MODEL` | `gpt-4o-mini` | OpenAI / OpenAI-compatible model name |
 | `PORTKEY_API_KEY` | empty | Portkey AI gateway API key (enables Portkey routing) |
 | `PORTKEY_BASE_URL` | `https://api.portkey.ai/v1` | Portkey API base URL |
 | `PORTKEY_VIRTUAL_KEY` | empty | Portkey virtual key for provider routing |

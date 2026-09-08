@@ -41,3 +41,29 @@ def test_api_scan_qr_with_valid_key(client, sample_employee):
     data = res.get_json()
     assert data["success"] is True
     assert data["entity_type"] == "employee"
+
+
+def test_ai_status_with_authenticated_session(client, monkeypatch):
+    """Test /api/ai/status reports cloud provider when configured."""
+    monkeypatch.setattr("routes.ai.GEMINI_API_KEY", "test-gemini-key")
+    monkeypatch.setattr("routes.ai.GEMINI_MODEL", "gemini-2.5-flash")
+    with client.session_transaction() as sess:
+        sess["logged_in"] = True
+        sess["username"] = "admin"
+        sess["role"] = "admin"
+
+    res = client.get("/api/ai/status")
+    assert res.status_code == 200
+    data = res.get_json()
+    assert data["available"] is True
+    assert data["provider"] == "gemini"
+    assert "gemini" in data["model"]
+
+
+def test_qr_scanner_template_renders_hardware_key(client, app):
+    """Test that qr_scanner template renders the configured HARDWARE_API_KEY."""
+    from flask import render_template
+    with app.test_request_context():
+        html = render_template("qr_scanner.html")
+        assert "test-hardware-key-1234" in html
+
