@@ -48,12 +48,12 @@ export default async function ApprovalsPage() {
 
   return (
     <div className="p-8">
-      <h1 className="text-2xl font-bold mb-4">
+      <h1 className="text-2xl font-bold mb-4 text-text-primary">
         Pending Approvals ({approvals.length})
       </h1>
 
       {approvals.length === 0 ? (
-        <div className="bg-white p-8 rounded-lg shadow border border-gray-200 text-center text-gray-500">
+        <div className="glass-card text-center text-text-secondary py-8">
           No pending approvals. New scan requests will appear here for review.
         </div>
       ) : (

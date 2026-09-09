@@ -66,38 +66,48 @@ export default async function OnboardPage({
 
   return (
     <div className="p-8">
-      <h1 className="text-2xl font-bold mb-2">Device Onboarding</h1>
-      <p className="text-gray-500 mb-6">
+      <h1 className="text-2xl font-bold mb-2 text-text-primary">
+        Device Onboarding
+      </h1>
+      <p className="text-text-secondary mb-6">
         Scan a QR code to provision a scanner or download the mobile app.
       </p>
 
       {/* Stats */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-        <div className="bg-white p-6 rounded-lg shadow-md border-l-4 border-blue-500">
-          <h2 className="text-gray-500 text-sm uppercase font-semibold">
+        <div className="glass-card">
+          <h2 className="text-text-secondary text-sm uppercase font-semibold">
             Total Devices
           </h2>
-          <p className="text-4xl font-bold mt-2">{stats.totalDevices}</p>
+          <p className="text-4xl font-bold mt-2 text-text-primary">
+            {stats.totalDevices}
+          </p>
         </div>
-        <div className="bg-white p-6 rounded-lg shadow-md border-l-4 border-green-500">
-          <h2 className="text-gray-500 text-sm uppercase font-semibold">
+        <div className="glass-card">
+          <h2 className="text-text-secondary text-sm uppercase font-semibold">
             Active Devices
           </h2>
-          <p className="text-4xl font-bold mt-2">{stats.activeDevices}</p>
+          <p className="text-4xl font-bold mt-2 text-text-primary">
+            {stats.activeDevices}
+          </p>
         </div>
-        <div className="bg-white p-6 rounded-lg shadow-md border-l-4 border-purple-500">
-          <h2 className="text-gray-500 text-sm uppercase font-semibold">
+        <div className="glass-card">
+          <h2 className="text-text-secondary text-sm uppercase font-semibold">
             Total Scans
           </h2>
-          <p className="text-4xl font-bold mt-2">{stats.totalScans}</p>
+          <p className="text-4xl font-bold mt-2 text-text-primary">
+            {stats.totalScans}
+          </p>
         </div>
       </div>
 
       {/* QR Codes */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-        <div className="bg-white p-6 rounded-lg shadow border border-gray-200 text-center">
-          <h3 className="text-lg font-medium mb-1">Scanner Config</h3>
-          <p className="text-sm text-gray-500 mb-4">
+        <div className="glass-card text-center">
+          <h3 className="text-lg font-medium mb-1 text-text-primary">
+            Scanner Config
+          </h3>
+          <p className="text-sm text-text-secondary mb-4">
             {serverIp}:{serverPort}
           </p>
           {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -108,12 +118,16 @@ export default async function OnboardPage({
             width={220}
             height={220}
           />
-          <p className="text-xs text-gray-400 mt-3 break-all">{configUrl}</p>
+          <p className="text-xs text-text-secondary mt-3 break-all">
+            {configUrl}
+          </p>
         </div>
 
-        <div className="bg-white p-6 rounded-lg shadow border border-gray-200 text-center">
-          <h3 className="text-lg font-medium mb-1">Mobile App Download</h3>
-          <p className="text-sm text-gray-500 mb-4">QrMobile.apk</p>
+        <div className="glass-card text-center">
+          <h3 className="text-lg font-medium mb-1 text-text-primary">
+            Mobile App Download
+          </h3>
+          <p className="text-sm text-text-secondary mb-4">QrMobile.apk</p>
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={appQrImage}
@@ -122,46 +136,43 @@ export default async function OnboardPage({
             width={220}
             height={220}
           />
-          <p className="text-xs text-gray-400 mt-3 break-all">
+          <p className="text-xs text-text-secondary mt-3 break-all">
             {appDownloadUrl}
           </p>
         </div>
       </div>
 
       {/* Recent Devices */}
-      <h2 className="text-xl font-bold mb-4">Recent Devices</h2>
-      <div className="overflow-x-auto bg-white rounded-lg shadow">
-        <table className="min-w-full divide-y divide-gray-200">
-          <thead className="bg-gray-50">
+      <h2 className="text-xl font-bold mb-4 text-text-primary">
+        Recent Devices
+      </h2>
+      <div className="glass-table overflow-x-auto">
+        <table className="min-w-full">
+          <thead>
             <tr>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Device
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Address
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Last Seen
-              </th>
+              <th>Device</th>
+              <th>Address</th>
+              <th>Last Seen</th>
             </tr>
           </thead>
-          <tbody className="bg-white divide-y divide-gray-200">
+          <tbody>
             {recentDevices.length === 0 ? (
               <tr>
-                <td colSpan={3} className="px-6 py-4 text-center text-gray-500">
+                <td
+                  colSpan={3}
+                  className="px-6 py-4 text-center text-text-secondary"
+                >
                   No devices registered yet.
                 </td>
               </tr>
             ) : (
               recentDevices.map((d) => (
                 <tr key={d.id}>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    {d.device_name}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
+                  <td className="whitespace-nowrap">{d.device_name}</td>
+                  <td className="whitespace-nowrap font-mono text-sm">
                     {d.ip_address || d.mac_address || "Unknown"}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
+                  <td className="whitespace-nowrap">
                     {d.last_seen
                       ? new Date(d.last_seen).toLocaleTimeString()
                       : "Never"}

@@ -14,8 +14,7 @@ export default async function EmployeesPage() {
 
   return (
     <div className="p-8">
-      {/* Proper header above the filter area */}
-      <h1 className="text-2xl font-bold mb-4">
+      <h1 className="text-2xl font-bold mb-4 text-text-primary">
         Employees ({employees.length})
       </h1>
 

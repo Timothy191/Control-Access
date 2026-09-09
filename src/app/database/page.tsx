@@ -25,56 +25,30 @@ export default async function DatabasePage() {
 
   return (
     <div className="p-8">
-      <h1 className="text-2xl font-bold mb-4">
+      <h1 className="text-2xl font-bold mb-4 text-text-primary">
         Database / Gate Logs ({logs.length})
       </h1>
 
-      <div className="overflow-x-auto bg-white rounded-lg shadow">
-        <table className="min-w-full divide-y divide-gray-200">
-          <thead className="bg-gray-50">
+      <div className="glass-table overflow-x-auto">
+        <table className="min-w-full">
+          <thead>
             <tr>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Photo
-              </th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Name &amp; Surname
-              </th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Id Number
-              </th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Job Title
-              </th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Area
-              </th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Medical Expiry
-              </th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Induction Expiry
-              </th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                QR-Code
-              </th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Location / Site
-              </th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Time Scanned
-              </th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Direction
-              </th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Status
-              </th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Alcohol Tested
-              </th>
+              <th>Photo</th>
+              <th>Name &amp; Surname</th>
+              <th>Id Number</th>
+              <th>Job Title</th>
+              <th>Area</th>
+              <th>Medical Expiry</th>
+              <th>Induction Expiry</th>
+              <th>QR-Code</th>
+              <th>Location / Site</th>
+              <th>Time Scanned</th>
+              <th>Direction</th>
+              <th>Status</th>
+              <th>Alcohol Tested</th>
             </tr>
           </thead>
-          <tbody className="bg-white divide-y divide-gray-200">
+          <tbody>
             {logs.map((log) => {
               const emp = log.employee;
               const name = emp
@@ -86,7 +60,7 @@ export default async function DatabasePage() {
 
               return (
                 <tr key={log.id}>
-                  <td className="px-4 py-3 whitespace-nowrap">
+                  <td className="whitespace-nowrap">
                     {photo ? (
                       // eslint-disable-next-line @next/next/no-img-element
                       <img
@@ -95,7 +69,7 @@ export default async function DatabasePage() {
                         className="h-10 w-10 rounded-full object-cover"
                       />
                     ) : (
-                      <div className="h-10 w-10 rounded-full bg-gray-200 flex items-center justify-center text-gray-500 text-xs font-semibold">
+                      <div className="h-10 w-10 rounded-full bg-white/10 flex items-center justify-center text-text-secondary text-xs font-semibold">
                         {name
                           .split(/\s+/)
                           .map((w) => w[0])
@@ -105,50 +79,54 @@ export default async function DatabasePage() {
                       </div>
                     )}
                   </td>
-                  <td className="px-4 py-3 whitespace-nowrap font-medium">
-                    {name}
-                  </td>
-                  <td className="px-4 py-3 whitespace-nowrap">
+                  <td className="whitespace-nowrap font-medium">{name}</td>
+                  <td className="whitespace-nowrap font-mono text-sm">
                     {idNumber || "-"}
                   </td>
-                  <td className="px-4 py-3 whitespace-nowrap">
-                    {emp?.job_title || "-"}
-                  </td>
-                  <td className="px-4 py-3 whitespace-nowrap">
-                    {emp?.area || "-"}
-                  </td>
-                  <td className="px-4 py-3 whitespace-nowrap">
+                  <td className="whitespace-nowrap">{emp?.job_title || "-"}</td>
+                  <td className="whitespace-nowrap">{emp?.area || "-"}</td>
+                  <td className="whitespace-nowrap">
                     {fmtDate(emp?.medical_expiry)}
                   </td>
-                  <td className="px-4 py-3 whitespace-nowrap">
+                  <td className="whitespace-nowrap">
                     {fmtDate(emp?.induction_expiry)}
                   </td>
-                  <td className="px-4 py-3 whitespace-nowrap font-mono text-xs">
+                  <td className="whitespace-nowrap font-mono text-xs">
                     {qrCode}
                   </td>
-                  <td className="px-4 py-3 whitespace-nowrap">
+                  <td className="whitespace-nowrap">
                     {log.gate_location || "Main Gate"}
                   </td>
-                  <td className="px-4 py-3 whitespace-nowrap">
+                  <td className="whitespace-nowrap">
                     {fmtTime(log.scanned_at)}
                   </td>
-                  <td className="px-4 py-3 whitespace-nowrap">
+                  <td className="whitespace-nowrap">
                     <span
-                      className={`text-xs px-2 py-0.5 rounded font-mono ${log.direction === "IN" ? "bg-blue-100 text-blue-800" : log.direction === "OUT" ? "bg-orange-100 text-orange-800" : "bg-gray-100 text-gray-700"}`}
+                      className={`text-xs px-2 py-0.5 rounded font-mono border ${
+                        log.direction === "IN"
+                          ? "bg-red-primary/20 text-red-primary border-red-primary/30"
+                          : log.direction === "OUT"
+                            ? "bg-warning/20 text-warning border-warning/30"
+                            : "bg-white/10 text-text-secondary border-white/10"
+                      }`}
                     >
                       {log.direction || "SCAN"}
                     </span>
                   </td>
-                  <td className="px-4 py-3 whitespace-nowrap">
+                  <td className="whitespace-nowrap">
                     <span
-                      className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${log.access_granted ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"}`}
+                      className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full border ${
+                        log.access_granted
+                          ? "bg-success/20 text-success border-success/30"
+                          : "bg-danger/20 text-danger border-danger/30"
+                      }`}
                     >
                       {log.access_granted
                         ? "GRANTED"
                         : log.denial_reason || "DENIED"}
                     </span>
                   </td>
-                  <td className="px-4 py-3 whitespace-nowrap">
+                  <td className="whitespace-nowrap">
                     {log.alcohol_tested || "-"}
                   </td>
                 </tr>
@@ -158,7 +136,7 @@ export default async function DatabasePage() {
               <tr>
                 <td
                   colSpan={13}
-                  className="px-6 py-8 text-center text-gray-500"
+                  className="px-6 py-8 text-center text-text-secondary"
                 >
                   No gate scan records found.
                 </td>

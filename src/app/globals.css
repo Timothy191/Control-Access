@@ -3,7 +3,7 @@
 @theme {
   --color-background: #0a0a0a;
   --color-foreground: #ffffff;
-  
+
   --color-red-primary: #ff6b00;
   --color-red-dark: #d95800;
   --color-steel: #d4af37;
@@ -11,13 +11,15 @@
   --color-dark-card: rgba(15, 15, 20, 0.65);
   --color-text-primary: #ffffff;
   --color-text-secondary: #cccccc;
-  
+
   --color-success: #10b981;
   --color-warning: #f59e0b;
   --color-danger: #ef4444;
 
   --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
-  --font-mono: var(--font-jetbrains-mono), ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  --font-mono:
+    var(--font-jetbrains-mono), ui-monospace, SFMono-Regular, Menlo, Monaco,
+    Consolas, monospace;
 }
 
 @layer base {
@@ -33,6 +35,12 @@ body {
   font-family: var(--font-sans);
 }
 
+/* Accessibility: visible focus ring on all interactive elements (DESIGN.md §4) */
+:focus-visible {
+  outline: 2px solid var(--color-red-primary);
+  outline-offset: 2px;
+}
+
 /* Base card styling matching DESIGN.md */
 @layer components {
   .glass-card {
@@ -43,9 +51,49 @@ body {
     padding: 1rem;
     transition: all 0.2s ease;
   }
-  
+
   .glass-card:hover {
     box-shadow: 0 4px 20px rgba(255, 107, 0, 0.2);
     transform: translateY(-2px);
+  }
+
+  /* Consistent dark glass table surface */
+  .glass-table {
+    background-color: rgba(15, 15, 20, 0.6);
+    backdrop-filter: blur(4px);
+    border: 1px solid rgba(212, 175, 55, 0.3);
+    border-radius: 12px;
+    overflow: hidden;
+  }
+
+  .glass-table thead {
+    background-color: rgba(255, 255, 255, 0.05);
+  }
+
+  .glass-table th {
+    color: var(--color-text-secondary);
+    font-size: 0.75rem;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    text-align: left;
+    padding: 0.75rem 1rem;
+  }
+
+  .glass-table td {
+    padding: 0.75rem 1rem;
+    color: var(--color-text-primary);
+  }
+
+  .glass-table tbody tr {
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  }
+
+  .glass-table tbody tr:last-child {
+    border-bottom: none;
+  }
+
+  .glass-table tbody tr:hover {
+    background-color: rgba(255, 255, 255, 0.04);
   }
 }

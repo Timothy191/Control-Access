@@ -35,31 +35,36 @@ function LoginForm() {
   };
 
   return (
-    <div className="flex h-screen items-center justify-center bg-gray-100">
-      <div className="w-full max-w-md bg-white p-8 rounded-lg shadow-md">
-        <h2 className="text-2xl font-bold mb-6 text-center">
-          Login to Control-Access
-        </h2>
+    <div className="flex h-screen items-center justify-center p-4">
+      <div className="w-full max-w-md glass-card">
+        <div className="flex items-center justify-center gap-3 mb-6">
+          <div className="w-10 h-10 rounded bg-red-primary flex items-center justify-center font-bold text-lg shadow-[0_0_15px_rgba(255,107,0,0.5)]">
+            CA
+          </div>
+          <h2 className="text-2xl font-bold text-text-primary">
+            CONTROL<span className="text-red-primary">-</span>ACCESS
+          </h2>
+        </div>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700">
+            <label className="block text-sm font-medium text-text-secondary">
               Username
             </label>
             <input
               type="text"
-              className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md"
+              className="mt-1 block w-full px-3 py-2 border border-steel/30 rounded-md bg-black/40 text-text-primary placeholder:text-text-secondary"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
               autoComplete="username"
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700">
+            <label className="block text-sm font-medium text-text-secondary">
               Password
             </label>
             <input
               type="password"
-              className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md"
+              className="mt-1 block w-full px-3 py-2 border border-steel/30 rounded-md bg-black/40 text-text-primary placeholder:text-text-secondary"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               autoComplete="current-password"
@@ -67,7 +72,7 @@ function LoginForm() {
           </div>
 
           {error && (
-            <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-md px-3 py-2">
+            <p className="text-sm text-danger bg-danger/10 border border-danger/30 rounded-md px-3 py-2">
               {error}
             </p>
           )}
@@ -75,7 +80,7 @@ function LoginForm() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-blue-600 text-white py-2 px-4 rounded hover:bg-blue-700 disabled:opacity-50"
+            className="w-full bg-red-primary text-white py-2 px-4 rounded hover:bg-red-dark disabled:opacity-50 transition"
           >
             {loading ? "Signing in..." : "Sign In"}
           </button>

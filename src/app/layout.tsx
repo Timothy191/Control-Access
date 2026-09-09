@@ -1,6 +1,21 @@
 import type { Metadata } from "next";
+import { Inter, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
-import Link from "next/link";
+import GlobalBackground from "@/components/layout/GlobalBackground";
+import Sidebar from "@/components/layout/Sidebar";
+import TopBar from "@/components/layout/TopBar";
+
+const inter = Inter({
+  subsets: ["latin"],
+  variable: "--font-inter",
+  display: "swap",
+});
+
+const jetbrainsMono = JetBrains_Mono({
+  subsets: ["latin"],
+  variable: "--font-jetbrains-mono",
+  display: "swap",
+});
 
 export const metadata: Metadata = {
   title: "Control-Access System",
@@ -14,78 +29,15 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body className="antialiased flex h-screen bg-transparent relative overflow-hidden">
-        <video
-          autoPlay
-          loop
-          muted
-          playsInline
-          className="absolute inset-0 w-full h-full object-cover z-[-1]"
-        >
-          <source src="/background.mp4" type="video/mp4" />
-        </video>
-        <aside className="w-64 bg-slate-900 text-white flex flex-col">
-          <div className="p-6 font-bold text-xl border-b border-slate-700 flex items-center gap-3">
-            <img
-              src="/arch-linux-mono.svg"
-              alt="Logo"
-              className="w-8 h-8"
-              style={{ filter: "invert(1)" }}
-            />
-            Control-Access
-          </div>
-          <nav className="flex-1 p-4 space-y-2">
-            <Link
-              href="/dashboard"
-              className="block p-3 rounded hover:bg-slate-800 transition"
-            >
-              Dashboard
-            </Link>
-            <Link
-              href="/employees"
-              className="block p-3 rounded hover:bg-slate-800 transition"
-            >
-              Employees
-            </Link>
-            <Link
-              href="/visitors"
-              className="block p-3 rounded hover:bg-slate-800 transition"
-            >
-              Visitors
-            </Link>
-            <Link
-              href="/fleet"
-              className="block p-3 rounded hover:bg-slate-800 transition"
-            >
-              Fleet
-            </Link>
-            <Link
-              href="/equipment"
-              className="block p-3 rounded hover:bg-slate-800 transition"
-            >
-              Equipment
-            </Link>
-            <Link
-              href="/approvals"
-              className="block p-3 rounded hover:bg-slate-800 transition"
-            >
-              Approvals
-            </Link>
-            <Link
-              href="/database"
-              className="block p-3 rounded hover:bg-slate-800 transition"
-            >
-              Database
-            </Link>
-            <Link
-              href="/admin"
-              className="block p-3 rounded hover:bg-slate-800 transition"
-            >
-              Admin Settings
-            </Link>
-          </nav>
-        </aside>
-        <main className="flex-1 overflow-auto">{children}</main>
+      <body
+        className={`${inter.variable} ${jetbrainsMono.variable} antialiased flex h-screen bg-transparent relative overflow-hidden font-sans`}
+      >
+        <GlobalBackground />
+        <Sidebar />
+        <div className="flex-1 flex flex-col min-w-0 relative z-10">
+          <TopBar />
+          <main className="flex-1 overflow-auto">{children}</main>
+        </div>
       </body>
     </html>
   );

@@ -35,16 +35,16 @@ export default function EmployeeTable({
   return (
     <div>
       {/* Filter Area */}
-      <div className="bg-white rounded-lg shadow border border-gray-200 p-4 mb-4">
+      <div className="glass-card mb-4">
         <div className="flex flex-wrap items-end gap-4">
           <div>
-            <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-1">
+            <label className="block text-xs font-medium text-text-secondary uppercase tracking-wider mb-1">
               Area
             </label>
             <select
               value={area}
               onChange={(e) => setArea(e.target.value)}
-              className="px-3 py-2 border border-gray-300 rounded-md bg-white text-sm"
+              className="px-3 py-2 border border-steel/30 rounded-md bg-black/40 text-text-primary text-sm"
             >
               <option value="all">All Areas</option>
               {areas.map((a) => (
@@ -55,63 +55,55 @@ export default function EmployeeTable({
             </select>
           </div>
           <div>
-            <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-1">
+            <label className="block text-xs font-medium text-text-secondary uppercase tracking-wider mb-1">
               Status
             </label>
             <select
               value={status}
               onChange={(e) => setStatus(e.target.value)}
-              className="px-3 py-2 border border-gray-300 rounded-md bg-white text-sm"
+              className="px-3 py-2 border border-steel/30 rounded-md bg-black/40 text-text-primary text-sm"
             >
               <option value="all">All Statuses</option>
               <option value="Active">Active</option>
               <option value="Inactive">Inactive</option>
             </select>
           </div>
-          <div className="text-sm text-gray-500">
+          <div className="text-sm text-text-secondary">
             {filtered.length} of {employees.length} employees
           </div>
         </div>
       </div>
 
       {/* Table */}
-      <div className="overflow-x-auto bg-white rounded-lg shadow">
-        <table className="min-w-full divide-y divide-gray-200">
-          <thead className="bg-gray-50">
+      <div className="glass-table">
+        <table className="min-w-full">
+          <thead>
             <tr>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Name
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Employee Code
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Job Title
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Area
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Status
-              </th>
+              <th>Name</th>
+              <th>Employee Code</th>
+              <th>Job Title</th>
+              <th>Area</th>
+              <th>Status</th>
             </tr>
           </thead>
-          <tbody className="bg-white divide-y divide-gray-200">
+          <tbody>
             {filtered.map((emp) => (
               <tr key={emp.id}>
-                <td className="px-6 py-4 whitespace-nowrap">
+                <td className="whitespace-nowrap">
                   {emp.first_name} {emp.surname}
                 </td>
-                <td className="px-6 py-4 whitespace-nowrap">{emp.emp_code}</td>
-                <td className="px-6 py-4 whitespace-nowrap">
-                  {emp.job_title || "-"}
+                <td className="whitespace-nowrap font-mono text-sm">
+                  {emp.emp_code}
                 </td>
-                <td className="px-6 py-4 whitespace-nowrap">
-                  {emp.area || "-"}
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap">
+                <td className="whitespace-nowrap">{emp.job_title || "-"}</td>
+                <td className="whitespace-nowrap">{emp.area || "-"}</td>
+                <td className="whitespace-nowrap">
                   <span
-                    className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${emp.status === "Active" ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"}`}
+                    className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full border ${
+                      emp.status === "Active"
+                        ? "bg-success/20 text-success border-success/30"
+                        : "bg-danger/20 text-danger border-danger/30"
+                    }`}
                   >
                     {emp.status}
                   </span>
@@ -120,7 +112,10 @@ export default function EmployeeTable({
             ))}
             {filtered.length === 0 && (
               <tr>
-                <td colSpan={5} className="px-6 py-8 text-center text-gray-500">
+                <td
+                  colSpan={5}
+                  className="px-6 py-8 text-center text-text-secondary"
+                >
                   No employees match the selected filters.
                 </td>
               </tr>

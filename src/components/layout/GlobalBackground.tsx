@@ -10,7 +10,7 @@ export default function GlobalBackground() {
         className="absolute inset-0 w-full h-full object-cover"
         style={{ filter: "brightness(0.65) contrast(1.1)" }}
       >
-        <source src="/global-bg.mp4" type="video/mp4" />
+        <source src="/background.mp4" type="video/mp4" />
       </video>
 
       {/* Fallback CSS background (behind video if it fails, or overlaid if opacity adjusted) */}

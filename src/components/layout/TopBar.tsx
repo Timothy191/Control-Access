@@ -5,16 +5,29 @@ import { IconBell, IconUserCircle } from "@tabler/icons-react";
 
 export default function TopBar() {
   const pathname = usePathname();
-  
+
   const getPageTitle = () => {
     switch (pathname) {
-      case "/": return "Dashboard";
-      case "/kiosk": return "Live Scanning";
-      case "/employees": return "Employees";
-      case "/fleet": return "Fleet & Equipment";
-      case "/monitoring": return "Monitoring Wallboard";
-      case "/settings": return "Settings";
-      default: return "Dashboard";
+      case "/":
+        return "Dashboard";
+      case "/employees":
+        return "Employees";
+      case "/visitors":
+        return "Visitors";
+      case "/fleet":
+        return "Fleet";
+      case "/equipment":
+        return "Equipment";
+      case "/approvals":
+        return "Approvals";
+      case "/database":
+        return "Database";
+      case "/admin":
+        return "Admin Settings";
+      case "/onboard":
+        return "Device Onboarding";
+      default:
+        return "Dashboard";
     }
   };
 
@@ -24,26 +37,29 @@ export default function TopBar() {
         <h2 className="font-display font-semibold text-lg text-text-primary">
           {getPageTitle()}
         </h2>
-        {/* Mock Live Indicator */}
-        {pathname === "/monitoring" && (
-          <div className="flex items-center gap-2 px-2 py-1 rounded bg-red-primary/10 border border-red-primary/30">
-            <div className="w-2 h-2 rounded-full bg-red-primary animate-pulse" />
-            <span className="text-xs font-mono font-medium text-red-primary">LIVE</span>
-          </div>
-        )}
       </div>
 
       <div className="flex items-center gap-4 text-text-secondary">
-        <button className="p-2 hover:bg-steel/10 hover:text-text-primary rounded-full transition-colors relative" aria-label="Notifications">
+        <button
+          className="p-2 hover:bg-steel/10 hover:text-text-primary rounded-full transition-colors relative"
+          aria-label="Notifications"
+        >
           <IconBell size={22} />
           <span className="absolute top-1.5 right-2 w-2 h-2 rounded-full bg-red-primary" />
         </button>
         <div className="h-6 w-px bg-steel/30" />
-        <button className="flex items-center gap-2 hover:text-text-primary transition-colors" aria-label="User Profile">
+        <button
+          className="flex items-center gap-2 hover:text-text-primary transition-colors"
+          aria-label="User Profile"
+        >
           <IconUserCircle size={26} />
           <div className="hidden sm:flex flex-col items-start text-left">
-            <span className="text-sm font-medium text-text-primary leading-tight">Admin User</span>
-            <span className="text-xs font-mono text-text-secondary leading-tight">ID: ADMIN-01</span>
+            <span className="text-sm font-medium text-text-primary leading-tight">
+              Admin User
+            </span>
+            <span className="text-xs font-mono text-text-secondary leading-tight">
+              ID: ADMIN-01
+            </span>
           </div>
         </button>
       </div>
