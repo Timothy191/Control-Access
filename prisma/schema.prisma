@@ -48,6 +48,7 @@ model employees {
   medical_expiry   DateTime?
   qr_code          String?     @unique
   rfid_tag         String?     @unique
+  photo            String?
   status           String      @default("Active")
   created_at       DateTime    @default(now())
   visitors         visitors[]
@@ -108,6 +109,7 @@ model gate_logs {
   ip_address     String?
   user_agent     String?
   parsed_qr_data String?
+  alcohol_tested String?
   employee_id    Int?
   employee       employees? @relation(fields: [employee_id], references: [id])
   vehicle_id     Int?

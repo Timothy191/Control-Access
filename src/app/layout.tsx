@@ -14,10 +14,24 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body className="antialiased flex h-screen bg-gray-100">
+      <body className="antialiased flex h-screen bg-transparent relative overflow-hidden">
+        <video
+          autoPlay
+          loop
+          muted
+          playsInline
+          className="absolute inset-0 w-full h-full object-cover z-[-1]"
+        >
+          <source src="/background.mp4" type="video/mp4" />
+        </video>
         <aside className="w-64 bg-slate-900 text-white flex flex-col">
           <div className="p-6 font-bold text-xl border-b border-slate-700 flex items-center gap-3">
-            <img src="/arch-linux-mono.svg" alt="Logo" className="w-8 h-8" style={{ filter: 'invert(1)' }} />
+            <img
+              src="/arch-linux-mono.svg"
+              alt="Logo"
+              className="w-8 h-8"
+              style={{ filter: "invert(1)" }}
+            />
             Control-Access
           </div>
           <nav className="flex-1 p-4 space-y-2">
@@ -56,6 +70,12 @@ export default function RootLayout({
               className="block p-3 rounded hover:bg-slate-800 transition"
             >
               Approvals
+            </Link>
+            <Link
+              href="/database"
+              className="block p-3 rounded hover:bg-slate-800 transition"
+            >
+              Database
             </Link>
             <Link
               href="/admin"
