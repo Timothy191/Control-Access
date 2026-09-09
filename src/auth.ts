@@ -2,11 +2,15 @@ import NextAuth from "next-auth";
 import Credentials from "next-auth/providers/credentials";
 import { PrismaClient } from "@prisma/client";
 import { verifyWerkzeugHash } from "./lib/auth/werkzeug";
-import { authenticator } from "otplib";
+import { verify } from "otplib";
 
 const prisma = new PrismaClient();
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
+  secret:
+    process.env.AUTH_SECRET ||
+    process.env.SECRET_KEY ||
+    "control-access-dev-secret",
   providers: [
     Credentials({
       credentials: {
@@ -27,7 +31,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
 
         const isPasswordValid = await verifyWerkzeugHash(
           user.password,
-          credentials.password as string
+          credentials.password as string,
         );
 
         if (!isPasswordValid) return null;
@@ -35,15 +39,17 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         // TOTP check if enabled
         if (user.mfa_enabled && user.totp_secret) {
           if (!credentials.totp) return null; // MFA required but not provided
-          
-          const isValidTotp = authenticator.verify({
+
+          const isValidTotp = verify({
             token: credentials.totp as string,
             secret: user.totp_secret,
           });
 
           if (!isValidTotp) {
             // Check backup codes
-            const backupCodes = user.mfa_backup_codes ? user.mfa_backup_codes.split(" ") : [];
+            const backupCodes = user.mfa_backup_codes
+              ? user.mfa_backup_codes.split(" ")
+              : [];
             if (!backupCodes.includes(credentials.totp as string)) {
               return null;
             }
@@ -70,6 +76,23 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         (session.user as any).role = token.role;
       }
       return session;
+    },
+  },
+  session: {
+    strategy: "jwt",
+  },
+  cookies: {
+    sessionToken: {
+      name:
+        process.env.NODE_ENV === "production"
+          ? "__Secure-authjs.session-token"
+          : "authjs.session-token",
+      options: {
+        httpOnly: true,
+        sameSite: "lax",
+        path: "/",
+        secure: process.env.NODE_ENV === "production",
+      },
     },
   },
 });
