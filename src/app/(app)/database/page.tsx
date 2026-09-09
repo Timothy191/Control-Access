@@ -1,7 +1,9 @@
 import { redirect } from "next/navigation";
+import { cookies } from "next/headers";
 import { auth } from "@/auth";
 import prisma from "@/lib/prisma";
 import { decryptField } from "@/lib/crypto";
+import { normalizeSiteName } from "@/lib/sites";
 
 function fmtDate(d: Date | null | undefined): string {
   if (!d) return "-";
@@ -13,21 +15,45 @@ function fmtTime(d: Date | null | undefined): string {
   return new Date(d).toLocaleString();
 }
 
-export default async function DatabasePage() {
+export default async function DatabasePage({
+  searchParams,
+}: {
+  searchParams?: Promise<{ site?: string }>;
+}) {
   const session = await auth();
   if (!session?.user)
     redirect(`/login?callbackUrl=${encodeURIComponent("/database")}`);
 
+  const cookieStore = await cookies();
+  const sp = searchParams ? await searchParams : {};
+  const rawSite = sp.site || cookieStore.get("selected_site")?.value;
+  const site = normalizeSiteName(rawSite);
+  const isFiltered = site !== "all";
+
   const logs = await prisma.gate_logs.findMany({
+    where: isFiltered
+      ? {
+          OR: [
+            { gate_location: { contains: site } },
+            { employee: { area: { contains: site } } },
+          ],
+        }
+      : {},
     orderBy: { id: "desc" },
     include: { employee: true },
   });
 
   return (
     <div className="p-8">
-      <h1 className="text-2xl font-bold mb-4 text-text-primary">
-        Database / Gate Logs ({logs.length})
-      </h1>
+      <div className="flex flex-wrap items-center justify-between gap-4 mb-4">
+        <h1 className="text-2xl font-bold text-text-primary">
+          Database / Gate Logs ({logs.length})
+        </h1>
+        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-white/10 bg-white/5 text-xs font-mono text-neutral-300">
+          <span className="h-2 w-2 rounded-full bg-red-primary" />
+          <span>Site Filter: {isFiltered ? site : "All Sites (Global)"}</span>
+        </div>
+      </div>
 
       <div className="glass-table overflow-x-auto">
         <table className="min-w-full">

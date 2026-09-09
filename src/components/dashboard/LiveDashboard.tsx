@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useTelemetry } from "@/hooks/useTelemetry";
+import { useSite } from "@/components/layout/SiteContext";
 
 interface ScanLog {
   id: number;
@@ -31,10 +32,11 @@ export default function LiveDashboard({
   const [stats, setStats] = useState<DashboardStats>(initialStats);
   const [lastUpdated, setLastUpdated] = useState<string>("");
   const telemetry = useTelemetry();
+  const { selectedSite } = useSite();
 
-  const fetchStats = async () => {
+  const fetchStats = useCallback(async () => {
     try {
-      const res = await fetch("/api/dashboard/stats", { cache: "no-store" });
+      const res = await fetch(`/api/dashboard/stats?site=${encodeURIComponent(selectedSite)}`, { cache: "no-store" });
       if (res.ok) {
         const data = await res.json();
         setStats(data);
@@ -43,14 +45,14 @@ export default function LiveDashboard({
     } catch (err) {
       console.error("Failed to refresh live stats:", err);
     }
-  };
+  }, [selectedSite]);
 
   useEffect(() => {
-    setLastUpdated(new Date().toLocaleTimeString());
-    // Auto-update live system every 2.5 seconds
-    const interval = setInterval(fetchStats, 2500);
+    fetchStats();
+    // Auto-update live system every 3 seconds
+    const interval = setInterval(fetchStats, 3000);
     return () => clearInterval(interval);
-  }, []);
+  }, [fetchStats]);
 
   return (
     <div className="space-y-8">

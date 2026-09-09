@@ -4,6 +4,7 @@ import { GeistMono } from "geist/font/mono";
 import { SessionProvider } from "next-auth/react";
 import "./globals.css";
 import GlobalBackground from "@/components/layout/GlobalBackground";
+import { SiteProvider } from "@/components/layout/SiteContext";
 
 export const metadata: Metadata = {
   title: "Control-Access — Plantcor Arch System",
@@ -21,7 +22,9 @@ export default function RootLayout({
         className={`${GeistSans.className} antialiased flex h-screen bg-transparent relative overflow-hidden font-sans`}
       >
         <GlobalBackground />
-        <SessionProvider>{children}</SessionProvider>
+        <SessionProvider>
+          <SiteProvider>{children}</SiteProvider>
+        </SessionProvider>
       </body>
     </html>
   );

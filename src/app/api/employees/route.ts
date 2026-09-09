@@ -1,9 +1,16 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 
-export async function GET() {
+export async function GET(req: Request) {
   try {
-    const employees = await prisma.employees.findMany();
+    const url = new URL(req.url);
+    const site = url.searchParams.get("site");
+    const isFiltered = site && site !== "all" && !site.toLowerCase().includes("all");
+
+    const employees = await prisma.employees.findMany({
+      where: isFiltered ? { area: { contains: site.trim() } } : {},
+      orderBy: { created_at: "desc" },
+    });
     return NextResponse.json(employees);
   } catch (error) {
     return NextResponse.json({ error: "Failed to fetch employees" }, { status: 500 });
