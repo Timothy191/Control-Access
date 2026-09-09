@@ -1,5 +1,6 @@
 import QRCode from "qrcode";
 import dgram from "node:dgram";
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import prisma from "@/lib/prisma";
@@ -50,12 +51,12 @@ export default async function OnboardPage({
             and retry.
           </p>
         </div>
-        <a
+        <Link
           href="/"
           className="inline-block mt-4 text-text-secondary hover:text-text-primary text-sm"
         >
           ← Back to dashboard
-        </a>
+        </Link>
       </div>
     );
   }

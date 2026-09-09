@@ -2,8 +2,15 @@
 
 import { useEffect, useState } from "react";
 
+export interface TelemetryEvent {
+  type?: string;
+  timestamp?: string;
+  activeTCP?: number;
+  [key: string]: unknown;
+}
+
 export function useTelemetry() {
-  const [data, setData] = useState<any[]>([]);
+  const [data, setData] = useState<TelemetryEvent[]>([]);
 
   useEffect(() => {
     const eventSource = new EventSource("/api/telemetry");

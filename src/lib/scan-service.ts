@@ -42,7 +42,7 @@ export async function processQrScan({
   let accessGranted = false;
   let denialReason: string | null = null;
 
-  let employee = await prisma.employees.findFirst({
+  const employee = await prisma.employees.findFirst({
     where: { qr_code: normalized },
   });
 
@@ -156,7 +156,7 @@ export async function processRfidScan({
   let accessGranted = false;
   let denialReason: string | null = null;
 
-  let employee = await prisma.employees.findFirst({
+  const employee = await prisma.employees.findFirst({
     where: { rfid_tag: tag },
   });
 

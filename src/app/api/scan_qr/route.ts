@@ -4,7 +4,7 @@ import { processQrScan } from "@/lib/scan-service";
 export async function POST(request: Request) {
   try {
     const data = await request.json();
-    const { qr_data, gate_location, direction, scanned_by } = data;
+    const { qr_data, gate_location, scanned_by } = data;
 
     if (!qr_data) {
       return NextResponse.json({ error: "Missing qr_data" }, { status: 400 });
@@ -22,7 +22,7 @@ export async function POST(request: Request) {
     });
 
     return NextResponse.json(result);
-  } catch (error: any) {
+  } catch (error) {
     console.error("QR Scan API Error:", error);
     return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
   }

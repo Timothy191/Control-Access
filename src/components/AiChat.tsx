@@ -26,7 +26,7 @@ export default function AiChat() {
         ...prev,
         { role: "ai", content: data.reply || data.error },
       ]);
-    } catch (error) {
+    } catch {
       setMessages((prev) => [
         ...prev,
         { role: "ai", content: "Connection error" },

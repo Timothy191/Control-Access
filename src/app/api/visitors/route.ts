@@ -5,7 +5,7 @@ export async function GET() {
   try {
     const visitors = await prisma.visitors.findMany();
     return NextResponse.json(visitors);
-  } catch (error) {
+  } catch {
     return NextResponse.json({ error: "Failed to fetch visitors" }, { status: 500 });
   }
 }
@@ -17,7 +17,7 @@ export async function POST(req: Request) {
       data: body,
     });
     return NextResponse.json(newVisitor, { status: 201 });
-  } catch (error) {
+  } catch {
     return NextResponse.json({ error: "Failed to create visitor" }, { status: 500 });
   }
 }

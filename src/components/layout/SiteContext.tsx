@@ -27,7 +27,9 @@ export function SiteProvider({ children }: { children: React.ReactNode }) {
 
     const norm = normalizeSiteName(initial);
     const resolved = SITES.find((s) => s.name.toLowerCase() === norm.toLowerCase())?.name || "All Sites (Global)";
-    setSelectedSiteState(resolved);
+    queueMicrotask(() => {
+      setSelectedSiteState(resolved);
+    });
   }, []);
 
   const setSelectedSite = (site: string) => {

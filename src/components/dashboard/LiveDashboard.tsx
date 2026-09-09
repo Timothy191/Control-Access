@@ -48,10 +48,15 @@ export default function LiveDashboard({
   }, [selectedSite]);
 
   useEffect(() => {
-    fetchStats();
+    const timer = setTimeout(() => {
+      fetchStats();
+    }, 0);
     // Auto-update live system every 3 seconds
     const interval = setInterval(fetchStats, 3000);
-    return () => clearInterval(interval);
+    return () => {
+      clearTimeout(timer);
+      clearInterval(interval);
+    };
   }, [fetchStats]);
 
   return (
@@ -162,7 +167,7 @@ export default function LiveDashboard({
                   className="p-2 rounded bg-black/40 border border-white/5 text-gray-300 flex items-center justify-between"
                 >
                   <span>
-                    [{new Date(event.timestamp || Date.now()).toLocaleTimeString()}] Type: {event.type || "heartbeat"}
+                    [{event.timestamp ? new Date(event.timestamp).toLocaleTimeString() : "Live"}] Type: {event.type || "heartbeat"}
                   </span>
                   <span className="text-emerald-400">TCP: {event.activeTCP ?? 1}</span>
                 </div>

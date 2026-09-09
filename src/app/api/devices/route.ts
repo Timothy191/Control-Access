@@ -5,7 +5,7 @@ export async function GET() {
   try {
     const devices = await prisma.devices.findMany();
     return NextResponse.json(devices);
-  } catch (error) {
+  } catch {
     return NextResponse.json({ error: "Failed to fetch devices" }, { status: 500 });
   }
 }
@@ -17,7 +17,7 @@ export async function POST(req: Request) {
       data: body,
     });
     return NextResponse.json(newDevice, { status: 201 });
-  } catch (error) {
+  } catch {
     return NextResponse.json({ error: "Failed to create device" }, { status: 500 });
   }
 }

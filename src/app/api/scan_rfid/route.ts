@@ -4,7 +4,7 @@ import { processRfidScan } from "@/lib/scan-service";
 export async function POST(request: Request) {
   try {
     const data = await request.json();
-    const { rfid_tag, gate_location, direction, scanned_by } = data;
+    const { rfid_tag, gate_location, scanned_by } = data;
 
     if (!rfid_tag) {
       return NextResponse.json({ error: "Missing rfid_tag" }, { status: 400 });
@@ -22,7 +22,7 @@ export async function POST(request: Request) {
     });
 
     return NextResponse.json(result);
-  } catch (error: any) {
+  } catch (error) {
     console.error("RFID Scan API Error:", error);
     return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
   }

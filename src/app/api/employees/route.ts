@@ -12,7 +12,7 @@ export async function GET(req: Request) {
       orderBy: { created_at: "desc" },
     });
     return NextResponse.json(employees);
-  } catch (error) {
+  } catch {
     return NextResponse.json({ error: "Failed to fetch employees" }, { status: 500 });
   }
 }
@@ -24,7 +24,7 @@ export async function POST(req: Request) {
       data: body,
     });
     return NextResponse.json(newEmployee, { status: 201 });
-  } catch (error) {
+  } catch {
     return NextResponse.json({ error: "Failed to create employee" }, { status: 500 });
   }
 }

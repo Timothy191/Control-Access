@@ -72,10 +72,10 @@ export async function GET(req: Request) {
         "Expires": "0",
       },
     });
-  } catch (error: any) {
+  } catch (error) {
     console.error("Dashboard stats error:", error);
     return NextResponse.json(
-      { error: "Failed to fetch dashboard stats", details: error.message },
+      { error: "Failed to fetch dashboard stats", details: error instanceof Error ? error.message : String(error) },
       { status: 500 }
     );
   }

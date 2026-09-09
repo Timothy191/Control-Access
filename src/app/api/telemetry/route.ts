@@ -5,7 +5,7 @@ export async function GET() {
     start(controller) {
       controller.enqueue("retry: 1000\n\n");
       
-      const sendEvent = (data: any) => {
+      const sendEvent = (data: unknown) => {
         controller.enqueue(`data: ${JSON.stringify(data)}\n\n`);
       };
 
@@ -17,7 +17,7 @@ export async function GET() {
             timestamp: new Date().toISOString(),
             activeTCP: Math.floor(Math.random() * 10),
           });
-        } catch (error) {
+        } catch {
           clearInterval(interval);
         }
       }, 5000);
