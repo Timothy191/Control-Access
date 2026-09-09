@@ -1,6 +1,12 @@
+import { redirect } from "next/navigation";
+import { auth } from "@/auth";
 import prisma from "@/lib/prisma";
 
 export default async function VisitorsPage() {
+  const session = await auth();
+  if (!session?.user)
+    redirect(`/login?callbackUrl=${encodeURIComponent("/visitors")}`);
+
   const visitors = await prisma.visitors.findMany({
     orderBy: { created_at: "desc" },
   });

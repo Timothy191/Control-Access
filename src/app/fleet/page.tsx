@@ -1,6 +1,12 @@
+import { redirect } from "next/navigation";
+import { auth } from "@/auth";
 import prisma from "@/lib/prisma";
 
 export default async function FleetPage() {
+  const session = await auth();
+  if (!session?.user)
+    redirect(`/login?callbackUrl=${encodeURIComponent("/fleet")}`);
+
   const vehicles = await prisma.vehicles.findMany({
     orderBy: { created_at: "desc" },
   });

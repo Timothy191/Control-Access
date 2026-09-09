@@ -1,7 +1,13 @@
+import { redirect } from "next/navigation";
+import { auth } from "@/auth";
 import prisma from "@/lib/prisma";
 import EmployeeTable from "@/components/employees/EmployeeTable";
 
 export default async function EmployeesPage() {
+  const session = await auth();
+  if (!session?.user)
+    redirect(`/login?callbackUrl=${encodeURIComponent("/employees")}`);
+
   const employees = await prisma.employees.findMany({
     orderBy: { created_at: "desc" },
   });

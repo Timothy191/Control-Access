@@ -1,21 +1,25 @@
-import { PrismaClient } from "@prisma/client";
+import { redirect } from "next/navigation";
+import { auth } from "@/auth";
+import prisma from "@/lib/prisma";
 import LiveDashboard from "@/components/dashboard/LiveDashboard";
-
-const prisma = new PrismaClient();
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
 export default async function DashboardPage() {
-  const [totalScans, activeDevices, pendingApprovals, rawRecentScans] = await Promise.all([
-    prisma.gate_logs.count(),
-    prisma.devices.count({ where: { status: "online" } }),
-    prisma.approvals.count({ where: { status: "Pending" } }),
-    prisma.gate_logs.findMany({
-      take: 10,
-      orderBy: { id: "desc" },
-    }),
-  ]);
+  const session = await auth();
+  if (!session?.user) redirect(`/login?callbackUrl=${encodeURIComponent("/")}`);
+
+  const [totalScans, activeDevices, pendingApprovals, rawRecentScans] =
+    await Promise.all([
+      prisma.gate_logs.count(),
+      prisma.devices.count({ where: { status: "online" } }),
+      prisma.approvals.count({ where: { status: "Pending" } }),
+      prisma.gate_logs.findMany({
+        take: 10,
+        orderBy: { id: "desc" },
+      }),
+    ]);
 
   const musterCount = await prisma.gate_logs.count({
     where: { direction: "IN", access_granted: true },
@@ -29,7 +33,9 @@ export default async function DashboardPage() {
     access_granted: scan.access_granted,
     denial_reason: scan.denial_reason,
     gate_location: scan.gate_location,
-    scanned_at: scan.scanned_at ? scan.scanned_at.toISOString() : new Date().toISOString(),
+    scanned_at: scan.scanned_at
+      ? scan.scanned_at.toISOString()
+      : new Date().toISOString(),
   }));
 
   const initialStats = {

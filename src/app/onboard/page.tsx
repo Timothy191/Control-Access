@@ -1,5 +1,7 @@
 import QRCode from "qrcode";
 import dgram from "node:dgram";
+import { redirect } from "next/navigation";
+import { auth } from "@/auth";
 import prisma from "@/lib/prisma";
 
 function getServerIp(): Promise<string> {
@@ -27,16 +29,43 @@ export default async function OnboardPage({
 }: {
   searchParams: Promise<{ port?: string }>;
 }) {
+  const session = await auth();
+  if (!session?.user)
+    redirect(`/login?callbackUrl=${encodeURIComponent("/onboard")}`);
+
   const { port } = await searchParams;
   const serverPort = port || "8080";
   const serverIp = await getServerIp();
+
+  if (serverIp === "127.0.0.1") {
+    return (
+      <div className="p-8">
+        <div className="glass-card border-danger/40">
+          <h1 className="text-xl font-bold text-text-primary mb-2">
+            Onboarding unavailable
+          </h1>
+          <p className="text-text-secondary">
+            Could not determine the server&apos;s LAN IP, so scanner QR codes
+            would point at an unreachable address. Set the server IP explicitly
+            and retry.
+          </p>
+        </div>
+        <a
+          href="/"
+          className="inline-block mt-4 text-text-secondary hover:text-text-primary text-sm"
+        >
+          ← Back to dashboard
+        </a>
+      </div>
+    );
+  }
 
   // Build Config JSON (standard format for mobile auto-config)
   const configPayload = {
     server_ip: serverIp,
     server_port: serverPort,
     api_endpoint: `http://${serverIp}:${serverPort}/api/scanner/receive`,
-    api_key: "MINE-CONFIG-ABC-123",
+    api_key: process.env.HARDWARE_API_KEY || "MINE-CONFIG-ABC-123",
     timestamp: new Date().toISOString(),
   };
   const configJson = JSON.stringify(configPayload);
