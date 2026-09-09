@@ -16,7 +16,8 @@ export default function RootLayout({
     <html lang="en">
       <body className="antialiased flex h-screen bg-gray-100">
         <aside className="w-64 bg-slate-900 text-white flex flex-col">
-          <div className="p-6 font-bold text-xl border-b border-slate-700">
+          <div className="p-6 font-bold text-xl border-b border-slate-700 flex items-center gap-3">
+            <img src="/arch-linux-mono.svg" alt="Logo" className="w-8 h-8" style={{ filter: 'invert(1)' }} />
             Control-Access
           </div>
           <nav className="flex-1 p-4 space-y-2">
