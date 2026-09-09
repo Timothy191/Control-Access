@@ -63,7 +63,12 @@ function verifyScrypt(hashString: string, password: string): boolean {
   // Wait, Werkzeug's generate_password_hash generates hex or base64?
   // Usually Werkzeug generates base64 for scrypt and hex for pbkdf2. Let's check python output.
   // Actually, pbkdf2 produces hex string. Scrypt might produce base64? No, Werkzeug uses hex for scrypt too.
-  const derivedKey = crypto.scryptSync(password, salt, expectedHash.length / 2, { N, r, p });
+  const derivedKey = crypto.scryptSync(password, salt, expectedHash.length / 2, {
+    N,
+    r,
+    p,
+    maxmem: 64 * 1024 * 1024,
+  });
   
   return derivedKey.toString("hex") === expectedHash;
 }
