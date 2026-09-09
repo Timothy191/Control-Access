@@ -1,25 +1,10 @@
 import type { Metadata } from "next";
-import { Inter, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
-import GlobalBackground from "@/components/layout/GlobalBackground";
-import Sidebar from "@/components/layout/Sidebar";
-import TopBar from "@/components/layout/TopBar";
-
-const inter = Inter({
-  variable: "--font-inter",
-  subsets: ["latin"],
-  display: "swap",
-});
-
-const jetbrainsMono = JetBrains_Mono({
-  variable: "--font-jetbrains-mono",
-  subsets: ["latin"],
-  display: "swap",
-});
+import Link from "next/link";
 
 export const metadata: Metadata = {
-  title: "Control-Access",
-  description: "Mine/construction site access control system",
+  title: "Control-Access System",
+  description: "Mine Site Access & Gate Operations System",
 };
 
 export default function RootLayout({
@@ -28,18 +13,58 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={`${inter.variable} ${jetbrainsMono.variable} h-full antialiased dark`}>
-      <body className="min-h-full flex flex-col relative text-text-primary bg-background">
-        <GlobalBackground />
-        <div className="flex flex-1 z-10 relative">
-          <Sidebar />
-          <div className="flex-1 flex flex-col min-h-screen relative">
-            <TopBar />
-            <main className="flex-1 p-6 z-10 max-w-[1400px] w-full mx-auto">
-              {children}
-            </main>
+    <html lang="en">
+      <body className="antialiased flex h-screen bg-gray-100">
+        <aside className="w-64 bg-slate-900 text-white flex flex-col">
+          <div className="p-6 font-bold text-xl border-b border-slate-700">
+            Control-Access
           </div>
-        </div>
+          <nav className="flex-1 p-4 space-y-2">
+            <Link
+              href="/dashboard"
+              className="block p-3 rounded hover:bg-slate-800 transition"
+            >
+              Dashboard
+            </Link>
+            <Link
+              href="/employees"
+              className="block p-3 rounded hover:bg-slate-800 transition"
+            >
+              Employees
+            </Link>
+            <Link
+              href="/visitors"
+              className="block p-3 rounded hover:bg-slate-800 transition"
+            >
+              Visitors
+            </Link>
+            <Link
+              href="/fleet"
+              className="block p-3 rounded hover:bg-slate-800 transition"
+            >
+              Fleet
+            </Link>
+            <Link
+              href="/equipment"
+              className="block p-3 rounded hover:bg-slate-800 transition"
+            >
+              Equipment
+            </Link>
+            <Link
+              href="/approvals"
+              className="block p-3 rounded hover:bg-slate-800 transition"
+            >
+              Approvals
+            </Link>
+            <Link
+              href="/admin"
+              className="block p-3 rounded hover:bg-slate-800 transition"
+            >
+              Admin Settings
+            </Link>
+          </nav>
+        </aside>
+        <main className="flex-1 overflow-auto">{children}</main>
       </body>
     </html>
   );
