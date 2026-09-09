@@ -1,0 +1,51 @@
+@import "tailwindcss";
+
+@theme {
+  --color-background: #0a0a0a;
+  --color-foreground: #ffffff;
+  
+  --color-red-primary: #ff6b00;
+  --color-red-dark: #d95800;
+  --color-steel: #d4af37;
+  --color-dark-bg: #0a0a0a;
+  --color-dark-card: rgba(15, 15, 20, 0.65);
+  --color-text-primary: #ffffff;
+  --color-text-secondary: #cccccc;
+  
+  --color-success: #10b981;
+  --color-warning: #f59e0b;
+  --color-danger: #ef4444;
+
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-jetbrains-mono), ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+}
+
+@layer base {
+  :root {
+    --background: #0a0a0a;
+    --foreground: #ffffff;
+  }
+}
+
+body {
+  background-color: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans);
+}
+
+/* Base card styling matching DESIGN.md */
+@layer components {
+  .glass-card {
+    background-color: var(--color-dark-card);
+    backdrop-filter: blur(4px);
+    border: 1px solid var(--color-steel);
+    border-radius: 12px;
+    padding: 1rem;
+    transition: all 0.2s ease;
+  }
+  
+  .glass-card:hover {
+    box-shadow: 0 4px 20px rgba(255, 107, 0, 0.2);
+    transform: translateY(-2px);
+  }
+}

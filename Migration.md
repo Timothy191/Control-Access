@@ -1,36 +1,45 @@
-# Control-Access: Next.js Full Stack Migration Blueprint
+# Control-Access: Next.js Full Stack Migration Blueprint & Master Execution Plan
+
+> **Target Stack**: Next.js 15+ (App Router, React 19, TypeScript strict), Prisma ORM v6, Tailwind CSS v4 / Shadcn UI (with industrial theme tokens), Auth.js (NextAuth v5), Redis / SSE Real-time Engine, Node.js Hardware Daemon.  
+> **Source Stack**: Python 3.10+, Flask 3.1.3, Eventlet 0.40.3, SQLAlchemy 2.0, SQLite (WAL mode) / Azure SQL.  
+> **Status**: Comprehensive Architectural Blueprint & Production Migration Specification.
+
+---
 
 ## Executive Overview & Strategic Goals
 
-This document outlines the master architectural plan and step-by-step execution strategy to migrate the **Control-Access Mine Site Access & Gate Operations System** from its legacy **Flask / Jinja2 / Eventlet** stack to a modern, unified **Next.js 15+ (App Router) Full Stack React TypeScript** architecture.
+This document outlines the master architectural plan and step-by-step execution strategy to migrate the **Control-Access Mine Site Access & Gate Operations System** from its legacy **Flask / Jinja2 / Eventlet** stack to a modern, unified **Next.js 15+ Full Stack React TypeScript** architecture.
 
 ### Key Drivers for Migration
-- **Unified Monorepo Architecture**: Eliminate separate frontend templates, backend Jinja routes, and fragmented static JS scripts into a single, type-safe Next.js codebase.
-- **Type Safety End-to-End**: End-to-end TypeScript interfaces across Database Models, Server Actions, API Contracts, WebSockets, and UI Components.
-- **Sub-100ms High-Frequency Gate Operations**: Utilize Next.js React Server Components (RSC) and optimized Edge/Node.js API endpoints for low-latency hardware QR/RFID scanning.
-- **Modern Industrial UI**: Re-implement the dark industrial control panel visual system (`DESIGN.md`) using **Tailwind CSS v4**, **Shadcn UI**, **Framer Motion**, and **React 19**.
-- **Real-Time Telemetry**: Replace Flask-SocketIO with a high-throughput Node.js WebSocket engine (Socket.io / Server-Sent Events / native WS) backed by Redis for multi-kiosk live synchronization.
-- **Enterprise Scale & Observability**: Standardized deployment via Docker/PM2, unified logging, and Vercel AI SDK integration for multi-provider AI access.
+- **Unified Monorepo Architecture**: Eliminate fragmented Jinja templates, separate backend routes, and ad-hoc client scripts into a single, type-safe Next.js codebase.
+- **Strict End-to-End Type Safety**: TypeScript interfaces shared across Database Models, Server Actions, API Contracts, WebSockets/SSE, and UI Components.
+- **Sub-100ms High-Frequency Gate Operations**: Leverage Next.js Server Components, optimized Route Handlers, and targeted database indices for low-latency QR/RFID scanning.
+- **Modern Industrial UI**: Re-implement the dark industrial control panel visual system (`DESIGN.md`) using **Tailwind CSS v4**, **Shadcn UI**, **Framer Motion**, and **React 19** with custom tokens preserving the steel/orange palette.
+- **Real-Time Telemetry**: Replace Flask-SocketIO with a high-throughput Node.js WebSocket/SSE engine backed by Redis Pub/Sub for multi-kiosk live synchronization.
+- **Hardware Continuity**: Maintain reliable TCP/UDP network socket listeners for Chainway (C66/C70/C71) handhelds and stationary gate scanners.
 
 ---
 
-## 1. Current System Architecture (As-Is Audit)
+## 1. Codebase Audit & Architectural Delta Analysis
 
-| Subsystem | Legacy Tech Stack | Key Responsibilities / Dependencies |
-| :--- | :--- | :--- |
-| **Framework & Web Server** | Python 3.10+, Flask 3.1.3, Eventlet 0.40.3, Gunicorn 23.0.0 | HTTP routes, HTML rendering via Jinja2, session management |
-| **Database & ORM** | SQLAlchemy 2.0, SQLite (WAL mode) / Azure SQL | Relational models (`Employee`, `Vehicle`, `Equipment`, `Visitor`, `GateLog`, `Approval`, `Device`, `User`, `GateMapping`, etc.) |
-| **Field Encryption** | Cryptography (`Fernet` AES-128-CBC) | Field-level encryption for ID numbers, medical notes, visitor names |
-| **Real-Time Engine** | Flask-SocketIO 5.3.4 (Eventlet) | Emits live `gate_scan`, `device_status`, and system telemetry to wallboards |
-| **Hardware Listeners** | Python `socket` threads on ports 8081-8200 & UDP 9100 | Receives raw barcode data from Chainway C66/C70/C71 scanners, Infowedge, DataWedge |
-| **Auth & Security** | Werkzeug security (`scrypt` / `PBKDF2`), `pyotp` | User sessions, TOTP MFA, backup codes, `X-API-Key` headers for hardware scanners |
-| **SharePoint Sync** | `O365` / `requests`, `APScheduler` | Cron sync of employee rosters & site permits from SharePoint Online |
-| **AI Assistant** | Ollama API, Portkey Gateway, OpenAI / Gemini APIs | Natural language site procedure querying and gate database searching |
-| **Reporting & Exports** | ReportLab, OpenPyXL, Pandas | On-the-fly PDF visitor passes, gate log reports, Excel roster exports |
+A comprehensive audit of the active codebase (`models.py`, `services/scan_service.py`, `services/listeners.py`, `routes/*`, `DESIGN.md`, `.env.example`) identified critical nuances that must be addressed during migration:
+
+| Subsystem / Area | Current Python Implementation | Target Next.js Architecture | Critical Nuance / Grounded Fix |
+| :--- | :--- | :--- | :--- |
+| **Framework** | Flask 3.1.3, Jinja2, Eventlet 0.40.3 | Next.js 15.1+ (App Router, React 19, Server Actions) | Standalone Node.js deployment with internal Route Handlers and Server Actions. |
+| **Database & ORM** | SQLAlchemy 2.0, SQLite (WAL) / Azure SQL | Prisma ORM v6 (SQLite / PostgreSQL / SQL Server) | Add explicit indices on `qrCode`, `rfidTag`, `empCode`, `idNumberHash` for sub-100ms scan lookups. |
+| **Field-Level Encryption** | Cryptography `Fernet` (AES-128-CBC + HMAC-SHA256) | Node.js `crypto` Fernet Compatibility Bridge (`lib/crypto.ts`) | **Fix**: Replicate exact key derivation: base64url decode raw 32-byte key; bytes 0-16 for HMAC, bytes 16-32 for AES-128. |
+| **User Authentication** | Werkzeug (`scrypt`/`pbkdf2`), `pyotp` | Auth.js (NextAuth v5) + `otplib` | Password hashes must be parsed according to Werkzeug's `method$salt$hash` scheme or migrated seamlessly. |
+| **API Authentication** | `HARDWARE_API_KEY`, `MOBILE_API_KEY` | Custom Next.js Route Middleware | Validate `X-API-Key` headers for both hardware scanners and mobile applications. |
+| **Hardware Listeners** | `services/listeners.py` (UDP 5000, 8080, 9000, 9999, 10000; TCP 8081-8200) | Standalone Daemon (`server/hardware-daemon.ts`) | Port conflict resolution: TCP listeners renumbered away from 3000/8080; broadcast on UDP 9999 maintained. |
+| **Scan Service Core** | `services/scan_service.py` (1,171 lines) | `src/lib/scan-service.ts` | Complete 1:1 port of QR normalization, multi-stage fallback lookup, expiry checks, and approval validation. |
+| **Real-Time Engine** | Flask-SocketIO (Eventlet) | Server-Sent Events (SSE) / Redis Pub/Sub | High-efficiency one-directional SSE stream for wallboards with automated reconnection. |
+| **AI Assistant** | `routes/ai.py` (Multi-provider) | Vercel AI SDK (`@ai-sdk/google`, `@ai-sdk/openai`, `@ai-sdk/ollama`, Portkey) | Cascade: Portkey Gateway → Gemini 2.5 Flash → OpenAI → Ollama fallback. |
+| **Design System** | `DESIGN.md` (Custom CSS variables) | Tailwind CSS v4 + Shadcn UI Overrides | Map tokens (`--red-primary`, `--steel`, `--dark-card`) directly into `@theme` variables. |
 
 ---
 
-## 2. Target Technology Stack (To-Be Architecture)
+## 2. Target Technology Stack & Topology
 
 ```
                        +------------------------------------------+
@@ -38,8 +47,8 @@ This document outlines the master architectural plan and step-by-step execution 
                        |  (Chainway C66/C70/C71, Desktop Kiosks) |
                        +--------------------+---------------------+
                                             |
-                         HTTP / REST API    | Raw TCP/UDP Sockets
-                         (X-API-Key)        | (Ports 8081-8200, 9100)
+                          HTTP / REST API    | Raw TCP / UDP Sockets
+                          (X-API-Key)        | (Ports 8081-8200, UDP 5000-10000)
                                             v
 +-------------------------------------------+-------------------------------------------+
 |                               Next.js 15+ Application                                 |
@@ -47,52 +56,43 @@ This document outlines the master architectural plan and step-by-step execution 
 |  +---------------------------------------------------------------------------------+  |
 |  |                             App Router Pages & Layouts                          |  |
 |  |  - Kiosk Scanner  - Wallboard Dashboard  - Muster View  - Gate Logs  - Onboarding |  |
+|  |  - Employee CRUD  - Fleet & Equipment    - Device Status - Admin Audit & Users     |  |
 |  +---------------------------------------------------------------------------------+  |
 |  |                           React Server Components & UI                          |  |
-|  |  - Tailwind CSS v4  - Shadcn UI  - Framer Motion  - Tabler/Heroicons SVG          |  |
+|  |  - Tailwind CSS v4  - Shadcn UI (Industrial Theme)  - Framer Motion                |  |
+|  |  - Video Background (<GlobalBackground />)          - Web Audio Tone Feedback      |  |
 |  +---------------------------------------------------------------------------------+  |
 |  |                        Server Actions & Next.js API Routes                      |  |
-|  |  - /api/scan_qr     - /api/monitoring   - /api/ai/chat    - /api/sharepoint/sync |  |
+|  |  - /api/scan_qr     - /api/scan_rfid    - /api/monitoring/stream (SSE)            |  |
+|  |  - /api/ai/chat     - /api/cron/sharepoint-sync  - /api/exports/*                  |  |
 |  +---------------------------------------------------------------------------------+  |
 |  |                                Core Business Layer                              |  |
-|  |  - Scan Engine TS   - AES-256-GCM Fernet Bridge  - Direction Auto-Detect         |  |
-|  |  - Vercel AI SDK    - NextAuth.js v5 (MFA/TOTP)  - Rate Limiter (Upstash/Redis)   |  |
+|  |  - Scan Service TS  - Cryptography Fernet Bridge     - Direction Auto-Detect       |  |
+|  |  - Vercel AI SDK    - Auth.js v5 (TOTP MFA / Backup) - Rate Limiter (Redis)        |  |
 |  +---------------------------------------------------------------------------------+  |
 |  |                                  Data Layer                                     |  |
-|  |  - Prisma ORM / Drizzle ORM -> PostgreSQL / Azure SQL / SQLite (WAL)            |  |
+|  |  - Prisma ORM v6 -> SQLite (WAL mode) / PostgreSQL / Azure SQL                     |  |
 |  +---------------------------------------------------------------------------------+  |
 +-------------------------------------------+-------------------------------------------+
                                             |
-                      WebSockets / SSE      | Redis Pub/Sub
-                      (Realtime Engine)     | Scan Broadcasting
+                       Redis Pub/Sub        | HTTP Forwarding
+                       (Telemetry Channel)  | (Internal API)
                                             v
                        +--------------------+---------------------+
                        |   Standalone Hardware & Realtime Daemon  |
-                       |      (Node.js Net/dgram + Socket.io)     |
+                       |        (Node.js Net/dgram Sidecar)       |
                        +------------------------------------------+
 ```
 
-### Core Stack Components
-- **Framework**: Next.js 15.1+ (App Router, React 19, Server Actions, Route Handlers).
-- **Language**: TypeScript 5.6+ (Strict Type Checks, ESM).
-- **Database & ORM**: Prisma ORM v6 / Drizzle ORM (supporting PostgreSQL, Azure SQL, SQLite with WAL mode).
-- **Styling & UI**: Tailwind CSS v4, Shadcn UI (`@radix-ui`), Lucide / Tabler React Icons, Glassmorphism design system matching `DESIGN.md`.
-- **Authentication**: Auth.js (NextAuth v5) + `otplib` (TOTP MFA) + `qrcode` + Custom Middleware for API Keys (`X-API-Key`).
-- **Real-Time Server**: Standalone Socket.io server / Server-Sent Events (SSE) route handler integrated with Redis Pub/Sub.
-- **Hardware Socket Daemon**: Node.js `net` (TCP) and `dgram` (UDP) sidecar process listening on ports 8081-8200 and UDP 9100.
-- **AI Integration**: Vercel AI SDK (`@ai-sdk/ollama`, `@ai-sdk/openai`, `@ai-sdk/google`) with streaming UI (`useChat`).
-- **SharePoint Integration**: `@microsoft/microsoft-graph-client` & `@azure/msal-node` via Next.js Scheduled API Route (Cron) or BullMQ worker.
-- **PDF & Excel Exports**: `@react-pdf/renderer` or `pdfkit` + `exceljs`.
-
 ---
 
-## 3. Data Layer & ORM Migration Plan
+## 3. Data Layer & Prisma ORM Specification
 
-### Prisma Schema Mapping (`prisma/schema.prisma`)
+### `prisma/schema.prisma`
 
 ```prisma
 datasource db {
-  provider = "sqlite" // Configurable to "postgresql" or "sqlserver"
+  provider = "sqlite" // Easily switchable to "postgresql" or "sqlserver"
   url      = env("DATABASE_URL")
 }
 
@@ -125,6 +125,7 @@ model Device {
   totalScans      Int            @default(0) @map("total_scans")
   createdAt       DateTime       @default(now()) @map("created_at")
 
+  @@index([ipAddress])
   @@map("devices")
 }
 
@@ -135,13 +136,13 @@ model Employee {
   firstName       String         @map("first_name")
   secondName      String?        @map("second_name")
   surname         String
-  idNumber        String?        @map("id_number") // Encrypted at rest
+  idNumber        String?        @map("id_number") // Fernet Encrypted
   idNumberHash    String?        @unique @map("id_number_hash")
   jobTitle        String?        @map("job_title")
   area            String?
   induction       String?
   inductionExpiry DateTime?      @map("induction_expiry")
-  medical         String?        // Encrypted at rest
+  medical         String?        @map("medical")   // Fernet Encrypted
   medicalExpiry   DateTime?      @map("medical_expiry")
   qrCode          String?        @unique @map("qr_code")
   rfidTag         String?        @unique @map("rfid_tag")
@@ -151,6 +152,10 @@ model Employee {
   visitors        Visitor[]
   gateLogs        GateLog[]
 
+  @@index([empCode])
+  @@index([qrCode])
+  @@index([rfidTag])
+  @@index([idNumberHash])
   @@map("employees")
 }
 
@@ -165,6 +170,9 @@ model Vehicle {
 
   gateLogs           GateLog[]
 
+  @@index([fleetId])
+  @@index([qrCode])
+  @@index([rfidTag])
   @@map("vehicles")
 }
 
@@ -179,12 +187,15 @@ model Equipment {
 
   gateLogs           GateLog[]
 
+  @@index([radioId])
+  @@index([qrCode])
+  @@index([rfidTag])
   @@map("equipment")
 }
 
 model Visitor {
   id            Int            @id @default(autoincrement())
-  name          String         // Encrypted at rest
+  name          String         // Fernet Encrypted
   company       String?
   purpose       String?
   meetingPerson String?        @map("meeting_person")
@@ -199,6 +210,8 @@ model Visitor {
   host          Employee?      @relation(fields: [hostId], references: [id])
   gateLogs      GateLog[]
 
+  @@index([qrCode])
+  @@index([rfidTag])
   @@map("visitors")
 }
 
@@ -216,7 +229,7 @@ model GateLog {
   scannedBy     String?        @map("scanned_by")
   ipAddress     String?        @map("ip_address")
   userAgent     String?        @map("user_agent")
-  parsedQrData  String?        @map("parsed_qr_data") // JSON string
+  parsedQrData  String?        @map("parsed_qr_data")
 
   employeeId    Int?           @map("employee_id")
   vehicleId     Int?           @map("vehicle_id")
@@ -228,6 +241,10 @@ model GateLog {
   visitor       Visitor?       @relation(fields: [visitorId], references: [id])
   equipment     Equipment?     @relation(fields: [equipmentId], references: [id])
 
+  @@index([scannedAt])
+  @@index([accessGranted])
+  @@index([direction])
+  @@index([accessType, entityId])
   @@map("gate_logs")
 }
 
@@ -245,6 +262,7 @@ model Approval {
   scannedData   String?        @map("scanned_data")
   createdAt     DateTime       @default(now()) @map("created_at")
 
+  @@index([status])
   @@map("approvals")
 }
 
@@ -280,6 +298,7 @@ model AuditLog {
   ipAddress  String?  @map("ip_address")
   createdAt  DateTime @default(now()) @map("created_at")
 
+  @@index([createdAt])
   @@map("audit_logs")
 }
 
@@ -299,99 +318,111 @@ model GateMapping {
 
 ---
 
-## 4. Cryptography & Encryption Bridge Strategy
+## 4. Cryptographic Fernet Bridge (`src/lib/crypto.ts`)
 
-### Problem Statement
-The current Python backend uses `cryptography.fernet.Fernet` (AES-128-CBC with HMAC-SHA256 authentication) for field-level PII encryption (prefixed with `enc:`). Next.js must be able to read existing encrypted DB values seamlessly without requiring an offline database dump or re-encryption downtime.
-
-### Solution: Node.js Cryptography Fernet Adapter (`lib/crypto.ts`)
+To ensure seamless compatibility with existing SQLite records, the Node.js crypto module must decode Fernet tokens exactly as Python's `cryptography.fernet` does.
 
 ```typescript
 import crypto from 'node:crypto';
 
 const MARKER = 'enc:';
 
-/**
- * Derives key compatible with Python Fernet / FIELD_ENCRYPTION_KEY.
- */
-function getEncryptionKey(): Buffer | null {
-  const envKey = process.env.FIELD_ENCRYPTION_KEY;
-  if (envKey) {
-    return Buffer.from(envKey, 'base64'); // Fernet expects 32-byte key (16 AES + 16 HMAC)
-  }
-  const secret = process.env.SECRET_KEY;
-  if (secret) {
-    const derived = crypto.createHash('sha256').update(secret).digest();
-    return derived;
-  }
-  return null;
+interface FernetKeys {
+  signingKey: Buffer;    // First 16 bytes: HMAC-SHA256
+  encryptionKey: Buffer; // Last 16 bytes: AES-128-CBC
 }
 
-export function decryptField(value: string | null): string | null {
+function getFernetKeys(): FernetKeys | null {
+  let rawKey: Buffer | null = null;
+
+  const envKey = process.env.FIELD_ENCRYPTION_KEY;
+  if (envKey) {
+    // Standard 32-byte Fernet key encoded in URL-safe base64
+    rawKey = Buffer.from(envKey, 'base64url');
+  } else {
+    const secret = process.env.SECRET_KEY;
+    if (secret) {
+      // Deterministic fallback matching models.py: sha256(secret)
+      rawKey = crypto.createHash('sha256').update(secret, 'utf8').digest();
+    }
+  }
+
+  if (!rawKey || rawKey.length < 32) return null;
+
+  return {
+    signingKey: rawKey.subarray(0, 16),
+    encryptionKey: rawKey.subarray(16, 32),
+  };
+}
+
+export function decryptField(value: string | null | undefined): string | null {
   if (!value) return null;
   if (!value.startsWith(MARKER)) return value; // Plaintext fallback
 
-  const ciphertextWithMarker = value.slice(MARKER.length);
-  const key = getEncryptionKey();
-  if (!key) return value;
+  const keys = getFernetKeys();
+  if (!keys) return value;
+
+  const ciphertextBase64 = value.slice(MARKER.length);
 
   try {
-    const rawBytes = Buffer.from(ciphertextWithMarker, 'base64url');
-    // Fernet format: Version (1B) | Timestamp (8B) | IV (16B) | Ciphertext (var) | HMAC (32B)
-    const iv = rawBytes.subarray(9, 25);
-    const ciphertext = rawBytes.subarray(25, rawBytes.length - 32);
-    const hmacReceived = rawBytes.subarray(rawBytes.length - 32);
+    const payload = Buffer.from(ciphertextBase64, 'base64url');
+    // Fernet Token: Version(1) || Timestamp(8) || IV(16) || Ciphertext(N) || HMAC(32)
+    if (payload.length < 57) return value;
 
-    const signingKey = key.subarray(0, 16);
-    const encryptionKey = key.subarray(16, 32);
+    const dataToSign = payload.subarray(0, payload.length - 32);
+    const receivedHmac = payload.subarray(payload.length - 32);
 
-    // Verify HMAC
-    const hmac = crypto.createHmac('sha256', signingKey);
-    hmac.update(rawBytes.subarray(0, rawBytes.length - 32));
-    const hmacCalculated = hmac.digest();
+    const calculatedHmac = crypto
+      .createHmac('sha256', keys.signingKey)
+      .update(dataToSign)
+      .digest();
 
-    if (!crypto.timingSafeEqual(hmacReceived, hmacCalculated)) {
-      console.error('Field decryption HMAC mismatch');
+    if (!crypto.timingSafeEqual(receivedHmac, calculatedHmac)) {
+      console.error('[Crypto] HMAC verification failed for encrypted field');
       return value;
     }
 
-    const decipher = crypto.createDecipheriv('aes-128-cbc', encryptionKey, iv);
+    const iv = payload.subarray(9, 25);
+    const ciphertext = payload.subarray(25, payload.length - 32);
+
+    const decipher = crypto.createDecipheriv('aes-128-cbc', keys.encryptionKey, iv);
     let decrypted = decipher.update(ciphertext, undefined, 'utf8');
     decrypted += decipher.final('utf8');
+
     return decrypted;
-  } catch (err) {
-    console.error('Failed to decrypt field:', err);
+  } catch (error) {
+    console.error('[Crypto] Failed to decrypt field:', error);
     return value;
   }
 }
 
-export function encryptField(value: string | null): string | null {
+export function encryptField(value: string | null | undefined): string | null {
   if (!value) return null;
-  if (value.startsWith(MARKER)) return value;
+  if (value.startsWith(MARKER)) return value; // Prevent double-encryption
 
-  const key = getEncryptionKey();
-  if (!key) return value;
+  const keys = getFernetKeys();
+  if (!keys) return value;
 
   try {
-    const signingKey = key.subarray(0, 16);
-    const encryptionKey = key.subarray(16, 32);
-
     const version = Buffer.from([0x80]);
     const timestamp = Buffer.alloc(8);
     timestamp.writeBigInt64BE(BigInt(Math.floor(Date.now() / 1000)));
     const iv = crypto.randomBytes(16);
 
-    const cipher = crypto.createCipheriv('aes-128-cbc', encryptionKey, iv);
+    const cipher = crypto.createCipheriv('aes-128-cbc', keys.encryptionKey, iv);
     let ciphertext = cipher.update(value, 'utf8');
     ciphertext = Buffer.concat([ciphertext, cipher.final()]);
 
     const dataToSign = Buffer.concat([version, timestamp, iv, ciphertext]);
-    const hmac = crypto.createHmac('sha256', signingKey).update(dataToSign).digest();
+    const hmac = crypto
+      .createHmac('sha256', keys.signingKey)
+      .update(dataToSign)
+      .digest();
 
-    const fullPacket = Buffer.concat([dataToSign, hmac]);
-    return MARKER + fullPacket.toString('base64url');
-  } catch (err) {
-    console.error('Failed to encrypt field:', err);
+    const token = Buffer.concat([dataToSign, hmac]);
+    return MARKER + token.toString('base64url');
+  } catch (error) {
+    console.error('[Crypto] Failed to encrypt field:', error);
     return value;
   }
 }
@@ -399,49 +430,51 @@ export function encryptField(value: string | null): string | null {
 
 ---
 
-## 5. API Route & Server Actions Migration Matrix
+## 5. Comprehensive Route & Server Action Mapping
 
-### Route Mapping
-
-| Flask Route / Endpoint | Blueprint | Next.js App Router Target | HTTP Method / Type |
-| :--- | :--- | :--- | :--- |
-| `GET /` | `app.py` | `app/page.tsx` (Dashboard Redirect) | RSC Page |
-| `GET /login`, `POST /login` | `auth.py` | `app/(auth)/login/page.tsx` | Client Page / NextAuth |
-| `POST /api/auth/mfa` | `auth.py` | `app/api/auth/mfa/route.ts` | Route Handler |
-| `GET /dashboard` | `dashboard.py` | `app/(dashboard)/dashboard/page.tsx` | RSC Page |
-| `GET /api/dashboard/stats_history` | `dashboard.py` | `app/api/dashboard/stats-history/route.ts` | Route Handler (Cached) |
-| `GET /qr_scanner` | `scanning.py` | `app/(dashboard)/scanning/page.tsx` | RSC / Client Page |
-| `POST /api/scan_qr` | `scanning.py` | `app/api/scan_qr/route.ts` | Route Handler (`X-API-Key`) |
-| `POST /api/scan_rfid` | `scanning.py` | `app/api/scan_rfid/route.ts` | Route Handler |
-| `GET /kiosk` | `app.py` | `app/kiosk/page.tsx` | Kiosk View |
-| `GET /monitoring` | `monitoring.py` | `app/(dashboard)/monitoring/page.tsx` | RSC Page |
-| `GET /api/monitoring/stats` | `monitoring.py` | `app/api/monitoring/stats/route.ts` | Route Handler |
-| `GET /employees` | `employees.py` | `app/(dashboard)/employees/page.tsx` | RSC Page + Server Actions |
-| `POST /api/employees/add` | `employees.py` | `lib/actions/employees.ts` (`addEmployee`) | Server Action |
-| `POST /api/employees/edit/[id]` | `employees.py` | `lib/actions/employees.ts` (`editEmployee`) | Server Action |
-| `DELETE /api/employees/[id]` | `employees.py` | `lib/actions/employees.ts` (`deleteEmployee`) | Server Action |
-| `GET /fleet` | `fleet.py` | `app/(dashboard)/fleet/page.tsx` | RSC Page + Server Actions |
-| `GET /equipment` | `equipment.py` | `app/(dashboard)/equipment/page.tsx` | RSC Page + Server Actions |
-| `GET /visitors`, `POST /checkin` | `visitors.py` | `app/(dashboard)/visitors/page.tsx` | RSC Page + Server Actions |
-| `POST /visitor_request` | `app.py` | `app/visitor-request/page.tsx` | Public Form Action |
-| `GET /onboard` | `app.py` | `app/onboard/page.tsx` | Public Form Action |
-| `GET /pending_approvals` | `app.py` | `app/(dashboard)/approvals/page.tsx` | RSC Page |
-| `POST /approve_request/[id]` | `app.py` | `lib/actions/approvals.ts` | Server Action |
-| `GET /muster` | `app.py` | `app/(dashboard)/muster/page.tsx` | RSC Page (Emergency View) |
-| `GET /gate_logs` | `app.py` | `app/(dashboard)/gate-logs/page.tsx` | RSC Page |
-| `GET /audit_logs` | `admin.py` | `app/(dashboard)/admin/audit-logs/page.tsx` | RSC Page |
-| `GET /users` | `admin.py` | `app/(dashboard)/admin/users/page.tsx` | RSC Page |
-| `GET /gate_mappings` | `admin.py` | `app/(dashboard)/admin/gate-mappings/page.tsx` | RSC Page |
-| `POST /api/ai/chat` | `ai.py` | `app/api/ai/chat/route.ts` | Route Handler (Vercel AI SDK) |
-| `GET /api/sharepoint/sync` | `admin.py` | `app/api/sharepoint/sync/route.ts` | Route Handler (Cron) |
-| `GET /api/healthz` | `monitoring.py` | `app/api/healthz/route.ts` | Health Check Route |
+| Flask Route / Endpoint | Flask Module | Next.js App Router Target | Execution Type | Key Logic / Middlewares |
+| :--- | :--- | :--- | :--- | :--- |
+| `GET /` | `app.py` | `src/app/page.tsx` | RSC Page | Redirect to `/dashboard` |
+| `GET /login`, `POST /login` | `routes/auth.py` | `src/app/(auth)/login/page.tsx` | Client + NextAuth | Credentials verify (Werkzeug format) |
+| `POST /api/auth/mfa` | `routes/auth.py` | `src/app/api/auth/mfa/route.ts` | Route Handler | TOTP verification via `otplib` |
+| `GET /dashboard` | `routes/dashboard.py` | `src/app/(dashboard)/dashboard/page.tsx` | RSC Page | Occupancy counts, active fleet, stats |
+| `GET /api/dashboard/stats_history` | `routes/dashboard.py` | `src/app/api/dashboard/stats-history/route.ts` | Route Handler | 24-hour scan trend cache |
+| `GET /qr_scanner` | `routes/scanning.py` | `src/app/(dashboard)/scanning/page.tsx` | RSC + Client Component | HTML5 camera / hardware barcode reader |
+| `POST /api/scan_qr` | `routes/scanning.py` | `src/app/api/scan_qr/route.ts` | Route Handler | Validate `HARDWARE_API_KEY` & `MOBILE_API_KEY` |
+| `POST /api/scan_rfid` | `routes/scanning.py` | `src/app/api/scan_rfid/route.ts` | Route Handler | RFID resolution to Employee/Vehicle |
+| `GET /kiosk` | `app.py` | `src/app/kiosk/page.tsx` | Client Kiosk View | Fullscreen kiosk with audio feedback |
+| `GET /monitoring` | `routes/monitoring.py` | `src/app/(dashboard)/monitoring/page.tsx` | RSC Page | Live wallboard layout |
+| `GET /api/monitoring/stream` | `routes/monitoring.py` | `src/app/api/monitoring/stream/route.ts` | SSE Route Handler | Streams Redis `gate_scan_events` channel |
+| `GET /api/monitoring/stats` | `routes/monitoring.py` | `src/app/api/monitoring/stats/route.ts` | Route Handler | Polling fallback for wallboards |
+| `GET /employees` | `routes/employees.py` | `src/app/(dashboard)/employees/page.tsx` | RSC Page | Filterable roster, certification expiries |
+| `POST /api/employees/add` | `routes/employees.py` | `src/lib/actions/employees.ts#addEmployee` | Server Action | PII encryption, hash calculation, audit log |
+| `POST /api/employees/edit/[id]`| `routes/employees.py` | `src/lib/actions/employees.ts#editEmployee` | Server Action | Partial update, audit log |
+| `DELETE /api/employees/[id]` | `routes/employees.py` | `src/lib/actions/employees.ts#deleteEmployee` | Server Action | Soft/hard delete |
+| `GET /fleet` | `routes/fleet.py` | `src/app/(dashboard)/fleet/page.tsx` | RSC Page + Server Actions | Fleet registration & tracking |
+| `GET /equipment` | `routes/equipment.py` | `src/app/(dashboard)/equipment/page.tsx` | RSC Page + Server Actions | Radio ID & equipment check-out |
+| `GET /devices` | `routes/devices.py` | `src/app/(dashboard)/devices/page.tsx` | RSC Page | Hardware terminals list & status |
+| `GET /api/devices/status` | `routes/devices.py` | `src/app/api/devices/status/route.ts` | Route Handler | Online/offline telemetry check |
+| `GET /visitors` | `routes/visitors.py` | `src/app/(dashboard)/visitors/page.tsx` | RSC Page + Server Actions | Visitor register & check-out |
+| `POST /visitor_request` | `app.py` | `src/app/visitor-request/page.tsx` | Public Server Action | Protected by `VISITOR_PIN` |
+| `GET /onboard` | `app.py` | `src/app/onboard/page.tsx` | Public Form Action | Self-onboarding request creation |
+| `GET /pending_approvals` | `app.py` | `src/app/(dashboard)/approvals/page.tsx` | RSC Page | Review queue for new onboardings |
+| `POST /approve_request/[id]` | `app.py` | `src/lib/actions/approvals.ts#approveRequest` | Server Action | Promotes approval into Employee/Fleet table |
+| `GET /muster` | `app.py` | `src/app/(dashboard)/muster/page.tsx` | RSC Page | Emergency evacuation roster (On-Site = IN) |
+| `GET /gate_logs` | `app.py` | `src/app/(dashboard)/gate-logs/page.tsx` | RSC Page | Paginated access logs with export links |
+| `GET /audit_logs` | `routes/admin.py` | `src/app/(dashboard)/admin/audit-logs/page.tsx` | RSC Page | Security log view (Admin only) |
+| `GET /users` | `routes/admin.py` | `src/app/(dashboard)/admin/users/page.tsx` | RSC Page | User management & role assignment |
+| `GET /gate_mappings` | `routes/admin.py` | `src/app/(dashboard)/admin/gate-mappings/page.tsx` | RSC Page + Server Actions | IP-to-Gate location configuration |
+| `POST /api/ai/chat` | `routes/ai.py` | `src/app/api/ai/chat/route.ts` | Route Handler | Multi-provider streaming AI response |
+| `GET /api/cron/sharepoint-sync` | `routes/admin.py` | `src/app/api/cron/sharepoint-sync/route.ts` | Cron Route Handler | Microsoft Graph sync pipeline |
+| `GET /api/healthz` | `routes/monitoring.py` | `src/app/api/healthz/route.ts` | Route Handler | Healthcheck (DB ping + Redis ping) |
+| `GET /api/exports/gate-logs` | `app.py` | `src/app/api/exports/gate-logs/route.ts` | Route Handler | Excel generation via `exceljs` |
+| `GET /api/exports/visitor-pass/[id]` | `app.py` | `src/app/api/exports/visitor-pass/[id]/route.ts` | Route Handler | PDF generation via `@react-pdf/renderer` |
 
 ---
 
-## 6. Hardware & Real-Time Engine Architecture
+## 6. Hardware Listener Daemon (`server/hardware-daemon.ts`)
 
-### Hardware Scanner TCP/UDP Listener Daemon (`server/hardware-daemon.ts`)
-Hardware barcode terminals (Chainway C66, C70, C71, Zebra DataWedge) send raw barcode payloads via direct TCP sockets (ports 8081-8200) or broadcast discovery via UDP (port 9100).
+The hardware daemon runs as an isolated sidecar process in Node.js, servicing low-level socket connections from physical scanning hardware.
 
 ```typescript
 import net from 'node:net';
@@ -449,148 +482,205 @@ import dgram from 'node:dgram';
 import { Redis } from 'iovalkey';
 
 const redis = new Redis(process.env.REDIS_URL || 'redis://localhost:6379');
+const NEXT_API_URL = process.env.NEXT_INTERNAL_API_URL || 'http://localhost:3000';
+const HARDWARE_API_KEY = process.env.HARDWARE_API_KEY || '';
 
-// 1. TCP Server Pool for Hardware Scanners
-const START_PORT = 8081;
-const END_PORT = 8200;
+// 1. TCP Server Pool for Direct Scanner Connections (Ports 8081 - 8200)
+const TCP_START_PORT = 8081;
+const TCP_END_PORT = 8200;
 
-for (let port = START_PORT; port <= END_PORT; port++) {
+for (let port = TCP_START_PORT; port <= TCP_END_PORT; port++) {
   const server = net.createServer((socket) => {
-    const clientIp = socket.remoteAddress || '';
+    const clientIp = socket.remoteAddress || 'unknown';
+    socket.setKeepAlive(true, 5000);
 
-    socket.on('data', async (data) => {
-      const qrCode = data.toString('utf-8').trim();
-      if (!qrCode) return;
+    socket.on('data', async (buffer) => {
+      const qrData = buffer.toString('utf8').trim();
+      if (!qrData) return;
 
-      // Dispatch scan payload to Next.js Internal API
       try {
-        const res = await fetch('http://localhost:3000/api/scan_qr', {
+        const response = await fetch(`${NEXT_API_URL}/api/scan_qr`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'X-API-Key': process.env.HARDWARE_API_KEY || '',
+            'X-API-Key': HARDWARE_API_KEY,
           },
           body: JSON.stringify({
-            qr_code: qrCode,
+            qr_code: qrData,
             direction: 'AUTO',
-            gate_location: `TCP Port ${port} (${clientIp})`,
+            gate_location: `TCP Port ${port}`,
             ip_address: clientIp,
           }),
         });
 
-        const result = await res.json();
+        const result = await response.json();
         socket.write(JSON.stringify(result) + '\n');
-
-        // Publish to Redis for WebSocket Wallboard push
-        await redis.publish('gate_scan_events', JSON.stringify(result));
       } catch (err) {
-        console.error(`Error processing scan on port ${port}:`, err);
-        socket.write(JSON.stringify({ status: 'error', message: 'Scan processing failed' }) + '\n');
+        console.error(`[TCP ${port}] Scan dispatch error:`, err);
+        socket.write(JSON.stringify({ status: 'error', message: 'Gate API unreachable' }) + '\n');
       }
     });
   });
 
-  server.listen(port, () => {
-    console.log(`[Hardware Daemon] Listening on TCP port ${port}`);
+  server.listen(port, '0.0.0.0', () => {
+    console.log(`[Hardware Daemon] TCP listener online on port ${port}`);
   });
 }
 
-// 2. UDP Discovery Listener
-const udpSocket = dgram.createSocket('udp4');
-udpSocket.on('message', (msg, rinfo) => {
-  console.log(`[UDP Discovery] Received ping from ${rinfo.address}:${rinfo.port}`);
-  const ack = Buffer.from(JSON.stringify({ status: 'ACK', service: 'Control-Access-Next' }));
-  udpSocket.send(ack, rinfo.port, rinfo.address);
+// 2. Multi-Port UDP Scanning Listeners
+const UDP_PORTS = [5000, 8080, 9000, 9999, 10000];
+
+UDP_PORTS.forEach((port) => {
+  const udpSocket = dgram.createSocket({ type: 'udp4', reuseAddr: true });
+
+  udpSocket.on('message', async (msg, rinfo) => {
+    const qrData = msg.toString('utf8').trim();
+    if (!qrData) return;
+
+    try {
+      const response = await fetch(`${NEXT_API_URL}/api/scan_qr`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-API-Key': HARDWARE_API_KEY,
+        },
+        body: JSON.stringify({
+          qr_code: qrData,
+          direction: 'AUTO',
+          gate_location: `UDP Port ${port}`,
+          ip_address: rinfo.address,
+        }),
+      });
+
+      const result = await response.json();
+      const reply = Buffer.from(JSON.stringify(result));
+      udpSocket.send(reply, rinfo.port, rinfo.address);
+    } catch (err) {
+      console.error(`[UDP ${port}] Scan error from ${rinfo.address}:`, err);
+    }
+  });
+
+  udpSocket.bind(port, '0.0.0.0', () => {
+    console.log(`[Hardware Daemon] UDP listener online on port ${port}`);
+  });
 });
-udpSocket.bind(9100, () => {
-  console.log('[Hardware Daemon] UDP Scanner Discovery active on port 9100');
+
+// 3. UDP Discovery & Broadcast (Port 9100)
+const discoverySocket = dgram.createSocket({ type: 'udp4', reuseAddr: true });
+discoverySocket.on('message', (msg, rinfo) => {
+  const ack = Buffer.from(JSON.stringify({ status: 'ACK', system: 'Control-Access-Next' }));
+  discoverySocket.send(ack, rinfo.port, rinfo.address);
 });
-```
-
-### Real-Time WebSocket / SSE Architecture
-- Next.js Client Wallboard pages subscribe to Server-Sent Events (`/api/monitoring/stream`) or WebSocket room (`Socket.io` node container).
-- When `scan_qr` API processes a scan, it publishes the `GateLog` event to Redis channel `gate_scan_events`.
-- Wallboards automatically update live counts (`People On Site`, `Granted Scans`, `Denied Scans`, `Fleet Occupancy`) and display toast notifications with audio alerts.
-
----
-
-## 7. Frontend UI / UX Migration Strategy
-
-### Design System Compliance (`DESIGN.md`)
-The Next.js frontend will strictly preserve the dark industrial aesthetic:
-
-- **Color Tokens (Tailwind CSS v4 Configuration)**:
-  - `--red-primary`: `#ff6b00` (Active state, scan borders, primary badges)
-  - `--red-dark`: `#d95800` (Hover actions)
-  - `--steel`: `#d4af37` (Borders, metadata highlights)
-  - `--dark-card`: `rgba(15,15,20,0.65)` with `backdrop-filter: blur(8px)`
-  - `--success`: `#10b981` | `--warning`: `#f59e0b` | `--danger`: `#ef4444`
-- **Typography**: Inter (Body & Display) and JetBrains Mono (Datetimes, RFID tags, Scan IDs).
-- **Background Component**: Re-implement `<GlobalBackground />` with MP4 video stream fallback to animated CSS starfield.
-- **Audio Feedback**: Web Audio API hooks (`useScanAudio`) emitting industrial grant/deny tones.
-
-### Key Pages Structure
-
-```
-app/
-├── (auth)/
-│   ├── login/page.tsx
-│   └── mfa-challenge/page.tsx
-├── (dashboard)/
-│   ├── layout.tsx                # Sidebar, Top Bar, Live Telemetry Header
-│   ├── dashboard/page.tsx         # Main Occupancy & Gate Stats
-│   ├── scanning/page.tsx          # Interactive Gate QR Scanner
-│   ├── monitoring/page.tsx        # Security Wallboard (Real-time grid)
-│   ├── employees/page.tsx         # Roster Management & Cert Expiries
-│   ├── fleet/page.tsx             # Vehicle Fleet Tracking
-│   ├── equipment/page.tsx         # Radio & Equipment Tracking
-│   ├── visitors/page.tsx          # Visitor Check-in / Gate Approvals
-│   ├── approvals/page.tsx         # Onboarding & Gate Expiry Approvals
-│   ├── muster/page.tsx            # Emergency Evacuation Roster
-│   ├── gate-logs/page.tsx         # Searchable Access Logs
-│   ├── admin/
-│   │   ├── users/page.tsx
-│   │   ├── audit-logs/page.tsx
-│   │   ├── gate-mappings/page.tsx
-│   │   └── settings/page.tsx
-│   └── ai-chat/page.tsx           # Vercel AI SDK Assistant Interface
-├── kiosk/page.tsx                 # Fullscreen Terminal Kiosk View
-├── visitor-request/page.tsx       # Self-Service Visitor Registration
-└── onboard/page.tsx               # Public Employee/Vehicle Self-Onboarding
+discoverySocket.bind(9100, '0.0.0.0', () => {
+  console.log('[Hardware Daemon] Discovery listener active on port 9100');
+});
 ```
 
 ---
 
-## 8. AI Assistant Engine (Vercel AI SDK Integration)
+## 7. Real-Time Telemetry & Wallboard Sync
 
-### Route Implementation (`app/api/ai/chat/route.ts`)
+### Server-Sent Events Route (`src/app/api/monitoring/stream/route.ts`)
 
 ```typescript
-import { createOllama } from 'ollama-ai-provider';
+import { NextRequest } from 'next/server';
+import { Redis } from 'iovalkey';
+
+export const dynamic = 'force-dynamic';
+
+export async function GET(req: NextRequest) {
+  const redis = new Redis(process.env.REDIS_URL || 'redis://localhost:6379');
+  const encoder = new TextEncoder();
+
+  const stream = new ReadableStream({
+    async start(controller) {
+      controller.enqueue(encoder.encode(`event: connected\ndata: {"status":"ok"}\n\n`));
+
+      await redis.subscribe('gate_scan_events');
+
+      redis.on('message', (channel, message) => {
+        if (channel === 'gate_scan_events') {
+          controller.enqueue(encoder.encode(`event: scan\ndata: ${message}\n\n`));
+        }
+      });
+
+      req.signal.addEventListener('abort', () => {
+        redis.unsubscribe();
+        redis.quit();
+        controller.close();
+      });
+    },
+  });
+
+  return new Response(stream, {
+    headers: {
+      'Content-Type': 'text/event-stream',
+      'Cache-Control': 'no-cache, no-transform',
+      Connection: 'keep-alive',
+    },
+  });
+}
+```
+
+---
+
+## 8. Multi-Provider AI Assistant Engine
+
+### `src/app/api/ai/chat/route.ts`
+
+```typescript
 import { streamText } from 'ai';
+import { createGoogleGenerativeAI } from '@ai-sdk/google';
+import { createOpenAI } from '@ai-sdk/openai';
+import { createOllama } from 'ollama-ai-provider';
 import { prisma } from '@/lib/prisma';
 
-const ollama = createOllama({
-  baseURL: process.env.OLLAMA_URL || 'http://localhost:11434/api',
-});
+export const maxDuration = 30;
+
+function resolveModel() {
+  if (process.env.PORTKEY_API_KEY) {
+    const portkey = createOpenAI({
+      baseURL: process.env.PORTKEY_BASE_URL || 'https://api.portkey.ai/v1',
+      headers: {
+        'x-portkey-api-key': process.env.PORTKEY_API_KEY,
+        'x-portkey-virtual-key': process.env.PORTKEY_VIRTUAL_KEY || '',
+      },
+    });
+    return portkey(process.env.OPENAI_MODEL || 'gpt-4o-mini');
+  }
+
+  if (process.env.GEMINI_API_KEY) {
+    const google = createGoogleGenerativeAI({ apiKey: process.env.GEMINI_API_KEY });
+    return google(process.env.GEMINI_MODEL || 'gemini-2.5-flash');
+  }
+
+  if (process.env.OPENAI_API_KEY) {
+    const openai = createOpenAI({ apiKey: process.env.OPENAI_API_KEY });
+    return openai(process.env.OPENAI_MODEL || 'gpt-4o-mini');
+  }
+
+  const ollama = createOllama({
+    baseURL: process.env.OLLAMA_URL || 'http://localhost:11434/api',
+  });
+  return ollama(process.env.OLLAMA_MODEL || 'mine-assistant-fast');
+}
 
 export async function POST(req: Request) {
   const { messages } = await req.json();
 
-  // Fetch current site context dynamically
-  const activeEmployees = await prisma.employee.count({ where: { status: 'Active' } });
-  const peopleOnSite = await prisma.gateLog.count({
-    where: { accessGranted: true, direction: 'IN' },
-  });
+  const [activeEmployees, onSiteCount] = await Promise.all([
+    prisma.employee.count({ where: { status: 'Active' } }),
+    prisma.gateLog.count({ where: { accessGranted: true, direction: 'IN' } }),
+  ]);
 
-  const systemPrompt = `You are the Mine Safety & Gate Access AI Assistant for Control-Access.
-Current Site Telemetry:
-- Active Registered Employees: ${activeEmployees}
-- Personnel Currently On Site: ${peopleOnSite}
-Answer site procedures, gate log queries, and safety compliance questions precisely.`;
+  const systemPrompt = `You are the Control-Access Mine Site Operational Assistant.
+Current Telemetry:
+- Active Registered Personnel: ${activeEmployees}
+- Personnel Currently On Site (Muster): ${onSiteCount}
+Answer questions regarding gate scans, access permissions, and safety inductions accurately and factually.`;
 
   const result = streamText({
-    model: ollama(process.env.OLLAMA_MODEL || 'mine-assistant-fast'),
+    model: resolveModel(),
     system: systemPrompt,
     messages,
   });
@@ -601,89 +691,82 @@ Answer site procedures, gate log queries, and safety compliance questions precis
 
 ---
 
-## 9. SharePoint Synchronization Engine
-
-- Migration from `services/sharepoint_sync.py` to Next.js Cron Route Handler (`app/api/cron/sharepoint-sync/route.ts`).
-- Uses `@microsoft/microsoft-graph-client` with Azure AD Client Credentials flow (`SHAREPOINT_CLIENT_ID`, `SHAREPOINT_CLIENT_SECRET`, `SHAREPOINT_TENANT_ID`).
-- Executed on schedule (00:00, 06:00, 12:00, 18:00) via Vercel Cron, systemd timer, or internal node cron.
-- Read-only pipeline updates `Employee` records, medical dates, induction expiries, and populates `AuditLog`.
-
----
-
-## 10. Phased Execution Roadmap
+## 9. Phased Execution Roadmap & Test Gates
 
 ```
 +-----------------------------------------------------------------------------------+
-| PHASE 0: Infrastructure & Project Scaffolding                                      |
-| - Initialize Next.js 15+ App Router TypeScript project                            |
-| - Set up Tailwind v4, Shadcn UI theme, and global styling tokens from DESIGN.md   |
+| PHASE 0: Project Scaffolding & Design System Alignment                            |
+| - Initialize Next.js 15+ App Router TypeScript project (pnpm)                     |
+| - Configure Tailwind CSS v4 @theme with DESIGN.md color tokens & fonts            |
+| - Implement <GlobalBackground /> video fallback & dark glass card components      |
 +-----------------------------------------------------------------------------------+
-                                        |
-                                        v
+                                         |
+                                         v
 +-----------------------------------------------------------------------------------+
-| PHASE 1: Data Layer & Encryption Compatibility                                    |
-| - Define Prisma Schema matching SQLAlchemy models                                 |
-| - Implement Fernet/AES-256-GCM dual-crypto compatibility module (`lib/crypto.ts`) |
-| - Run database migration & baseline seed validation                              |
+| PHASE 1: Data Layer & Cryptographic Parity                                        |
+| - Generate Prisma Schema matching SQLAlchemy schema                               |
+| - Implement lib/crypto.ts Fernet compatibility bridge                             |
+| - GATE: Execute crypto unit test comparing Python ciphertext output               |
+| - Baseline seed verification: 100% successful decryption of existing test data    |
 +-----------------------------------------------------------------------------------+
-                                        |
-                                        v
+                                         |
+                                         v
 +-----------------------------------------------------------------------------------+
-| PHASE 2: Auth, Security & Core Scan Engine                                        |
-| - Implement Auth.js (NextAuth v5) with TOTP MFA support                           |
-| - Port `services/scan_service.py` to `lib/scan-service.ts`                       |
-| - Build `/api/scan_qr` endpoint with API Key middleware                           |
+| PHASE 2: Auth, Security & API Key Validation                                      |
+| - Configure Auth.js (NextAuth v5) credentials provider                            |
+| - Support Werkzeug hash format verification and TOTP MFA (otplib)                 |
+| - Implement API Key middleware for HARDWARE_API_KEY & MOBILE_API_KEY              |
 +-----------------------------------------------------------------------------------+
-                                        |
-                                        v
+                                         |
+                                         v
 +-----------------------------------------------------------------------------------+
-| PHASE 3: Hardware Daemon & Real-Time Engine                                       |
-| - Develop Node.js TCP/UDP socket daemon (`server/hardware-daemon.ts`)             |
-| - Integrate Redis Pub/Sub & WebSockets/SSE telemetry broadcasting                |
+| PHASE 3: Core Scan Engine TS Port                                                 |
+| - Port scan_service.py to src/lib/scan-service.ts                                 |
+| - Implement /api/scan_qr and /api/scan_rfid route handlers                        |
+| - Direction auto-detection & induction/medical expiry validation                  |
+| - GATE: Run test suite across 10+ standard and malformed QR formats               |
+| - Benchmark: p99 latency < 100ms on SQLite index lookups                          |
 +-----------------------------------------------------------------------------------+
-                                        |
-                                        v
+                                         |
+                                         v
 +-----------------------------------------------------------------------------------+
-| PHASE 4: UI Dashboard & Gate Management Views                                     |
+| PHASE 4: Hardware Socket Daemon & Telemetry Streaming                             |
+| - Build server/hardware-daemon.ts (TCP pool 8081-8200, UDP 5000-10000)            |
+| - Wire Redis Pub/Sub telemetry channel and SSE stream route handler               |
+| - Auto-register new hardware devices upon scan event                              |
++-----------------------------------------------------------------------------------+
+                                         |
+                                         v
++-----------------------------------------------------------------------------------+
+| PHASE 5: UI Views & Operational Dashboards                                        |
 | - Build RSC Pages: Dashboard, Scanning Kiosk, Monitoring Wallboard, Employees     |
-| - Build Fleet, Equipment, Visitors, Approvals, Muster, and Gate Logs views         |
+| - Build Fleet, Equipment, Devices, Visitors, Approvals, Muster, and Gate Logs     |
+| - Build Public Kiosk, Visitor Self-Service Request, and Onboarding Forms          |
 +-----------------------------------------------------------------------------------+
-                                        |
-                                        v
+                                         |
+                                         v
 +-----------------------------------------------------------------------------------+
-| PHASE 5: AI Chat, SharePoint Sync & PDF Exports                                   |
-| - Integrate Vercel AI SDK with Ollama / Portkey providers                         |
-| - Port SharePoint synchronization pipeline to TS Graph Client                     |
-| - Build PDF visitor pass and Excel log exporter modules                          |
+| PHASE 6: AI Assistant, SharePoint Sync & Exporters                                |
+| - Deploy multi-provider Vercel AI SDK chat route handler                         |
+| - Port SharePoint synchronization pipeline via MS Graph API                       |
+| - Implement Excel gate log export (exceljs) and PDF pass generator                |
 +-----------------------------------------------------------------------------------+
-                                        |
-                                        v
+                                         |
+                                         v
 +-----------------------------------------------------------------------------------+
-| PHASE 6: E2E QA, Hardware Emulation & Production Rollout                          |
-| - Run hardware barcode scanner emulation test suite                               |
-| - Execute zero-downtime cutover & dual-run verification                           |
+| PHASE 7: Staging QA, Shadow Mode & Zero-Downtime Cutover                          |
+| - Dual-run in Read-Only Shadow Mode alongside legacy Flask server                 |
+| - Hardware emulation test via netcat/UDP packet injector                          |
+| - Validate backup codes and MFA recovery paths                                    |
+| - Execute production cutover by redirecting gateway/reverse-proxy traffic         |
 +-----------------------------------------------------------------------------------+
 ```
 
 ---
 
-## 11. Testing, Risk Matrix & Mitigation
+## 10. Production Deployment & Containerization
 
-### Risk Matrix & Remediation
-
-| Risk Factor | Level | Potential Impact | Mitigation Strategy |
-| :--- | :--- | :--- | :--- |
-| **Fernet Key Decryption Failure** | **High** | Cannot read legacy encrypted ID numbers/medical records | Retain exact HMAC-SHA256Fernet verification logic in `lib/crypto.ts`; run DB validation script prior to cutover |
-| **Hardware Socket Disconnection** | **High** | Chainway C66/C70/C71 scanners drop connections | Implement TCP Keep-Alive and auto-reconnect listeners in `hardware-daemon.ts` |
-| **QR Scan Latency > 100ms** | **Medium** | Slow gate clearance during shift changes | Optimize Prisma queries with indexes on `qrCode`, `empCode`, `rfidTag`; cache static gate rules in memory |
-| **WebSocket Wallboard Disconnection** | **Medium** | Kiosk displays stall live updates | Auto-reconnect with exponential backoff and fallback polling every 5s |
-| **SharePoint Sync Throttling** | **Low** | Sync job fails due to Graph API rate limit | Implement batch fetching (100 items per request) & exponential backoff retry |
-
----
-
-## 12. Production Deployment & Service Configuration
-
-### Docker Compose Architecture (`docker-compose.prod.yml`)
+### `docker-compose.prod.yml`
 
 ```yaml
 version: '3.8'
@@ -700,10 +783,22 @@ services:
       - DATABASE_URL=file:/app/data/access.db
       - REDIS_URL=redis://redis:6379/0
       - HARDWARE_API_KEY=${HARDWARE_API_KEY}
+      - MOBILE_API_KEY=${MOBILE_API_KEY}
       - FIELD_ENCRYPTION_KEY=${FIELD_ENCRYPTION_KEY}
       - SECRET_KEY=${SECRET_KEY}
+      - NEXTAUTH_SECRET=${NEXTAUTH_SECRET}
+      - NEXTAUTH_URL=${NEXTAUTH_URL}
     volumes:
       - db_data:/app/data
+      - ./assets:/app/public/assets:ro
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3000/api/healthz"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+    networks:
+      - internal_net
+      - public_net
 
   hardware-daemon:
     build:
@@ -712,44 +807,55 @@ services:
     restart: always
     ports:
       - "8081-8200:8081-8200"
+      - "5000:5000/udp"
+      - "8080:8080/udp"
+      - "9000:9000/udp"
       - "9100:9100/udp"
+      - "9999:9999/udp"
+      - "10000:10000/udp"
     environment:
-      - NEXT_API_URL=http://app:3000/api/scan_qr
+      - NEXT_INTERNAL_API_URL=http://app:3000
       - HARDWARE_API_KEY=${HARDWARE_API_KEY}
       - REDIS_URL=redis://redis:6379/0
+    depends_on:
+      - app
+      - redis
+    networks:
+      - internal_net
+      - public_net
 
   redis:
     image: redis:7-alpine
     restart: always
+    command: redis-server --appendonly yes
     ports:
       - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - internal_net
 
 volumes:
   db_data:
-```
+  redis_data:
 
-### Systemd Service Setup (`/etc/systemd/system/control-access-next.service`)
-
-```ini
-[Unit]
-Description=Control-Access Next.js Full Stack Gate Engine
-After=network.target redis.service
-
-[Service]
-Type=simple
-User=timothy
-WorkingDirectory=/home/timothy/Projects/Access
-ExecStart=/usr/bin/npm start
-Restart=always
-RestartSec=5
-Environment=NODE_ENV=production PORT=3000
-
-[Install]
-WantedBy=multi-user.target
+networks:
+  internal_net:
+    internal: true
+  public_net:
+    driver: bridge
 ```
 
 ---
 
-## Summary & Sign-off
+## 11. Verification & Compliance Matrix
 
-This migration blueprint provides an immediate, production-ready roadmap to transform the **Control-Access** codebase into a robust Next.js 15+ fullstack application while preserving 100% feature parity, visual design fidelity (`DESIGN.md`), field encryption integrity, and low-latency hardware gate scanner operations.
+| Phase | Automated Test / Verification Command | Success Criteria |
+| :--- | :--- | :--- |
+| **Phase 1: Crypto** | `pnpm test crypto.test.ts` | 100% round-trip parity on Python-encrypted strings; HMAC tamper detection active. |
+| **Phase 2: Auth** | `pnpm test auth.test.ts` | Werkzeug hashes verify; TOTP tokens validate; API keys gated on protected routes. |
+| **Phase 3: Scan Engine** | `pnpm test scan-service.test.ts` | URLs, raw IDs, JSON, and RFID resolve correctly; auto-direction flip works; latency < 100ms. |
+| **Phase 4: Hardware** | `echo "EMP:1002" \| nc -u 127.0.0.1 9000` | UDP scan returns JSON ACK; Redis pub/sub emits event; Device status updated. |
+| **Phase 5: UI & Kiosk** | `pnpm playwright test` | Wallboard renders live telemetry; Scanning kiosk triggers audio feedback; Forms submit without error. |
+| **Phase 6: Services** | `curl -X POST http://localhost:3000/api/ai/chat` | AI returns streamed SSE tokens with live muster site counts. |
+| **Phase 7: Cutover** | Dual-run telemetry comparison | 0 dropped scans; zero schema drift; full data consistency between old and new systems. |

@@ -1,0 +1,162 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:../mine_management.db"
+}
+
+model users {
+  id               Int             @id @default(autoincrement())
+  username         String          @unique
+  password         String
+  role             String          @default("user")
+  totp_secret      String?
+  mfa_enabled      Boolean         @default(false)
+  mfa_backup_codes String?
+  created_at       DateTime        @default(now())
+  notifications    notifications[]
+}
+
+model devices {
+  id          Int      @id @default(autoincrement())
+  device_name String
+  device_type String?
+  mac_address String?
+  ip_address  String?
+  last_seen   DateTime @default(now())
+  status      String   @default("online")
+  total_scans Int      @default(0)
+  created_at  DateTime @default(now())
+}
+
+model employees {
+  id               Int         @id @default(autoincrement())
+  emp_code         String      @unique
+  initials         String?
+  first_name       String
+  second_name      String?
+  surname          String
+  id_number        String?     @unique
+  id_number_hash   String?     @unique
+  job_title        String?
+  area             String?
+  induction        String?
+  induction_expiry DateTime?
+  medical          String?
+  medical_expiry   DateTime?
+  qr_code          String?     @unique
+  rfid_tag         String?     @unique
+  status           String      @default("Active")
+  created_at       DateTime    @default(now())
+  visitors         visitors[]
+  gate_logs        gate_logs[]
+}
+
+model vehicles {
+  id                  Int         @id @default(autoincrement())
+  fleet_id            String      @unique
+  registration_expiry DateTime?
+  qr_code             String?     @unique
+  rfid_tag            String?     @unique
+  status              String      @default("Active")
+  created_at          DateTime    @default(now())
+  gate_logs           gate_logs[]
+}
+
+model equipment {
+  id                  Int         @id @default(autoincrement())
+  radio_id            String      @unique
+  registration_expiry DateTime?
+  qr_code             String?     @unique
+  rfid_tag            String?     @unique
+  status              String      @default("Active")
+  created_at          DateTime    @default(now())
+  gate_logs           gate_logs[]
+}
+
+model visitors {
+  id             Int         @id @default(autoincrement())
+  name           String
+  company        String?
+  purpose        String?
+  meeting_person String?
+  qr_code        String?     @unique
+  rfid_tag       String?     @unique
+  host_id        Int?
+  host           employees?  @relation(fields: [host_id], references: [id])
+  check_in_time  DateTime    @default(now())
+  check_out_time DateTime?
+  status         String      @default("Checked In")
+  created_at     DateTime    @default(now())
+  gate_logs      gate_logs[]
+}
+
+model gate_logs {
+  id             Int        @id @default(autoincrement())
+  access_type    String?
+  entity_id      Int?
+  entity_name    String?
+  direction      String?
+  qr_data        String?
+  access_granted Boolean    @default(true)
+  denial_reason  String?
+  gate_location  String?
+  scanned_at     DateTime   @default(now())
+  scanned_by     String?
+  ip_address     String?
+  user_agent     String?
+  parsed_qr_data String?
+  employee_id    Int?
+  employee       employees? @relation(fields: [employee_id], references: [id])
+  vehicle_id     Int?
+  vehicle        vehicles?  @relation(fields: [vehicle_id], references: [id])
+  visitor_id     Int?
+  visitor        visitors?  @relation(fields: [visitor_id], references: [id])
+  equipment_id   Int?
+  equipment      equipment? @relation(fields: [equipment_id], references: [id])
+}
+
+model approvals {
+  id             Int       @id @default(autoincrement())
+  request_type   String?
+  request_id     Int?
+  requester_name String?
+  details        String?
+  status         String    @default("Pending")
+  approved_by    String?
+  approval_date  DateTime?
+  comments       String?
+  target_table   String?
+  scanned_data   String?
+  created_at     DateTime  @default(now())
+}
+
+model site_settings {
+  id    Int     @id @default(autoincrement())
+  key   String  @unique
+  value String?
+}
+
+model notifications {
+  id         Int      @id @default(autoincrement())
+  user_id    Int?
+  user       users?   @relation(fields: [user_id], references: [id])
+  type       String
+  message    String
+  read       Boolean  @default(false)
+  link       String?
+  created_at DateTime @default(now())
+}
+
+model gate_mappings {
+  id                   Int      @id @default(autoincrement())
+  ip_address           String   @unique
+  scanner_id           String?
+  gate_name            String
+  location_description String?
+  is_active            Boolean  @default(true)
+  created_at           DateTime @default(now())
+  updated_at           DateTime @updatedAt
+}
