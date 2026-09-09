@@ -6,7 +6,8 @@ import ApprovalCard from "@/components/approvals/ApprovalCard";
 
 export default async function ApprovalsPage() {
   const session = await auth();
-  if (!session?.user) redirect("/login");
+  if (!session?.user)
+    redirect(`/login?callbackUrl=${encodeURIComponent("/approvals")}`);
 
   const approvals = await prisma.approvals.findMany({
     where: { status: "Pending" },

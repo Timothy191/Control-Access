@@ -11,17 +11,21 @@ export async function GET() {
 
       // Mocking Redis pub/sub telemetry events for SSE
       const interval = setInterval(() => {
-        sendEvent({
-          type: "ping",
-          timestamp: new Date().toISOString(),
-          activeTCP: Math.floor(Math.random() * 10),
-        });
+        try {
+          sendEvent({
+            type: "ping",
+            timestamp: new Date().toISOString(),
+            activeTCP: Math.floor(Math.random() * 10),
+          });
+        } catch (error) {
+          clearInterval(interval);
+        }
       }, 5000);
-
-      // Clean up when the client disconnects
-      // The stream doesn't inherently notify of client disconnect without a wrapper,
-      // but this is a stub for the telemetry stream.
     },
+    cancel() {
+      // Clean up when the client disconnects
+      console.log("Telemetry stream disconnected");
+    }
   });
 
   return new NextResponse(stream, {

@@ -1,53 +1,36 @@
-import { PrismaClient } from "@prisma/client";
-
-export const dynamic = "force-dynamic";
-export const revalidate = 0;
-
-const prisma = new PrismaClient();
+import prisma from "@/lib/prisma";
 
 export default async function EmployeesPage() {
   const employees = await prisma.employees.findMany({
-    take: 50,
-    orderBy: { id: "desc" },
+    orderBy: { created_at: "desc" },
   });
 
   return (
-    <div className="space-y-6">
-      <h1 className="text-2xl font-bold">Employees</h1>
-      <div className="bg-white/10 backdrop-blur-md rounded-xl border border-white/20 overflow-hidden">
-        <table className="w-full text-left">
-          <thead className="bg-white/5 border-b border-white/10">
+    <div className="p-8">
+      <h1 className="text-2xl font-bold mb-4">Employees ({employees.length})</h1>
+      <div className="overflow-x-auto bg-white rounded-lg shadow">
+        <table className="min-w-full divide-y divide-gray-200">
+          <thead className="bg-gray-50">
             <tr>
-              <th className="px-6 py-3 font-semibold text-sm">ID</th>
-              <th className="px-6 py-3 font-semibold text-sm">Code</th>
-              <th className="px-6 py-3 font-semibold text-sm">Name</th>
-              <th className="px-6 py-3 font-semibold text-sm">Title</th>
-              <th className="px-6 py-3 font-semibold text-sm">Status</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Employee Code</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Job Title</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-white/10">
+          <tbody className="bg-white divide-y divide-gray-200">
             {employees.map((emp) => (
-              <tr key={emp.id} className="hover:bg-white/5 transition-colors">
-                <td className="px-6 py-4 text-sm">{emp.id}</td>
-                <td className="px-6 py-4 text-sm font-mono text-gray-400">{emp.emp_code}</td>
-                <td className="px-6 py-4 text-sm">{emp.first_name} {emp.surname}</td>
-                <td className="px-6 py-4 text-sm">{emp.job_title}</td>
-                <td className="px-6 py-4 text-sm">
-                  <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                    emp.status === "Active" ? "bg-green-500/20 text-green-300" : "bg-red-500/20 text-red-300"
-                  }`}>
-                    {emp.status || "Unknown"}
+              <tr key={emp.id}>
+                <td className="px-6 py-4 whitespace-nowrap">{emp.first_name} {emp.surname}</td>
+                <td className="px-6 py-4 whitespace-nowrap">{emp.emp_code}</td>
+                <td className="px-6 py-4 whitespace-nowrap">{emp.job_title || "-"}</td>
+                <td className="px-6 py-4 whitespace-nowrap">
+                  <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${emp.status === 'Active' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                    {emp.status}
                   </span>
                 </td>
               </tr>
             ))}
-            {employees.length === 0 && (
-              <tr>
-                <td colSpan={5} className="px-6 py-8 text-center text-gray-500">
-                  No employees found.
-                </td>
-              </tr>
-            )}
           </tbody>
         </table>
       </div>
