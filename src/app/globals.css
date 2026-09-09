@@ -1,25 +1,29 @@
 @import "tailwindcss";
 
 @theme {
-  --color-background: #0a0a0a;
-  --color-foreground: #ffffff;
+  --color-background: #000000;
+  --color-foreground: #ededed;
+
+  /* Vercel Geist Scale */
+  --color-geist-bg: #000000;
+  --color-geist-card: rgba(10, 10, 12, 0.85);
+  --color-geist-border: rgba(255, 255, 255, 0.1);
+  --color-geist-border-subtle: rgba(255, 255, 255, 0.05);
 
   --color-red-primary: #ff6b00;
   --color-red-dark: #d95800;
   --color-steel: #d4af37;
-  --color-dark-bg: #0a0a0a;
-  --color-dark-card: rgba(15, 15, 20, 0.65);
-  --color-text-primary: #ffffff;
-  --color-text-secondary: #cccccc;
+  --color-dark-bg: #000000;
+  --color-dark-card: rgba(10, 10, 14, 0.8);
+  --color-text-primary: #ededed;
+  --color-text-secondary: #888888;
 
   --color-success: #10b981;
   --color-warning: #f59e0b;
   --color-danger: #ef4444;
 
-  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
-  --font-mono:
-    var(--font-jetbrains-mono), ui-monospace, SFMono-Regular, Menlo, Monaco,
-    Consolas, monospace;
+  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
 }
 
 @layer base {
