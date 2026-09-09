@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 import {
   IconDashboard,
   IconQrcode,
+  IconDeviceMobile,
   IconUsers,
   IconTruck,
   IconTool,
@@ -23,34 +24,37 @@ import Image from "next/image";
 export default function Sidebar() {
   const pathname = usePathname();
   const [isOpen, setIsOpen] = useState(false);
-  const [mounted, setMounted] = useState(false);
   const [copied, setCopied] = useState(false);
 
   const publicUrl = "https://diamond-casino-towards-wanting.trycloudflare.com";
 
   const handleCopy = () => {
-    navigator.clipboard.writeText(publicUrl);
+    navigator.clipboard.writeText(publicUrl).catch(() => {
+      // clipboard unavailable (non-secure context); copied state stays false
+    });
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
 
   useEffect(() => {
-    setMounted(true);
-    // Auto-hide behavior: sidebar starts closed on all devices.
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setIsOpen(false);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
   }, []);
 
   const navItems = [
     { name: "Dashboard", href: "/", icon: IconDashboard },
     { name: "Employees", href: "/employees", icon: IconUsers },
     { name: "Visitors", href: "/visitors", icon: IconQrcode },
+    { name: "Onboarding", href: "/onboard", icon: IconDeviceMobile },
     { name: "Fleet", href: "/fleet", icon: IconTruck },
     { name: "Equipment", href: "/equipment", icon: IconTool },
     { name: "Approvals", href: "/approvals", icon: IconClipboardCheck },
     { name: "Database", href: "/database", icon: IconDatabase },
     { name: "Admin Settings", href: "/admin", icon: IconSettings },
   ];
-
-  if (!mounted) return null;
 
   return (
     <>
@@ -181,6 +185,7 @@ export default function Sidebar() {
         <div
           className="md:hidden fixed inset-0 bg-black/60 backdrop-blur-sm z-30"
           onClick={() => setIsOpen(false)}
+          role="presentation"
         />
       )}
     </>
