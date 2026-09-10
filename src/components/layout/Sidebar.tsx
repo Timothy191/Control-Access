@@ -53,11 +53,7 @@ export default function Sidebar() {
 
   const navItems = [
     { name: "Dashboard", href: "/", icon: IconDashboard },
-    { name: "Employees", href: "/employees", icon: IconUsers },
-    { name: "Visitors", href: "/visitors", icon: IconQrcode },
     { name: "Onboarding", href: "/onboard", icon: IconDeviceMobile },
-    { name: "Fleet", href: "/fleet", icon: IconTruck },
-    { name: "Equipment", href: "/equipment", icon: IconTool },
     { name: "Approvals", href: "/approvals", icon: IconClipboardCheck },
     { name: "Database", href: "/database", icon: IconDatabase },
     { name: "Admin Settings", href: "/admin", icon: IconSettings },

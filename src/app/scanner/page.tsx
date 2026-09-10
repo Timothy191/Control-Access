@@ -265,6 +265,15 @@ export default function PermanentC66ScannerPage() {
         }
       }
 
+      // Chainway C66 Native Bridge API Call
+      if (typeof window !== "undefined" && (window as any).ChainwayHardware) {
+        try {
+          (window as any).ChainwayHardware.errorFeedback();
+        } catch {
+          // ignore
+        }
+      }
+
       // Android push notification
       if (
         typeof window !== "undefined" &&
@@ -454,6 +463,15 @@ export default function PermanentC66ScannerPage() {
       inputRef.current?.focus();
     }
   };
+
+  // 8.5 Native Android Bridge (Chainway C66)
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      (window as any).onNativeScanReceived = (barcode: string) => {
+        handleProcessScan(barcode);
+      };
+    }
+  });
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Enter") {

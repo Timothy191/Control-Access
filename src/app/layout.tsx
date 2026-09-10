@@ -5,6 +5,7 @@ import { SessionProvider } from "next-auth/react";
 import "./globals.css";
 import GlobalBackground from "@/components/layout/GlobalBackground";
 import { SiteProvider } from "@/components/layout/SiteContext";
+import AiAssistant from "@/components/layout/AiAssistant";
 
 export const metadata: Metadata = {
   title: "Control-Access — Plantcor Arch System",
@@ -33,6 +34,7 @@ export default function RootLayout({
         <SessionProvider>
           <SiteProvider>{children}</SiteProvider>
         </SessionProvider>
+        <AiAssistant />
       </body>
     </html>
   );
