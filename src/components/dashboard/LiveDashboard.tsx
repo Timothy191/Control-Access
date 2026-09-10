@@ -5,6 +5,7 @@ import { useTelemetry } from "@/hooks/useTelemetry";
 import { useSite } from "@/components/layout/SiteContext";
 import InteractiveStatCard from "./InteractiveStatCard";
 import LiveScansTable from "./LiveScansTable";
+import OperationalCommandStrip from "./OperationalCommandStrip";
 
 interface ScanLog {
   id: number;
@@ -63,21 +64,13 @@ export default function LiveDashboard({
 
   return (
     <div className="space-y-8">
-      {/* Live System Status Header */}
-      <div className="flex flex-wrap items-center justify-between gap-4 p-4 rounded-xl bg-neutral-900/80 backdrop-blur-xl border border-white/10 shadow-sm">
-        <div className="flex items-center gap-3">
-          <span className="relative flex h-2.5 w-2.5">
-            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-            <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.8)]"></span>
-          </span>
-          <span className="text-xs font-semibold text-emerald-400 font-mono tracking-wider uppercase">
-            Live Cloudflare Edge Sync • Connected
-          </span>
-        </div>
-        <div className="text-xs text-neutral-400 font-mono">
-          Auto-refresh: 3s {lastUpdated && `• Last sync: ${lastUpdated}`}
-        </div>
-      </div>
+      {/* Operational Command Strip */}
+      <OperationalCommandStrip
+        selectedSite={selectedSite}
+        musterCount={stats.musterCount}
+        lastUpdated={lastUpdated}
+        onRefresh={fetchStats}
+      />
 
       {/* Compact Interactive KPI Stats Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
