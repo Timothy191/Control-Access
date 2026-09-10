@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useMemo } from "react";
+import Link from "next/link";
 import {
   IconSearch,
   IconLayoutGrid,
@@ -17,7 +18,10 @@ import {
   IconFilter,
   IconEye,
   IconRefresh,
+  IconClock,
+  IconRadio,
 } from "@tabler/icons-react";
+import { decodeScanForDisplay } from "@/lib/scan-decoder";
 
 export interface ScanEvent {
   id: number;
@@ -28,6 +32,8 @@ export interface ScanEvent {
   denial_reason: string | null;
   gate_location: string | null;
   scanned_at: string;
+  qr_data?: string | null;
+  parsed_qr_data?: string | null;
 }
 
 interface LiveScansTableProps {
@@ -56,36 +62,59 @@ export default function LiveScansTable({
 }: LiveScansTableProps) {
   const [search, setSearch] = useState("");
   const [directionFilter, setDirectionFilter] = useState<"ALL" | "IN" | "OUT">("ALL");
-  const [statusFilter, setStatusFilter] = useState<"ALL" | "GRANTED" | "DENIED">("ALL");
+  const [statusFilter, setStatusFilter] = useState<"ALL" | "GRANTED" | "PENDING" | "DENIED">("ALL");
   const [viewMode, setViewMode] = useState<"table" | "grid">("table");
   const [inspectedScan, setInspectedScan] = useState<ScanEvent | null>(null);
   const [copiedId, setCopiedId] = useState<number | null>(null);
 
+  // Pre-calculate status counts
+  const counts = useMemo(() => {
+    let granted = 0;
+    let pending = 0;
+    let denied = 0;
+    for (const s of scans) {
+      if (s.access_granted) {
+        granted++;
+      } else if (decodeScanForDisplay(s).isPending) {
+        pending++;
+      } else {
+        denied++;
+      }
+    }
+    return { all: scans.length, granted, pending, denied };
+  }, [scans]);
+
   // Filter scans
   const filteredScans = useMemo(() => {
     return scans.filter((scan) => {
+      const decoded = decodeScanForDisplay(scan);
+
       // Direction match
       if (directionFilter !== "ALL") {
         const dir = (scan.direction || "").toUpperCase();
         if (dir !== directionFilter) return false;
       }
+
       // Status match
       if (statusFilter === "GRANTED" && !scan.access_granted) return false;
-      if (statusFilter === "DENIED" && scan.access_granted) return false;
+      if (statusFilter === "PENDING" && !decoded.isPending) return false;
+      if (statusFilter === "DENIED" && (scan.access_granted || decoded.isPending)) return false;
 
       // Text search match
       if (search.trim()) {
         const q = search.toLowerCase();
-        const name = (scan.entity_name || "").toLowerCase();
+        const name = (decoded.cleanName || scan.entity_name || "").toLowerCase();
         const gate = (scan.gate_location || "").toLowerCase();
         const type = (scan.access_type || "").toLowerCase();
         const reason = (scan.denial_reason || "").toLowerCase();
+        const tag = (decoded.decodedTag || scan.qr_data || "").toLowerCase();
         const idStr = String(scan.id);
         if (
           !name.includes(q) &&
           !gate.includes(q) &&
           !type.includes(q) &&
           !reason.includes(q) &&
+          !tag.includes(q) &&
           !idStr.includes(q)
         ) {
           return false;
@@ -101,76 +130,112 @@ export default function LiveScansTable({
     const headers = [
       "ID",
       "Timestamp",
-      "Entity Name",
+      "Decoded Entity Name",
+      "Raw Scanned Tag",
       "Access Type",
       "Direction",
       "Gate Location",
-      "Access Granted",
-      "Denial Reason",
+      "Status",
+      "Reason",
     ];
-    const rows = filteredScans.map((s) => [
-      s.id,
-      `"${s.scanned_at}"`,
-      `"${s.entity_name || "Unknown"}"`,
-      `"${s.access_type || "N/A"}"`,
-      `"${s.direction || "N/A"}"`,
-      `"${s.gate_location || "N/A"}"`,
-      s.access_granted ? "GRANTED" : "DENIED",
-      `"${s.denial_reason || ""}"`,
-    ]);
-    const csvContent = [headers.join(","), ...rows.map((r) => r.join(","))].join("\n");
-    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
+    const rows = filteredScans.map((s) => {
+      const dec = decodeScanForDisplay(s);
+      return [
+        s.id,
+        `"${s.scanned_at}"`,
+        `"${dec.cleanName}"`,
+        `"${dec.decodedTag || s.qr_data || ""}"`,
+        `"${s.access_type || "N/A"}"`,
+        `"${s.direction || "N/A"}"`,
+        `"${s.gate_location || "N/A"}"`,
+        s.access_granted ? "GRANTED" : dec.isPending ? "PENDING" : "DENIED",
+        `"${s.denial_reason || ""}"`,
+      ];
+    });
+
+    const csvContent =
+      "data:text/csv;charset=utf-8," +
+      [headers.join(","), ...rows.map((e) => e.join(","))].join("\n");
+    const encodedUri = encodeURI(csvContent);
     const link = document.createElement("a");
-    link.href = url;
-    link.setAttribute("download", `live_scans_${new Date().toISOString().slice(0, 10)}.csv`);
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", `access_scans_${new Date().toISOString().slice(0, 10)}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
   };
 
   const handleCopyScan = (scan: ScanEvent) => {
-    navigator.clipboard.writeText(JSON.stringify(scan, null, 2)).catch(() => {});
+    const dec = decodeScanForDisplay(scan);
+    navigator.clipboard.writeText(
+      JSON.stringify(
+        {
+          ...scan,
+          decoded_entity: dec.cleanName,
+          decoded_tag: dec.decodedTag,
+          is_pending: dec.isPending,
+        },
+        null,
+        2
+      )
+    );
     setCopiedId(scan.id);
-    setTimeout(() => setCopiedId(null), 1800);
+    setTimeout(() => setCopiedId(null), 2000);
   };
 
-  const getEntityIcon = (accessType?: string | null) => {
-    const t = (accessType || "").toLowerCase();
-    if (t.includes("veh") || t.includes("truck") || t.includes("fleet")) {
-      return <IconTruck size={15} className="text-[#007AFF]" />;
+  const getEntityIcon = (type: string | null) => {
+    const t = (type || "").toLowerCase();
+    if (t.includes("vehicle") || t.includes("truck") || t.includes("fleet")) {
+      return <IconTruck size={14} className="text-[#007AFF]" />;
     }
-    if (t.includes("vis")) {
-      return <IconId size={15} className="text-[#BF5AF2]" />;
+    if (t.includes("radio") || t.includes("equipment")) {
+      return <IconRadio size={14} className="text-[#FFBD2E]" />;
     }
-    return <IconUser size={15} className="text-[#30D158]" />;
+    return <IconUser size={14} className="text-[#30D158]" />;
   };
 
   return (
-    <div className="relative overflow-hidden rounded-2xl border border-white/[0.14] bg-[#141418]/85 backdrop-blur-2xl shadow-xl flex flex-col font-sans transition-all duration-300">
-      {/* Top Hairline Sheen */}
-      <div className="pointer-events-none absolute inset-x-0 top-0 h-[1.5px] bg-gradient-to-r from-transparent via-[#007AFF]/60 to-transparent" />
+    <div className="relative overflow-hidden rounded-2xl border border-white/10 bg-[#18181b]/80 backdrop-blur-2xl shadow-[0_8px_32px_rgba(0,0,0,0.36)] flex flex-col font-sans transition-all">
+      {/* Top macOS Acrylic Accent */}
+      <div className="pointer-events-none absolute inset-x-0 top-0 h-[1px] bg-gradient-to-r from-transparent via-white/20 to-transparent" />
 
-      {/* Control Center Header Toolbar */}
-      <div className="p-4 sm:p-5 border-b border-white/[0.08] flex flex-col gap-3.5">
+      {/* Header Toolbar */}
+      <div className="p-4 border-b border-white/10 space-y-3.5">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          {/* Title & Live Status Beacon */}
+          {/* Section Title & Window Dots */}
           <div className="flex items-center gap-3">
             <div className="flex items-center gap-2">
-              <span className="relative flex h-2.5 w-2.5">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
-                <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.8)]" />
-              </span>
-              <h2 className="font-semibold text-sm sm:text-base text-white tracking-tight uppercase font-mono">
-                Live Access Scans
-              </h2>
+              <div className="h-3 w-3 rounded-full bg-[#FF5F56] border border-[#E0443E]/80 shadow-xs" />
+              <div className="h-3 w-3 rounded-full bg-[#FFBD2E] border border-[#DEA123]/80 shadow-xs" />
+              <div className="h-3 w-3 rounded-full bg-[#27C93F] border border-[#1AAB29]/80 shadow-xs" />
             </div>
-            <span className="text-[11px] font-mono text-neutral-400 px-2 py-0.5 rounded-md bg-white/[0.05] border border-white/10">
-              {filteredScans.length} {filteredScans.length === 1 ? "Event" : "Events"}
-            </span>
+            <div>
+              <div className="flex items-center gap-2">
+                <h3 className="text-sm font-semibold text-white tracking-tight font-sans">
+                  Live Access Scans
+                </h3>
+                <span className="px-2 py-0.5 rounded-full text-[11px] font-mono font-medium bg-white/5 border border-white/10 text-neutral-300">
+                  {filteredScans.length} events
+                </span>
+                {counts.pending > 0 && (
+                  <Link
+                    href="/approvals"
+                    className="px-2 py-0.5 rounded-full text-[11px] font-mono font-semibold bg-amber-500/20 border border-amber-500/30 text-amber-300 hover:bg-amber-500/30 transition flex items-center gap-1"
+                    title="View pending scan authorizations"
+                  >
+                    <IconClock size={11} className="animate-spin text-amber-400" />
+                    <span>{counts.pending} Pending Review</span>
+                  </Link>
+                )}
+              </div>
+              <p className="text-[11px] text-neutral-400 font-sans mt-0.5">
+                Real-time RFID, biometric, and barcode perimeter transactions
+                {lastSync && ` • Synced ${lastSync}`}
+              </p>
+            </div>
           </div>
 
-          {/* Action Buttons: View Toggle & CSV Export */}
+          {/* Quick Action Tools */}
           <div className="flex items-center gap-2">
             {onRefresh && (
               <button
@@ -236,7 +301,7 @@ export default function LiveScansTable({
             </div>
             <input
               type="text"
-              placeholder="Search by name, gate, type, ID..."
+              placeholder="Search by decoded name, tag, gate, reason, ID..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="h-8 w-full appearance-none rounded-lg border border-white/[0.12] bg-black/40 pl-8 pr-3 text-xs text-neutral-100 placeholder:text-neutral-500 focus:border-[#007AFF] focus:bg-black/60 focus:outline-none focus:ring-1 focus:ring-[#007AFF]/40"
@@ -276,18 +341,30 @@ export default function LiveScansTable({
             {/* Status Filter */}
             <div className="flex items-center gap-1 rounded-lg border border-white/10 bg-black/30 p-0.5 text-[11px] font-mono">
               <span className="px-1.5 text-neutral-500 hidden sm:inline">STATUS:</span>
-              {(["ALL", "GRANTED", "DENIED"] as const).map((st) => (
+              {(
+                [
+                  { key: "ALL", label: `All (${counts.all})` },
+                  { key: "GRANTED", label: `Granted (${counts.granted})` },
+                  { key: "PENDING", label: `Pending (${counts.pending})` },
+                  { key: "DENIED", label: `Denied (${counts.denied})` },
+                ] as const
+              ).map((st) => (
                 <button
-                  key={st}
+                  key={st.key}
                   type="button"
-                  onClick={() => setStatusFilter(st)}
-                  className={`px-2 py-0.5 rounded transition cursor-pointer ${
-                    statusFilter === st
-                      ? "bg-white/15 text-white font-semibold"
+                  onClick={() => setStatusFilter(st.key)}
+                  className={`px-2 py-0.5 rounded transition cursor-pointer flex items-center gap-1 ${
+                    statusFilter === st.key
+                      ? st.key === "PENDING"
+                        ? "bg-amber-500/25 text-amber-300 border border-amber-500/40 font-semibold"
+                        : "bg-white/15 text-white font-semibold"
                       : "text-neutral-400 hover:text-neutral-200"
                   }`}
                 >
-                  {st === "GRANTED" ? "Granted" : st === "DENIED" ? "Denied" : "All"}
+                  {st.key === "PENDING" && counts.pending > 0 && (
+                    <span className="h-1.5 w-1.5 rounded-full bg-amber-400 animate-pulse" />
+                  )}
+                  <span>{st.label}</span>
                 </button>
               ))}
             </div>
@@ -296,7 +373,7 @@ export default function LiveScansTable({
       </div>
 
       {/* Content Area: Table Data Grid or Cards Grid */}
-      <div className="flex-1 overflow-auto min-h-[320px] max-h-[500px]">
+      <div className="flex-1 overflow-auto min-h-[320px] max-h-[520px]">
         {filteredScans.length === 0 ? (
           <div className="h-64 flex flex-col items-center justify-center gap-2 text-center p-6">
             <div className="w-10 h-10 rounded-full bg-white/[0.04] border border-white/10 flex items-center justify-center text-neutral-500">
@@ -321,22 +398,24 @@ export default function LiveScansTable({
             )}
           </div>
         ) : viewMode === "table" ? (
-          /* Professional Data Table Grid */
-          <table className="w-full text-left text-xs border-collapse">
-            <thead className="sticky top-0 z-20 bg-[#17171b]/95 backdrop-blur-md border-b border-white/10 text-neutral-400 font-mono text-[10px] uppercase tracking-wider">
-              <tr>
+          /* Table Data Grid View */
+          <table className="w-full text-left border-collapse text-xs">
+            <thead>
+              <tr className="border-b border-white/10 bg-black/40 text-[10px] uppercase font-mono tracking-wider text-neutral-400 sticky top-0 z-10 backdrop-blur-md">
                 <th className="py-2.5 px-4 font-semibold">Time & Status</th>
-                <th className="py-2.5 px-4 font-semibold">Subject / Entity</th>
+                <th className="py-2.5 px-4 font-semibold">Decoded Subject / Entity</th>
                 <th className="py-2.5 px-4 font-semibold hidden sm:table-cell">Type</th>
                 <th className="py-2.5 px-4 font-semibold">Direction</th>
-                <th className="py-2.5 px-4 font-semibold hidden md:table-cell">Gate / Location</th>
-                <th className="py-2.5 px-4 font-semibold text-right">Clearance</th>
-                <th className="py-2.5 px-4 font-semibold text-center w-12">Action</th>
+                <th className="py-2.5 px-4 font-semibold hidden md:table-cell">Gate Location</th>
+                <th className="py-2.5 px-4 font-semibold text-right">Clearance Decision</th>
+                <th className="py-2.5 px-4 font-semibold text-center w-16">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-white/[0.06]">
+            <tbody className="divide-y divide-white/5 font-sans">
               {filteredScans.map((scan) => {
+                const dec = decodeScanForDisplay(scan);
                 const isGranted = scan.access_granted;
+                const isPending = dec.isPending;
                 const isEntry = (scan.direction || "").toUpperCase() === "IN";
 
                 return (
@@ -350,7 +429,11 @@ export default function LiveScansTable({
                       <div className="flex items-center gap-2">
                         <span
                           className={`h-2 w-2 rounded-full shrink-0 shadow-xs ${
-                            isGranted ? "bg-emerald-400 shadow-[0_0_6px_rgba(52,211,153,0.8)]" : "bg-rose-400 shadow-[0_0_6px_rgba(244,63,94,0.8)]"
+                            isGranted
+                              ? "bg-emerald-400 shadow-[0_0_6px_rgba(52,211,153,0.8)]"
+                              : isPending
+                              ? "bg-amber-400 shadow-[0_0_6px_rgba(251,191,36,0.8)] animate-pulse"
+                              : "bg-rose-400 shadow-[0_0_6px_rgba(244,63,94,0.8)]"
                           }`}
                         />
                         <div>
@@ -364,20 +447,31 @@ export default function LiveScansTable({
                       </div>
                     </td>
 
-                    {/* Entity / Subject */}
+                    {/* Entity / Subject (Properly Decoded) */}
                     <td className="py-3 px-4">
                       <div className="flex items-center gap-2.5">
                         <div className="h-7 w-7 rounded-lg bg-black/50 border border-white/10 flex items-center justify-center shrink-0">
                           {getEntityIcon(scan.access_type)}
                         </div>
                         <div className="min-w-0">
-                          <div className="font-medium text-white text-xs truncate max-w-[160px] sm:max-w-[220px]">
-                            {scan.entity_name || "Unknown Individual"}
+                          <div className="font-medium text-white text-xs truncate max-w-[160px] sm:max-w-[220px] flex items-center gap-1.5">
+                            <span className="truncate">{dec.cleanName}</span>
+                            {isPending && (
+                              <span className="px-1.5 py-0.2 rounded bg-amber-500/20 text-amber-300 text-[9px] font-mono border border-amber-500/30 shrink-0">
+                                Pending
+                              </span>
+                            )}
                           </div>
                           <div className="text-[10px] font-mono text-neutral-400 flex items-center gap-1.5">
                             <span>ID: #{scan.id}</span>
-                            <span className="sm:hidden text-neutral-600">•</span>
-                            <span className="sm:hidden text-neutral-400">{scan.access_type || "Gate"}</span>
+                            {dec.decodedTag && (
+                              <>
+                                <span className="text-neutral-600">•</span>
+                                <span className="text-neutral-400 truncate max-w-[110px]">
+                                  {dec.decodedTag}
+                                </span>
+                              </>
+                            )}
                           </div>
                         </div>
                       </div>
@@ -414,16 +508,22 @@ export default function LiveScansTable({
 
                     {/* Clearance / Decision */}
                     <td className="py-3 px-4 text-right whitespace-nowrap">
-                      <span
-                        className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-mono font-medium border ${
-                          isGranted
-                            ? "bg-emerald-500/15 text-emerald-300 border-emerald-500/30"
-                            : "bg-rose-500/15 text-rose-300 border-rose-500/30"
-                        }`}
-                      >
-                        {isGranted ? <IconCheck size={12} /> : <IconX size={12} />}
-                        <span>{isGranted ? "GRANTED" : scan.denial_reason || "DENIED"}</span>
-                      </span>
+                      {isGranted ? (
+                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-mono font-medium border bg-emerald-500/15 text-emerald-300 border-emerald-500/30">
+                          <IconCheck size={12} />
+                          <span>GRANTED</span>
+                        </span>
+                      ) : isPending ? (
+                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-mono font-medium border bg-amber-500/15 text-amber-300 border-amber-500/30 animate-pulse">
+                          <IconClock size={12} className="text-amber-400" />
+                          <span>PENDING REVIEW</span>
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-mono font-medium border bg-rose-500/15 text-rose-300 border-rose-500/30">
+                          <IconX size={12} />
+                          <span>{scan.denial_reason || "DENIED"}</span>
+                        </span>
+                      )}
                     </td>
 
                     {/* Quick Action */}
@@ -435,7 +535,7 @@ export default function LiveScansTable({
                           setInspectedScan(scan);
                         }}
                         className="p-1 rounded-md text-neutral-400 hover:text-white hover:bg-white/10 transition cursor-pointer"
-                        title="View Full Scan Telemetry"
+                        title="View Full Decoded Telemetry"
                       >
                         <IconEye size={15} />
                       </button>
@@ -449,14 +549,20 @@ export default function LiveScansTable({
           /* Cards Grid View */
           <div className="p-4 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3.5">
             {filteredScans.map((scan) => {
+              const dec = decodeScanForDisplay(scan);
               const isGranted = scan.access_granted;
+              const isPending = dec.isPending;
               const isEntry = (scan.direction || "").toUpperCase() === "IN";
 
               return (
                 <div
                   key={scan.id}
                   onClick={() => setInspectedScan(scan)}
-                  className="rounded-xl border border-white/[0.1] bg-black/35 p-3.5 hover:border-white/20 hover:bg-white/[0.04] transition-all duration-150 cursor-pointer flex flex-col justify-between gap-3 group"
+                  className={`rounded-xl border p-3.5 transition-all duration-150 cursor-pointer flex flex-col justify-between gap-3 group ${
+                    isPending
+                      ? "border-amber-500/30 bg-amber-950/15 hover:border-amber-500/50 shadow-[0_0_15px_rgba(245,158,11,0.06)]"
+                      : "border-white/[0.1] bg-black/35 hover:border-white/20 hover:bg-white/[0.04]"
+                  }`}
                 >
                   {/* Top Meta Row */}
                   <div className="flex items-center justify-between gap-2">
@@ -471,16 +577,22 @@ export default function LiveScansTable({
                       <span>{scan.direction || "SCAN"}</span>
                     </span>
 
-                    <span
-                      className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-mono font-medium border ${
-                        isGranted
-                          ? "bg-emerald-500/15 text-emerald-300 border-emerald-500/30"
-                          : "bg-rose-500/15 text-rose-300 border-rose-500/30"
-                      }`}
-                    >
-                      {isGranted ? <IconCheck size={11} /> : <IconX size={11} />}
-                      <span>{isGranted ? "GRANTED" : "DENIED"}</span>
-                    </span>
+                    {isGranted ? (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-mono font-medium border bg-emerald-500/15 text-emerald-300 border-emerald-500/30">
+                        <IconCheck size={11} />
+                        <span>GRANTED</span>
+                      </span>
+                    ) : isPending ? (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-mono font-medium border bg-amber-500/15 text-amber-300 border-amber-500/30 animate-pulse">
+                        <IconClock size={11} />
+                        <span>PENDING REVIEW</span>
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-mono font-medium border bg-rose-500/15 text-rose-300 border-rose-500/30">
+                        <IconX size={11} />
+                        <span>DENIED</span>
+                      </span>
+                    )}
                   </div>
 
                   {/* Entity Information */}
@@ -490,7 +602,7 @@ export default function LiveScansTable({
                     </div>
                     <div className="min-w-0 flex-1">
                       <h4 className="font-medium text-white text-sm truncate">
-                        {scan.entity_name || "Unknown Entity"}
+                        {dec.cleanName}
                       </h4>
                       <p className="text-[11px] text-neutral-400 truncate flex items-center gap-1 mt-0.5 font-mono">
                         <IconMapPin size={12} className="text-neutral-500 shrink-0" />
@@ -518,125 +630,171 @@ export default function LiveScansTable({
       </div>
 
       {/* Table Footer Status Ribbon */}
-      <div className="px-4 py-2.5 border-t border-white/[0.08] bg-black/40 flex flex-wrap items-center justify-between gap-2 text-[11px] font-mono text-neutral-400">
-        <div className="flex items-center gap-2">
-          <span>Showing {filteredScans.length} of {scans.length} events</span>
-          {lastSync && (
-            <>
-              <span className="text-neutral-600">•</span>
-              <span>Synced at {lastSync}</span>
-            </>
-          )}
+      <div className="p-3 bg-black/40 border-t border-white/10 flex flex-wrap items-center justify-between gap-3 text-xs text-neutral-400 font-mono">
+        <div className="flex items-center gap-4">
+          <div className="flex items-center gap-1.5">
+            <span className="h-2 w-2 rounded-full bg-emerald-400" />
+            <span>{counts.granted} Authorized</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <span className="h-2 w-2 rounded-full bg-amber-400 animate-pulse" />
+            <span>{counts.pending} Pending</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <span className="h-2 w-2 rounded-full bg-rose-400" />
+            <span>{counts.denied} Rejected</span>
+          </div>
         </div>
-        <div className="flex items-center gap-1 text-[10px] text-neutral-500">
-          <span>Live SQLite WAL Stream</span>
+
+        <div className="text-[11px] text-neutral-500">
+          Showing {filteredScans.length} of {scans.length} total recorded scans
         </div>
       </div>
 
-      {/* Modal: Full Scan Telemetry Inspection */}
-      {inspectedScan && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-md animate-fade-in">
-          <div
-            className="fixed inset-0"
-            onClick={() => setInspectedScan(null)}
-          />
-          <div className="relative w-full max-w-lg mac-window border border-white/20 p-5 rounded-2xl shadow-2xl z-10 flex flex-col gap-4">
-            {/* Modal Titlebar with Traffic Lights */}
-            <div className="flex items-center justify-between border-b border-white/10 pb-3 -mx-1">
-              <div className="flex items-center gap-2">
-                <div
+      {/* Inspection Modal with Decoded Telemetry */}
+      {inspectedScan && (() => {
+        const dec = decodeScanForDisplay(inspectedScan);
+        return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-md p-4 animate-in fade-in duration-200">
+            <div className="relative w-full max-w-lg rounded-2xl border border-white/15 bg-[#18181b]/95 p-6 shadow-[0_20px_60px_rgba(0,0,0,0.7)] backdrop-blur-2xl space-y-5">
+              {/* macOS Titlebar */}
+              <div className="flex items-center justify-between pb-3 border-b border-white/10">
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setInspectedScan(null)}
+                    className="h-3 w-3 rounded-full bg-[#FF5F56] border border-[#E0443E]/80 hover:opacity-80 transition cursor-pointer"
+                    title="Close Modal"
+                  />
+                  <div className="h-3 w-3 rounded-full bg-[#FFBD2E] border border-[#DEA123]/80" />
+                  <div className="h-3 w-3 rounded-full bg-[#27C93F] border border-[#1AAB29]/80" />
+                </div>
+                <div className="text-xs font-mono text-neutral-300 font-semibold">
+                  Scan Audit Event #{inspectedScan.id}
+                </div>
+                <button
+                  type="button"
                   onClick={() => setInspectedScan(null)}
-                  className="h-3 w-3 rounded-full bg-[#FF5F56] border border-[#E0443E]/80 cursor-pointer"
-                  title="Close Modal"
-                />
-                <div className="h-3 w-3 rounded-full bg-[#FFBD2E] border border-[#DEA123]/80" />
-                <div className="h-3 w-3 rounded-full bg-[#27C93F] border border-[#1AAB29]/80" />
-              </div>
-              <div className="text-xs font-mono text-neutral-300 font-semibold">
-                Scan Audit Event #{inspectedScan.id}
-              </div>
-              <button
-                type="button"
-                onClick={() => setInspectedScan(null)}
-                className="text-neutral-400 hover:text-white transition cursor-pointer"
-              >
-                <IconX size={16} />
-              </button>
-            </div>
-
-            {/* Modal Details Grid */}
-            <div className="grid grid-cols-2 gap-3 text-xs font-mono">
-              <div className="p-2.5 rounded-lg bg-black/40 border border-white/5">
-                <span className="text-neutral-500 block text-[10px] uppercase">Entity Subject</span>
-                <span className="font-semibold text-white text-sm mt-0.5 block truncate">
-                  {inspectedScan.entity_name || "Unknown"}
-                </span>
-              </div>
-
-              <div className="p-2.5 rounded-lg bg-black/40 border border-white/5">
-                <span className="text-neutral-500 block text-[10px] uppercase">Access Type</span>
-                <span className="font-medium text-neutral-200 mt-0.5 block">
-                  {inspectedScan.access_type || "Employee Gate"}
-                </span>
-              </div>
-
-              <div className="p-2.5 rounded-lg bg-black/40 border border-white/5">
-                <span className="text-neutral-500 block text-[10px] uppercase">Direction & Gate</span>
-                <span className="font-medium text-neutral-200 mt-0.5 block">
-                  {inspectedScan.direction || "SCAN"} @ {inspectedScan.gate_location || "Main Portal"}
-                </span>
-              </div>
-
-              <div className="p-2.5 rounded-lg bg-black/40 border border-white/5">
-                <span className="text-neutral-500 block text-[10px] uppercase">Clearance Decision</span>
-                <span
-                  className={`font-semibold mt-0.5 block ${
-                    inspectedScan.access_granted ? "text-emerald-400" : "text-rose-400"
-                  }`}
+                  className="text-neutral-400 hover:text-white transition cursor-pointer"
                 >
-                  {inspectedScan.access_granted ? "ACCESS GRANTED" : inspectedScan.denial_reason || "ACCESS DENIED"}
-                </span>
+                  <IconX size={16} />
+                </button>
               </div>
 
-              <div className="col-span-2 p-2.5 rounded-lg bg-black/40 border border-white/5">
-                <span className="text-neutral-500 block text-[10px] uppercase">Full Timestamp</span>
-                <span className="font-medium text-neutral-300 mt-0.5 block">
-                  {new Date(inspectedScan.scanned_at).toLocaleString()} ({formatRelativeTime(inspectedScan.scanned_at)})
-                </span>
+              {/* Pending Action Banner if Scan is Pending */}
+              {dec.isPending && (
+                <div className="p-3 rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-200 text-xs flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <IconClock size={18} className="text-amber-400 shrink-0 animate-spin" />
+                    <span className="truncate">
+                      This scan is currently pending supervisor approval.
+                    </span>
+                  </div>
+                  <Link
+                    href="/approvals"
+                    className="px-3 py-1 rounded-lg bg-amber-500 hover:bg-amber-400 text-black font-semibold text-xs transition shrink-0"
+                  >
+                    Open Approvals
+                  </Link>
+                </div>
+              )}
+
+              {/* Modal Details Grid */}
+              <div className="grid grid-cols-2 gap-3 text-xs font-mono">
+                <div className="p-2.5 rounded-lg bg-black/40 border border-white/5">
+                  <span className="text-neutral-500 block text-[10px] uppercase">Decoded Subject</span>
+                  <span className="font-semibold text-white text-sm mt-0.5 block truncate">
+                    {dec.cleanName}
+                  </span>
+                </div>
+
+                <div className="p-2.5 rounded-lg bg-black/40 border border-white/5">
+                  <span className="text-neutral-500 block text-[10px] uppercase">Access Type</span>
+                  <span className="font-medium text-neutral-200 mt-0.5 block">
+                    {inspectedScan.access_type || "Employee Gate"}
+                  </span>
+                </div>
+
+                <div className="p-2.5 rounded-lg bg-black/40 border border-white/5">
+                  <span className="text-neutral-500 block text-[10px] uppercase">Credential / Tag</span>
+                  <span className="font-medium text-neutral-200 mt-0.5 block truncate">
+                    {dec.decodedTag || inspectedScan.qr_data || "Standard Badge"}
+                  </span>
+                </div>
+
+                <div className="p-2.5 rounded-lg bg-black/40 border border-white/5">
+                  <span className="text-neutral-500 block text-[10px] uppercase">Clearance Decision</span>
+                  <span
+                    className={`font-semibold mt-0.5 block ${
+                      inspectedScan.access_granted
+                        ? "text-emerald-400"
+                        : dec.isPending
+                        ? "text-amber-400"
+                        : "text-rose-400"
+                    }`}
+                  >
+                    {inspectedScan.access_granted
+                      ? "ACCESS GRANTED"
+                      : dec.isPending
+                      ? "PENDING SUPERVISOR REVIEW"
+                      : inspectedScan.denial_reason || "ACCESS DENIED"}
+                  </span>
+                </div>
+
+                <div className="p-2.5 rounded-lg bg-black/40 border border-white/5">
+                  <span className="text-neutral-500 block text-[10px] uppercase">Gate Location</span>
+                  <span className="font-medium text-neutral-300 mt-0.5 block">
+                    {inspectedScan.gate_location || "Main Portal"}
+                  </span>
+                </div>
+
+                <div className="p-2.5 rounded-lg bg-black/40 border border-white/5">
+                  <span className="text-neutral-500 block text-[10px] uppercase">Direction</span>
+                  <span className="font-medium text-neutral-300 mt-0.5 block">
+                    {inspectedScan.direction || "SCAN"}
+                  </span>
+                </div>
+
+                <div className="col-span-2 p-2.5 rounded-lg bg-black/40 border border-white/5">
+                  <span className="text-neutral-500 block text-[10px] uppercase">Full Timestamp</span>
+                  <span className="font-medium text-neutral-300 mt-0.5 block">
+                    {new Date(inspectedScan.scanned_at).toLocaleString()} ({formatRelativeTime(inspectedScan.scanned_at)})
+                  </span>
+                </div>
               </div>
-            </div>
 
-            {/* Modal Actions */}
-            <div className="flex items-center justify-between pt-2 border-t border-white/10">
-              <button
-                type="button"
-                onClick={() => handleCopyScan(inspectedScan)}
-                className="px-3 py-1.5 rounded-lg border border-white/15 bg-white/5 hover:bg-white/10 text-xs font-mono text-neutral-200 transition cursor-pointer flex items-center gap-1.5"
-              >
-                {copiedId === inspectedScan.id ? (
-                  <>
-                    <IconCheck size={14} className="text-emerald-400" />
-                    <span>Copied JSON</span>
-                  </>
-                ) : (
-                  <>
-                    <IconId size={14} />
-                    <span>Copy JSON Log</span>
-                  </>
-                )}
-              </button>
+              {/* Modal Actions */}
+              <div className="flex items-center justify-between pt-2 border-t border-white/10">
+                <button
+                  type="button"
+                  onClick={() => handleCopyScan(inspectedScan)}
+                  className="px-3 py-1.5 rounded-lg border border-white/15 bg-white/5 hover:bg-white/10 text-xs font-mono text-neutral-200 transition cursor-pointer flex items-center gap-1.5"
+                >
+                  {copiedId === inspectedScan.id ? (
+                    <>
+                      <IconCheck size={14} className="text-emerald-400" />
+                      <span>Copied JSON</span>
+                    </>
+                  ) : (
+                    <>
+                      <IconId size={14} />
+                      <span>Copy JSON Log</span>
+                    </>
+                  )}
+                </button>
 
-              <button
-                type="button"
-                onClick={() => setInspectedScan(null)}
-                className="px-4 py-1.5 rounded-lg bg-[#007AFF] hover:bg-[#0A84FF] text-white text-xs font-medium transition cursor-pointer"
-              >
-                Done
-              </button>
+                <button
+                  type="button"
+                  onClick={() => setInspectedScan(null)}
+                  className="px-4 py-1.5 rounded-lg bg-[#007AFF] hover:bg-[#0A84FF] text-white text-xs font-medium transition cursor-pointer"
+                >
+                  Done
+                </button>
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
     </div>
   );
 }

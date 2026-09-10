@@ -16,6 +16,8 @@ interface ScanLog {
   denial_reason: string | null;
   gate_location: string | null;
   scanned_at: string;
+  qr_data?: string | null;
+  parsed_qr_data?: string | null;
 }
 
 interface DashboardStats {

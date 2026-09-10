@@ -1,6 +1,5 @@
-import { PrismaClient } from "@prisma/client";
-
-const prisma = new PrismaClient();
+import prisma from "@/lib/prisma";
+import { resolveEntityFromDatabase, decodePendingScan } from "./scan-decoder";
 
 function normalizeQrHash(qrHash: string | null): string | null {
   if (!qrHash) return null;
@@ -35,40 +34,68 @@ export async function processQrScan({
   const normalized = normalizeQrHash(qrHash);
   if (!normalized) return { accessGranted: false, denialReason: "Empty QR" };
 
-  // 1. Look up Employee by QR code
-  let entityType = "unknown";
-  let entityId: number | null = null;
-  let entityName = "Unknown";
+  // Check system lockdown setting
+  const lockdownSetting = await prisma.site_settings.findUnique({
+    where: { key: "system_lockdown" },
+  });
+  const isLockdown = lockdownSetting?.value === "true";
+
+  // 1. Resolve entity using multi-identifier database lookup
+  const matched = await resolveEntityFromDatabase(normalized);
+  const decoded = await decodePendingScan(normalized, {
+    details: `QR scan at ${gateLocation || "Access Portal"}`,
+  });
+
+  const entityType = matched?.type || decoded.entity_type || "unknown";
+  const entityId: number | null = matched?.id || null;
+  const entityName = matched?.name || decoded.name || "Unknown";
   let accessGranted = false;
   let denialReason: string | null = null;
 
-  const employee = await prisma.employees.findFirst({
-    where: { qr_code: normalized },
-  });
+  if (isLockdown) {
+    accessGranted = false;
+    denialReason = "PERIMETER LOCKDOWN IN EFFECT";
+  } else if (matched) {
+    // Registered entity status checks
+    if (matched.status === "Active") {
+      accessGranted = true;
+      denialReason = null;
+    } else {
+      accessGranted = false;
+      denialReason = `Credential status: ${matched.status} - Verification required`;
+    }
+  } else {
+    // Unregistered / Pending scan
+    accessGranted = false;
+    denialReason = "Pending supervisor approval - Credential verification required";
 
-  if (employee) {
-    entityType = "employee";
-    entityId = employee.id;
-    entityName = `${employee.first_name} ${employee.surname}`;
-  }
+    // Auto-create pending approval request for supervisor review
+    try {
+      const existingPending = await prisma.approvals.findFirst({
+        where: {
+          scanned_data: { contains: normalized },
+          status: "Pending",
+        },
+      });
 
-  // Handle vehicle, visitor, equipment fallbacks...
-  // For the sake of the port, let's assume it's just employees for now to simplify, or add simple checks:
-  if (!entityId) {
-    const vehicle = await prisma.vehicles.findFirst({ where: { qr_code: normalized } });
-    if (vehicle) {
-      entityType = "vehicle";
-      entityId = vehicle.id;
-      entityName = vehicle.fleet_id || "Unknown Vehicle";
+      if (!existingPending) {
+        await prisma.approvals.create({
+          data: {
+            request_type: "New QR Access Request",
+            requester_name: decoded.name || "Unassigned Entity",
+            details: `QR scan at ${gateLocation || "Access Portal"} (ID: ${decoded.employee_id || normalized})`,
+            status: "Pending",
+            target_table: decoded.entity_type === "vehicle" ? "fleet" : "employees",
+            scanned_data: JSON.stringify(decoded),
+          },
+        });
+      }
+    } catch (e) {
+      console.error("Failed to auto-create pending approval:", e);
     }
   }
 
-  if (!entityId) {
-    // If not found, deny access
-    denialReason = "Not registered in system";
-  }
-
-  // 2. Auto-Direction
+  // 2. Auto-Direction determination
   let direction = "IN";
   if (entityId && entityType) {
     const lastLog = await prisma.gate_logs.findFirst({
@@ -84,25 +111,7 @@ export async function processQrScan({
     }
   }
 
-  // 3. Expiry and Status Checks
-  if (entityType === "employee" && employee) {
-    const now = new Date();
-    if (employee.medical_expiry && new Date(employee.medical_expiry) < now) {
-      accessGranted = false;
-      denialReason = "Medical certificate expired";
-    } else if (employee.induction_expiry && new Date(employee.induction_expiry) < now) {
-      accessGranted = false;
-      denialReason = "Induction expired";
-    } else if (employee.status === "Active") {
-      accessGranted = true;
-      denialReason = null;
-    } else {
-      accessGranted = false;
-      denialReason = "Employee not active";
-    }
-  }
-
-  // 4. Record Gate Log
+  // 3. Record Gate Log with full decoded JSON
   await prisma.gate_logs.create({
     data: {
       access_type: entityType,
@@ -116,7 +125,12 @@ export async function processQrScan({
       scanned_by: scannedBy,
       ip_address: ipAddress,
       user_agent: userAgent,
-    }
+      parsed_qr_data: JSON.stringify(decoded),
+      employee_id: entityType === "employee" ? entityId : null,
+      vehicle_id: entityType === "vehicle" ? entityId : null,
+      visitor_id: entityType === "visitor" ? entityId : null,
+      equipment_id: entityType === "equipment" ? entityId : null,
+    },
   });
 
   return {
@@ -125,7 +139,8 @@ export async function processQrScan({
     entityType,
     entityId,
     entityName,
-    direction
+    direction,
+    decoded,
   };
 }
 
@@ -144,36 +159,72 @@ export async function processRfidScan({
 }) {
   if (!rfidTag) return { accessGranted: false, denialReason: "Empty RFID" };
 
+  // Check system lockdown setting
+  const lockdownSetting = await prisma.site_settings.findUnique({
+    where: { key: "system_lockdown" },
+  });
+  const isLockdown = lockdownSetting?.value === "true";
+
   // Normalize RFID
   let tag = rfidTag.trim().toUpperCase().replace(/[:\-\s\.]/g, "");
-  ["EPC:", "UID:", "TAG:", "RFID:", "[", "]"].forEach(p => {
+  ["EPC:", "UID:", "TAG:", "RFID:", "[", "]"].forEach((p) => {
     tag = tag.replace(p, "");
   });
 
-  let entityType = "unknown";
-  let entityId: number | null = null;
-  let entityName = "Unknown";
+  // 1. Resolve entity using multi-identifier database lookup
+  const matched = await resolveEntityFromDatabase(rfidTag);
+  const decoded = await decodePendingScan(rfidTag, {
+    details: `RFID scan at ${gateLocation || "Access Portal"}`,
+  });
+
+  const entityType = matched?.type || decoded.entity_type || "unknown";
+  const entityId: number | null = matched?.id || null;
+  const entityName = matched?.name || decoded.name || "Unknown";
   let accessGranted = false;
   let denialReason: string | null = null;
 
-  const employee = await prisma.employees.findFirst({
-    where: { rfid_tag: tag },
-  });
-
-  if (employee) {
-    entityType = "employee";
-    entityId = employee.id;
-    entityName = `${employee.first_name} ${employee.surname}`;
-    if (employee.status === "Active") {
+  if (isLockdown) {
+    accessGranted = false;
+    denialReason = "PERIMETER LOCKDOWN IN EFFECT";
+  } else if (matched) {
+    if (matched.status === "Active") {
       accessGranted = true;
+      denialReason = null;
     } else {
-      denialReason = "Employee not active";
+      accessGranted = false;
+      denialReason = `Credential status: ${matched.status} - Verification required`;
     }
   } else {
-    denialReason = "RFID tag not registered";
+    // Unregistered RFID scan -> create pending approval
+    accessGranted = false;
+    denialReason = "Pending supervisor approval - RFID tag not verified";
+
+    try {
+      const existingPending = await prisma.approvals.findFirst({
+        where: {
+          scanned_data: { contains: rfidTag },
+          status: "Pending",
+        },
+      });
+
+      if (!existingPending) {
+        await prisma.approvals.create({
+          data: {
+            request_type: "New RFID Access Request",
+            requester_name: decoded.name || "Unassigned RFID Credential",
+            details: `RFID scan at ${gateLocation || "Access Portal"} (Tag: ${rfidTag})`,
+            status: "Pending",
+            target_table: decoded.entity_type === "vehicle" ? "fleet" : "employees",
+            scanned_data: JSON.stringify(decoded),
+          },
+        });
+      }
+    } catch (e) {
+      console.error("Failed to auto-create pending approval for RFID:", e);
+    }
   }
 
-  // 2. Auto-Direction
+  // 2. Auto-Direction determination
   let direction = "IN";
   if (entityId && entityType) {
     const lastLog = await prisma.gate_logs.findFirst({
@@ -189,21 +240,26 @@ export async function processRfidScan({
     }
   }
 
-  // Record Gate Log
+  // 3. Record Gate Log with full decoded JSON
   await prisma.gate_logs.create({
     data: {
       access_type: entityType,
       entity_id: entityId,
       entity_name: entityName,
       direction: direction,
-      qr_data: tag, // RFID stored in qr_data for compatibility
+      qr_data: tag,
       access_granted: accessGranted,
       denial_reason: denialReason,
       gate_location: gateLocation,
       scanned_by: scannedBy,
       ip_address: ipAddress,
       user_agent: userAgent,
-    }
+      parsed_qr_data: JSON.stringify(decoded),
+      employee_id: entityType === "employee" ? entityId : null,
+      vehicle_id: entityType === "vehicle" ? entityId : null,
+      visitor_id: entityType === "visitor" ? entityId : null,
+      equipment_id: entityType === "equipment" ? entityId : null,
+    },
   });
 
   return {
@@ -212,6 +268,7 @@ export async function processRfidScan({
     entityType,
     entityId,
     entityName,
-    direction
+    direction,
+    decoded,
   };
 }

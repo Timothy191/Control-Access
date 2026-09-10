@@ -78,6 +78,8 @@ export default async function DashboardPage({
     scanned_at: scan.scanned_at
       ? scan.scanned_at.toISOString()
       : new Date().toISOString(),
+    qr_data: scan.qr_data,
+    parsed_qr_data: scan.parsed_qr_data,
   }));
 
   const initialStats = {
