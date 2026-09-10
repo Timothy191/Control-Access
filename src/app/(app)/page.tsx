@@ -58,7 +58,7 @@ export default async function DashboardPage({
       prisma.approvals.count({ where: { status: "Pending" } }),
       prisma.gate_logs.findMany({
         where: gateLogWhere,
-        take: 10,
+        take: 25,
         orderBy: { id: "desc" },
       }),
     ]);

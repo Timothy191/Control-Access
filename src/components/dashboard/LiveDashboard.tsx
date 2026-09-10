@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback } from "react";
 import { useTelemetry } from "@/hooks/useTelemetry";
 import { useSite } from "@/components/layout/SiteContext";
 import InteractiveStatCard from "./InteractiveStatCard";
+import LiveScansTable from "./LiveScansTable";
 
 interface ScanLog {
   id: number;
@@ -129,86 +130,48 @@ export default function LiveDashboard({
         />
       </div>
 
-      {/* Real-time Activity Panels */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Recent Scans Table */}
-        <div className="relative overflow-hidden rounded-xl border border-white/10 bg-[#0c0c0e]/85 backdrop-blur-xl shadow-lg flex flex-col h-[420px]">
-          <div className="pointer-events-none absolute inset-x-0 top-0 h-[1px] bg-gradient-to-r from-transparent via-white/20 to-transparent" />
-          <div className="p-4 border-b border-white/10 flex items-center justify-between">
-            <h2 className="font-semibold text-sm text-neutral-200 uppercase tracking-wider font-mono">Live Access Scans</h2>
-            <span className="text-xs font-mono text-neutral-400">Latest 10 logs</span>
+      {/* Live Access Scans - Professional Grid & Table */}
+      <LiveScansTable
+        scans={stats.recentScans || []}
+        onRefresh={fetchStats}
+        lastSync={lastUpdated}
+      />
+
+      {/* Telemetry & Hardware Edge Stream */}
+      <div className="relative overflow-hidden rounded-2xl border border-white/[0.12] bg-[#141418]/85 backdrop-blur-2xl shadow-xl flex flex-col font-mono text-xs">
+        <div className="pointer-events-none absolute inset-x-0 top-0 h-[1.5px] bg-gradient-to-r from-transparent via-cyan-400/50 to-transparent" />
+        <div className="p-4 border-b border-white/[0.08] flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <span className="h-2 w-2 rounded-full bg-cyan-400" />
+            <h3 className="font-semibold text-xs sm:text-sm text-white uppercase tracking-wider">
+              Telemetry & Hardware Edge Stream
+            </h3>
           </div>
-          <div className="p-4 flex-1 overflow-auto">
-            {stats.recentScans && stats.recentScans.length > 0 ? (
-              <div className="space-y-2">
-                {stats.recentScans.map((scan) => (
-                  <div
-                    key={scan.id}
-                    className="p-3 rounded-lg bg-black/20 border border-white/5 flex items-center justify-between hover:bg-white/5 transition-colors"
-                  >
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <span className="font-medium text-sm text-white">
-                          {scan.entity_name || "Unknown Entity"}
-                        </span>
-                        <span className="text-xs px-2 py-0.5 rounded bg-white/10 text-gray-300 font-mono">
-                          {scan.direction || "SCAN"}
-                        </span>
-                      </div>
-                      <div className="text-xs text-gray-400 mt-0.5">
-                        {scan.gate_location || "Main Gate"} &bull; {new Date(scan.scanned_at).toLocaleTimeString()}
-                      </div>
-                    </div>
-                    <span
-                      className={`text-xs px-2.5 py-1 rounded-full font-medium ${
-                        scan.access_granted
-                          ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/30"
-                          : "bg-rose-500/20 text-rose-300 border border-rose-500/30"
-                      }`}
-                    >
-                      {scan.access_granted ? "GRANTED" : scan.denial_reason || "DENIED"}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="h-full flex items-center justify-center">
-                <p className="text-gray-500">No recent scans recorded</p>
-              </div>
-            )}
+          <div className="flex items-center gap-2 text-[11px] text-emerald-400">
+            <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
+            <span>SSE Stream Active • TCP 8080/9100</span>
           </div>
         </div>
-
-        {/* Telemetry Stream */}
-        <div className="relative overflow-hidden rounded-xl border border-white/10 bg-[#0c0c0e]/85 backdrop-blur-xl shadow-lg flex flex-col h-[420px]">
-          <div className="pointer-events-none absolute inset-x-0 top-0 h-[1px] bg-gradient-to-r from-transparent via-cyan-400/30 to-transparent" />
-          <div className="p-4 border-b border-white/10 flex items-center justify-between">
-            <h2 className="font-semibold text-sm text-neutral-200 uppercase tracking-wider font-mono">Telemetry & Edge Stream</h2>
-            <div className="flex items-center gap-1.5 text-xs text-emerald-400 font-mono">
-              <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
-              <span>SSE Stream Active</span>
-            </div>
-          </div>
-          <div className="p-4 flex-1 overflow-auto space-y-2 font-mono text-xs">
-            {telemetry && telemetry.length > 0 ? (
-              telemetry.map((event, idx) => (
-                <div
-                  key={idx}
-                  className="p-2 rounded bg-black/40 border border-white/5 text-gray-300 flex items-center justify-between"
-                >
-                  <span>
-                    [{event.timestamp ? new Date(event.timestamp).toLocaleTimeString() : "Live"}] Type: {event.type || "heartbeat"}
-                  </span>
-                  <span className="text-emerald-400">TCP: {event.activeTCP ?? 1}</span>
-                </div>
-              ))
-            ) : (
-              <div className="h-full flex flex-col items-center justify-center gap-2">
-                <div className="animate-spin rounded-full h-6 w-6 border-2 border-emerald-400 border-t-transparent"></div>
-                <p className="text-gray-400 text-sm">Streaming live hardware events...</p>
+        <div className="p-4 max-h-56 overflow-auto space-y-2">
+          {telemetry && telemetry.length > 0 ? (
+            telemetry.map((event, idx) => (
+              <div
+                key={idx}
+                className="p-2.5 rounded-lg bg-black/40 border border-white/5 text-gray-300 flex items-center justify-between hover:bg-white/[0.03] transition-colors"
+              >
+                <span>
+                  [{event.timestamp ? new Date(event.timestamp).toLocaleTimeString() : "Live"}] Type:{" "}
+                  <span className="text-cyan-400">{event.type || "heartbeat"}</span>
+                </span>
+                <span className="text-emerald-400 font-medium">TCP Connections: {event.activeTCP ?? 1}</span>
               </div>
-            )}
-          </div>
+            ))
+          ) : (
+            <div className="py-8 flex flex-col items-center justify-center gap-2">
+              <div className="animate-spin rounded-full h-5 w-5 border-2 border-cyan-400 border-t-transparent" />
+              <p className="text-neutral-500 text-xs">Streaming live hardware events from C66 & IoT gateways...</p>
+            </div>
+          )}
         </div>
       </div>
     </div>
