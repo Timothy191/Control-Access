@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useState } from "react";
+import { Suspense, useState, useMemo } from "react";
 import { signIn } from "next-auth/react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
@@ -15,8 +15,10 @@ import {
   IconKey,
   IconDeviceMobile,
   IconMapPin,
+  IconChevronDown,
 } from "@tabler/icons-react";
 import { useSite } from "@/components/layout/SiteContext";
+import { getOperatorsForSite } from "@/lib/sites";
 import { ArchLinux, Vercel, Nextjs, Turborepo } from "@thesvg/react";
 
 function LoginForm() {
@@ -24,6 +26,7 @@ function LoginForm() {
   const searchParams = useSearchParams();
   const callbackUrl = searchParams.get("callbackUrl") || "/";
   const { selectedSite, setSelectedSite, availableSites } = useSite();
+  const siteOperators = useMemo(() => getOperatorsForSite(selectedSite), [selectedSite]);
 
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
@@ -33,7 +36,15 @@ function LoginForm() {
   const [capsLockActive, setCapsLockActive] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const effectiveUsername = siteOperators.some((op) => op.id === username) ? username : "";
 
+  const handleSiteChange = (newSite: string) => {
+    setSelectedSite(newSite);
+    const newOps = getOperatorsForSite(newSite);
+    if (username && !newOps.some((op) => op.id === username)) {
+      setUsername("");
+    }
+  };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     setCapsLockActive(e.getModifierState("CapsLock"));
@@ -41,7 +52,7 @@ function LoginForm() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!username.trim() || !password) {
+    if (!effectiveUsername.trim() || !password) {
       setError("Please provide both an Operator ID and password.");
       return;
     }
@@ -50,7 +61,7 @@ function LoginForm() {
     setError(null);
 
     const res = await signIn("credentials", {
-      username: username.trim(),
+      username: effectiveUsername.trim(),
       password,
       totp: totp.trim() || undefined,
       redirect: false,
@@ -137,25 +148,44 @@ function LoginForm() {
 
           {/* Credentials Form */}
           <form onSubmit={handleSubmit} className="space-y-4">
-            {/* Operator ID Field */}
+            {/* Operator ID Dropdown */}
             <div className="space-y-1.5">
-              <label className="block text-xs font-medium text-neutral-300">
-                Operator ID or Username
-              </label>
+              <div className="flex items-center justify-between">
+                <label htmlFor="operator-select" className="block text-xs font-medium text-neutral-300">
+                  Operator ID or Username
+                </label>
+                <span className="text-[10px] font-mono text-neutral-500">
+                  {siteOperators.length} Available
+                </span>
+              </div>
               <div className="relative">
-                <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-neutral-500">
+                <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-neutral-400">
                   <IconUser size={16} />
                 </div>
-                <input
-                  type="text"
+                <select
+                  id="operator-select"
                   required
                   autoFocus
-                  autoComplete="username"
-                  placeholder="e.g. admin, ADM001, EMP001..."
-                  value={username}
+                  value={effectiveUsername}
                   onChange={(e) => setUsername(e.target.value)}
-                  className="h-10 block w-full rounded-md border border-white/10 bg-black/50 py-2 pl-9 pr-3 text-sm text-neutral-100 placeholder:text-neutral-600 transition duration-150 ease-out focus:border-white/40 focus:bg-black/70 focus:outline-none focus:ring-1 focus:ring-white/30"
-                />
+                  className="h-10 block w-full appearance-none rounded-md border border-white/10 bg-black/60 py-2 pl-9 pr-9 text-sm font-medium text-neutral-100 transition duration-150 ease-out focus:border-white/40 focus:bg-black/80 focus:outline-none focus:ring-1 focus:ring-white/30 cursor-pointer"
+                >
+                  <option value="" disabled className="bg-neutral-900 text-neutral-500">
+                    -- Select Operator ID or Username --
+                  </option>
+                  {siteOperators.map((op) => (
+                    <option
+                      key={op.id}
+                      value={op.id}
+                      className="bg-neutral-900 text-neutral-200 py-1"
+                    >
+                      {op.id} — {op.name} ({op.role})
+                    </option>
+                  ))}
+                </select>
+                <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3 text-neutral-500">
+                  <IconChevronDown size={15} />
+                </div>
               </div>
             </div>
 
@@ -258,8 +288,8 @@ function LoginForm() {
                 </div>
                 <select
                   value={selectedSite}
-                  onChange={(e) => setSelectedSite(e.target.value)}
-                  className="h-10 block w-full rounded-md border border-white/10 bg-black/60 py-2 pl-9 pr-8 text-sm font-medium text-neutral-100 transition duration-150 ease-out focus:border-white/40 focus:bg-black/80 focus:outline-none focus:ring-1 focus:ring-white/30 cursor-pointer"
+                  onChange={(e) => handleSiteChange(e.target.value)}
+                  className="h-10 block w-full appearance-none rounded-md border border-white/10 bg-black/60 py-2 pl-9 pr-9 text-sm font-medium text-neutral-100 transition duration-150 ease-out focus:border-white/40 focus:bg-black/80 focus:outline-none focus:ring-1 focus:ring-white/30 cursor-pointer"
                 >
                   {availableSites.map((site) => (
                     <option
@@ -271,6 +301,9 @@ function LoginForm() {
                     </option>
                   ))}
                 </select>
+                <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3 text-neutral-500">
+                  <IconChevronDown size={15} />
+                </div>
               </div>
             </div>
 
