@@ -40,29 +40,46 @@ export async function processQrScan({
   });
   const isLockdown = lockdownSetting?.value === "true";
 
-  // 1. Resolve entity using multi-identifier database lookup
+  // 1. Resolve entity using multi-identifier database lookup & universal decoding
   const matched = await resolveEntityFromDatabase(normalized);
   const decoded = await decodePendingScan(normalized, {
     details: `QR scan at ${gateLocation || "Access Portal"}`,
   });
 
-  const entityType = matched?.type || decoded.entity_type || "unknown";
-  const entityId: number | null = matched?.id || null;
-  const entityName = matched?.name || decoded.name || "Unknown";
+  const resolved =
+    matched ||
+    (decoded.matched_record
+      ? {
+          type: decoded.matched_record.type as "employee" | "vehicle" | "visitor" | "equipment",
+          id: decoded.matched_record.id,
+          code: decoded.matched_record.code,
+          name: decoded.matched_record.name,
+          status: decoded.matched_record.status,
+          position: null,
+          department: null,
+          area: null,
+          rfid_tag: null,
+          qr_code: null,
+        }
+      : null);
+
+  const entityType = resolved?.type || decoded.entity_type || "unknown";
+  const entityId: number | null = resolved?.id || null;
+  const entityName = resolved?.name || decoded.name || "Unknown";
   let accessGranted = false;
   let denialReason: string | null = null;
 
   if (isLockdown) {
     accessGranted = false;
     denialReason = "PERIMETER LOCKDOWN IN EFFECT";
-  } else if (matched) {
+  } else if (resolved) {
     // Registered entity status checks
-    if (matched.status === "Active") {
+    if (resolved.status === "Active" || resolved.status === "Checked In") {
       accessGranted = true;
       denialReason = null;
     } else {
       accessGranted = false;
-      denialReason = `Credential status: ${matched.status} - Verification required`;
+      denialReason = `Credential status: ${resolved.status} - Verification required`;
     }
   } else {
     // Unregistered / Pending scan
@@ -111,8 +128,41 @@ export async function processQrScan({
     }
   }
 
-  // 3. Record Gate Log with full decoded JSON
-  await prisma.gate_logs.create({
+  // 3. Temporal & Rich Day / Shift Metadata
+  const now = new Date();
+  const dayNames = [
+    "Sunday",
+    "Monday",
+    "Tuesday",
+    "Wednesday",
+    "Thursday",
+    "Friday",
+    "Saturday",
+  ];
+  const dayOfWeek = dayNames[now.getDay()];
+  const dateStr = now.toISOString().split("T")[0];
+  const timeStr = now.toLocaleTimeString();
+  const currentHour = now.getHours();
+  const shiftName = currentHour >= 6 && currentHour < 18 ? "Day Shift" : "Night Shift";
+
+  const enrichedPayload = {
+    ...decoded,
+    day_of_week: dayOfWeek,
+    date: dateStr,
+    time: timeStr,
+    shift: shiftName,
+    scanned_at_iso: now.toISOString(),
+    entity_type: entityType,
+    entity_id: entityId,
+    entity_name: entityName,
+    scanned_by: scannedBy || "Gate Terminal",
+    gate_location: gateLocation,
+    direction,
+    access_granted: accessGranted,
+  };
+
+  // 4. Record Gate Log with explicit entity foreign keys & temporal details
+  const createdLog = await prisma.gate_logs.create({
     data: {
       access_type: entityType,
       entity_id: entityId,
@@ -122,10 +172,11 @@ export async function processQrScan({
       access_granted: accessGranted,
       denial_reason: denialReason,
       gate_location: gateLocation,
+      scanned_at: now,
       scanned_by: scannedBy,
       ip_address: ipAddress,
       user_agent: userAgent,
-      parsed_qr_data: JSON.stringify(decoded),
+      parsed_qr_data: JSON.stringify(enrichedPayload),
       employee_id: entityType === "employee" ? entityId : null,
       vehicle_id: entityType === "vehicle" ? entityId : null,
       visitor_id: entityType === "visitor" ? entityId : null,
@@ -134,13 +185,18 @@ export async function processQrScan({
   });
 
   return {
+    logId: createdLog.id,
     accessGranted,
     denialReason,
     entityType,
     entityId,
     entityName,
     direction,
-    decoded,
+    dayOfWeek,
+    date: dateStr,
+    shift: shiftName,
+    scannedAt: now.toISOString(),
+    decoded: enrichedPayload,
   };
 }
 
@@ -171,28 +227,45 @@ export async function processRfidScan({
     tag = tag.replace(p, "");
   });
 
-  // 1. Resolve entity using multi-identifier database lookup
+  // 1. Resolve entity using multi-identifier database lookup & universal decoding
   const matched = await resolveEntityFromDatabase(rfidTag);
   const decoded = await decodePendingScan(rfidTag, {
     details: `RFID scan at ${gateLocation || "Access Portal"}`,
   });
 
-  const entityType = matched?.type || decoded.entity_type || "unknown";
-  const entityId: number | null = matched?.id || null;
-  const entityName = matched?.name || decoded.name || "Unknown";
+  const resolved =
+    matched ||
+    (decoded.matched_record
+      ? {
+          type: decoded.matched_record.type as "employee" | "vehicle" | "visitor" | "equipment",
+          id: decoded.matched_record.id,
+          code: decoded.matched_record.code,
+          name: decoded.matched_record.name,
+          status: decoded.matched_record.status,
+          position: null,
+          department: null,
+          area: null,
+          rfid_tag: null,
+          qr_code: null,
+        }
+      : null);
+
+  const entityType = resolved?.type || decoded.entity_type || "unknown";
+  const entityId: number | null = resolved?.id || null;
+  const entityName = resolved?.name || decoded.name || "Unknown";
   let accessGranted = false;
   let denialReason: string | null = null;
 
   if (isLockdown) {
     accessGranted = false;
     denialReason = "PERIMETER LOCKDOWN IN EFFECT";
-  } else if (matched) {
-    if (matched.status === "Active") {
+  } else if (resolved) {
+    if (resolved.status === "Active" || resolved.status === "Checked In") {
       accessGranted = true;
       denialReason = null;
     } else {
       accessGranted = false;
-      denialReason = `Credential status: ${matched.status} - Verification required`;
+      denialReason = `Credential status: ${resolved.status} - Verification required`;
     }
   } else {
     // Unregistered RFID scan -> create pending approval
@@ -240,8 +313,41 @@ export async function processRfidScan({
     }
   }
 
-  // 3. Record Gate Log with full decoded JSON
-  await prisma.gate_logs.create({
+  // 3. Temporal & Rich Day / Shift Metadata
+  const now = new Date();
+  const dayNames = [
+    "Sunday",
+    "Monday",
+    "Tuesday",
+    "Wednesday",
+    "Thursday",
+    "Friday",
+    "Saturday",
+  ];
+  const dayOfWeek = dayNames[now.getDay()];
+  const dateStr = now.toISOString().split("T")[0];
+  const timeStr = now.toLocaleTimeString();
+  const currentHour = now.getHours();
+  const shiftName = currentHour >= 6 && currentHour < 18 ? "Day Shift" : "Night Shift";
+
+  const enrichedPayload = {
+    ...decoded,
+    day_of_week: dayOfWeek,
+    date: dateStr,
+    time: timeStr,
+    shift: shiftName,
+    scanned_at_iso: now.toISOString(),
+    entity_type: entityType,
+    entity_id: entityId,
+    entity_name: entityName,
+    scanned_by: scannedBy || "Gate Terminal",
+    gate_location: gateLocation,
+    direction,
+    access_granted: accessGranted,
+  };
+
+  // 4. Record Gate Log with explicit entity foreign keys & temporal details
+  const createdLog = await prisma.gate_logs.create({
     data: {
       access_type: entityType,
       entity_id: entityId,
@@ -251,10 +357,11 @@ export async function processRfidScan({
       access_granted: accessGranted,
       denial_reason: denialReason,
       gate_location: gateLocation,
+      scanned_at: now,
       scanned_by: scannedBy,
       ip_address: ipAddress,
       user_agent: userAgent,
-      parsed_qr_data: JSON.stringify(decoded),
+      parsed_qr_data: JSON.stringify(enrichedPayload),
       employee_id: entityType === "employee" ? entityId : null,
       vehicle_id: entityType === "vehicle" ? entityId : null,
       visitor_id: entityType === "visitor" ? entityId : null,
@@ -263,12 +370,17 @@ export async function processRfidScan({
   });
 
   return {
+    logId: createdLog.id,
     accessGranted,
     denialReason,
     entityType,
     entityId,
     entityName,
     direction,
-    decoded,
+    dayOfWeek,
+    date: dateStr,
+    shift: shiftName,
+    scannedAt: now.toISOString(),
+    decoded: enrichedPayload,
   };
 }

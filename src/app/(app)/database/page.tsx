@@ -2,18 +2,10 @@ import { redirect } from "next/navigation";
 import { cookies } from "next/headers";
 import { auth } from "@/auth";
 import prisma from "@/lib/prisma";
-import { decryptField } from "@/lib/crypto";
 import { normalizeSiteName } from "@/lib/sites";
+import AccessLogsExplorer, { type LogItem } from "@/components/logs/AccessLogsExplorer";
 
-function fmtDate(d: Date | null | undefined): string {
-  if (!d) return "-";
-  return new Date(d).toLocaleDateString();
-}
-
-function fmtTime(d: Date | null | undefined): string {
-  if (!d) return "-";
-  return new Date(d).toLocaleString();
-}
+export const dynamic = "force-dynamic";
 
 export default async function DatabasePage({
   searchParams,
@@ -30,7 +22,7 @@ export default async function DatabasePage({
   const site = normalizeSiteName(rawSite);
   const isFiltered = site !== "all";
 
-  const logs = await prisma.gate_logs.findMany({
+  const rawLogs = await prisma.gate_logs.findMany({
     where: isFiltered
       ? {
           OR: [
@@ -40,137 +32,101 @@ export default async function DatabasePage({
         }
       : {},
     orderBy: { id: "desc" },
-    include: { employee: true },
+    include: {
+      employee: true,
+      vehicle: true,
+      visitor: true,
+      equipment: true,
+    },
+    take: 300,
+  });
+
+  const formattedLogs: LogItem[] = rawLogs.map((log) => {
+    let meta: Record<string, unknown> = {};
+    try {
+      if (log.parsed_qr_data) {
+        meta = JSON.parse(log.parsed_qr_data);
+      }
+    } catch {
+      // ignore parse error
+    }
+
+    const scannedDate = log.scanned_at ? new Date(log.scanned_at) : new Date();
+    const dayNames = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+    const dayOfWeek = (meta.day_of_week as string) || dayNames[scannedDate.getDay()];
+    const dateString = (meta.date as string) || scannedDate.toISOString().split("T")[0];
+    const timeString = (meta.time as string) || scannedDate.toLocaleTimeString();
+    const shiftName =
+      (meta.shift as string) ||
+      (scannedDate.getHours() >= 6 && scannedDate.getHours() < 18 ? "Day Shift" : "Night Shift");
+
+    return {
+      id: log.id,
+      access_type: log.access_type || "unknown",
+      entity_id: log.entity_id,
+      entity_name:
+        log.employee
+          ? `${log.employee.first_name} ${log.employee.surname}`.trim()
+          : log.vehicle
+          ? `Vehicle ${log.vehicle.fleet_id}`
+          : log.visitor
+          ? log.visitor.name
+          : log.equipment
+          ? `Radio ${log.equipment.radio_id}`
+          : log.entity_name || "Unknown Entity",
+      direction: log.direction || "IN",
+      access_granted: log.access_granted,
+      denial_reason: log.denial_reason,
+      gate_location: log.gate_location || "Central Gate",
+      scanned_by: log.scanned_by || "System",
+      scanned_at: log.scanned_at ? log.scanned_at.toISOString() : new Date().toISOString(),
+      day_of_week: dayOfWeek,
+      date: dateString,
+      time: timeString,
+      shift: shiftName,
+      qr_data: log.qr_data,
+      employee: log.employee
+        ? {
+            id: log.employee.id,
+            emp_code: log.employee.emp_code,
+            name: `${log.employee.first_name} ${log.employee.surname}`.trim(),
+            job_title: log.employee.job_title,
+            area: log.employee.area,
+            status: log.employee.status,
+            photo: log.employee.photo,
+          }
+        : null,
+      vehicle: log.vehicle
+        ? {
+            id: log.vehicle.id,
+            fleet_id: log.vehicle.fleet_id,
+            status: log.vehicle.status,
+          }
+        : null,
+      visitor: log.visitor
+        ? {
+            id: log.visitor.id,
+            name: log.visitor.name,
+            company: log.visitor.company,
+            purpose: log.visitor.purpose,
+          }
+        : null,
+      equipment: log.equipment
+        ? {
+            id: log.equipment.id,
+            radio_id: log.equipment.radio_id,
+          }
+        : null,
+      raw_meta: meta,
+    };
   });
 
   return (
-    <div className="p-8">
-      <div className="flex flex-wrap items-center justify-between gap-4 mb-4">
-        <h1 className="text-2xl font-bold text-text-primary">
-          Database / Gate Logs ({logs.length})
-        </h1>
-        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-white/10 bg-white/5 text-xs font-mono text-neutral-300">
-          <span className="h-2 w-2 rounded-full bg-red-primary" />
-          <span>Site Filter: {isFiltered ? site : "All Sites (Global)"}</span>
-        </div>
-      </div>
-
-      <div className="glass-table overflow-x-auto">
-        <table className="min-w-full">
-          <thead>
-            <tr>
-              <th>Photo</th>
-              <th>Name &amp; Surname</th>
-              <th>Id Number</th>
-              <th>Job Title</th>
-              <th>Area</th>
-              <th>Medical Expiry</th>
-              <th>Induction Expiry</th>
-              <th>QR-Code</th>
-              <th>Location / Site</th>
-              <th>Time Scanned</th>
-              <th>Direction</th>
-              <th>Status</th>
-              <th>Alcohol Tested</th>
-            </tr>
-          </thead>
-          <tbody>
-            {logs.map((log) => {
-              const emp = log.employee;
-              const name = emp
-                ? `${emp.first_name} ${emp.surname}`.trim()
-                : log.entity_name || "Unknown";
-              const idNumber = emp ? decryptField(emp.id_number) : null;
-              const qrCode = emp?.qr_code || log.qr_data || "-";
-              const photo = emp?.photo || null;
-
-              return (
-                <tr key={log.id}>
-                  <td className="whitespace-nowrap">
-                    {photo ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img
-                        src={photo}
-                        alt={name}
-                        className="h-10 w-10 rounded-full object-cover"
-                      />
-                    ) : (
-                      <div className="h-10 w-10 rounded-full bg-white/10 flex items-center justify-center text-text-secondary text-xs font-semibold">
-                        {name
-                          .split(/\s+/)
-                          .map((w) => w[0])
-                          .slice(0, 2)
-                          .join("")
-                          .toUpperCase()}
-                      </div>
-                    )}
-                  </td>
-                  <td className="whitespace-nowrap font-medium">{name}</td>
-                  <td className="whitespace-nowrap font-mono text-sm">
-                    {idNumber || "-"}
-                  </td>
-                  <td className="whitespace-nowrap">{emp?.job_title || "-"}</td>
-                  <td className="whitespace-nowrap">{emp?.area || "-"}</td>
-                  <td className="whitespace-nowrap">
-                    {fmtDate(emp?.medical_expiry)}
-                  </td>
-                  <td className="whitespace-nowrap">
-                    {fmtDate(emp?.induction_expiry)}
-                  </td>
-                  <td className="whitespace-nowrap font-mono text-xs">
-                    {qrCode}
-                  </td>
-                  <td className="whitespace-nowrap">
-                    {log.gate_location || "Main Gate"}
-                  </td>
-                  <td className="whitespace-nowrap">
-                    {fmtTime(log.scanned_at)}
-                  </td>
-                  <td className="whitespace-nowrap">
-                    <span
-                      className={`text-xs px-2 py-0.5 rounded font-mono border ${
-                        log.direction === "IN"
-                          ? "bg-red-primary/20 text-red-primary border-red-primary/30"
-                          : log.direction === "OUT"
-                            ? "bg-warning/20 text-warning border-warning/30"
-                            : "bg-white/10 text-text-secondary border-white/10"
-                      }`}
-                    >
-                      {log.direction || "SCAN"}
-                    </span>
-                  </td>
-                  <td className="whitespace-nowrap">
-                    <span
-                      className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full border ${
-                        log.access_granted
-                          ? "bg-success/20 text-success border-success/30"
-                          : "bg-danger/20 text-danger border-danger/30"
-                      }`}
-                    >
-                      {log.access_granted
-                        ? "GRANTED"
-                        : log.denial_reason || "DENIED"}
-                    </span>
-                  </td>
-                  <td className="whitespace-nowrap">
-                    {log.alcohol_tested || "-"}
-                  </td>
-                </tr>
-              );
-            })}
-            {logs.length === 0 && (
-              <tr>
-                <td
-                  colSpan={13}
-                  className="px-6 py-8 text-center text-text-secondary"
-                >
-                  No gate scan records found.
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
+    <div className="p-4 sm:p-8 max-w-7xl mx-auto">
+      <AccessLogsExplorer
+        initialLogs={formattedLogs}
+        siteFilter={isFiltered ? site : undefined}
+      />
     </div>
   );
 }

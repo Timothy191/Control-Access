@@ -55,6 +55,37 @@ function formatRelativeTime(dateStr: string): string {
   }
 }
 
+function getTemporalInfo(dateStr: string, parsedQrData?: string | null) {
+  if (parsedQrData) {
+    try {
+      const parsed = JSON.parse(parsedQrData);
+      if (parsed.day_of_week && parsed.shift) {
+        return {
+          dayOfWeek: parsed.day_of_week as string,
+          date: (parsed.date as string) || new Date(dateStr).toISOString().slice(0, 10),
+          time: (parsed.time as string) || new Date(dateStr).toTimeString().slice(0, 8),
+          shift: parsed.shift as string,
+        };
+      }
+    } catch {}
+  }
+  try {
+    const d = new Date(dateStr);
+    const days = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+    const dayOfWeek = days[d.getDay()];
+    const hour = d.getHours();
+    const shift = hour >= 6 && hour < 18 ? "Day Shift" : "Night Shift";
+    return {
+      dayOfWeek,
+      date: d.toISOString().slice(0, 10),
+      time: d.toTimeString().slice(0, 8),
+      shift,
+    };
+  } catch {
+    return { dayOfWeek: "Unknown", date: "", time: "", shift: "Day Shift" };
+  }
+}
+
 export default function LiveScansTable({
   scans,
   onRefresh,
@@ -109,13 +140,21 @@ export default function LiveScansTable({
         const reason = (scan.denial_reason || "").toLowerCase();
         const tag = (decoded.decodedTag || scan.qr_data || "").toLowerCase();
         const idStr = String(scan.id);
+        const temp = getTemporalInfo(scan.scanned_at, scan.parsed_qr_data);
+        const day = temp.dayOfWeek.toLowerCase();
+        const shift = temp.shift.toLowerCase();
+        const dateStr = temp.date.toLowerCase();
+
         if (
           !name.includes(q) &&
           !gate.includes(q) &&
           !type.includes(q) &&
           !reason.includes(q) &&
           !tag.includes(q) &&
-          !idStr.includes(q)
+          !idStr.includes(q) &&
+          !day.includes(q) &&
+          !shift.includes(q) &&
+          !dateStr.includes(q)
         ) {
           return false;
         }
@@ -129,7 +168,10 @@ export default function LiveScansTable({
     if (!filteredScans.length) return;
     const headers = [
       "ID",
-      "Timestamp",
+      "Day",
+      "Date",
+      "Time",
+      "Shift",
       "Decoded Entity Name",
       "Raw Scanned Tag",
       "Access Type",
@@ -140,9 +182,13 @@ export default function LiveScansTable({
     ];
     const rows = filteredScans.map((s) => {
       const dec = decodeScanForDisplay(s);
+      const temp = getTemporalInfo(s.scanned_at, s.parsed_qr_data);
       return [
         s.id,
-        `"${s.scanned_at}"`,
+        `"${temp.dayOfWeek}"`,
+        `"${temp.date}"`,
+        `"${temp.time}"`,
+        `"${temp.shift}"`,
         `"${dec.cleanName}"`,
         `"${dec.decodedTag || s.qr_data || ""}"`,
         `"${s.access_type || "N/A"}"`,
@@ -414,6 +460,7 @@ export default function LiveScansTable({
             <tbody className="divide-y divide-white/5 font-sans">
               {filteredScans.map((scan) => {
                 const dec = decodeScanForDisplay(scan);
+                const temp = getTemporalInfo(scan.scanned_at, scan.parsed_qr_data);
                 const isGranted = scan.access_granted;
                 const isPending = dec.isPending;
                 const isEntry = (scan.direction || "").toUpperCase() === "IN";
@@ -437,11 +484,16 @@ export default function LiveScansTable({
                           }`}
                         />
                         <div>
-                          <div className="font-mono text-neutral-200 text-xs font-medium">
-                            {new Date(scan.scanned_at).toLocaleTimeString()}
+                          <div className="font-mono text-neutral-200 text-xs font-medium flex items-center gap-1.5">
+                            <span>{new Date(scan.scanned_at).toLocaleTimeString()}</span>
+                            <span className="text-[10px] px-1.5 py-0.5 rounded bg-white/5 border border-white/10 text-neutral-300 font-normal">
+                              {temp.dayOfWeek}
+                            </span>
                           </div>
-                          <div className="text-[10px] font-mono text-neutral-500">
-                            {formatRelativeTime(scan.scanned_at)}
+                          <div className="text-[10px] font-mono text-neutral-500 flex items-center gap-1 mt-0.5">
+                            <span>{formatRelativeTime(scan.scanned_at)}</span>
+                            <span>•</span>
+                            <span className="text-amber-400/90">{temp.shift}</span>
                           </div>
                         </div>
                       </div>
@@ -550,6 +602,7 @@ export default function LiveScansTable({
           <div className="p-4 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3.5">
             {filteredScans.map((scan) => {
               const dec = decodeScanForDisplay(scan);
+              const temp = getTemporalInfo(scan.scanned_at, scan.parsed_qr_data);
               const isGranted = scan.access_granted;
               const isPending = dec.isPending;
               const isEntry = (scan.direction || "").toUpperCase() === "IN";
@@ -613,10 +666,11 @@ export default function LiveScansTable({
 
                   {/* Card Footer: Timestamp & Details Link */}
                   <div className="flex items-center justify-between border-t border-white/[0.06] pt-2.5 text-[10px] font-mono text-neutral-400">
-                    <div>
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <span className="text-neutral-200 font-semibold">{temp.dayOfWeek}</span>
                       <span>{new Date(scan.scanned_at).toLocaleTimeString()}</span>
-                      <span className="text-neutral-600 mx-1">•</span>
-                      <span>{formatRelativeTime(scan.scanned_at)}</span>
+                      <span className="text-neutral-600">•</span>
+                      <span className="text-amber-400/90">{temp.shift}</span>
                     </div>
                     <span className="text-[#007AFF] group-hover:underline flex items-center gap-1">
                       Inspect ➔
@@ -654,6 +708,7 @@ export default function LiveScansTable({
       {/* Inspection Modal with Decoded Telemetry */}
       {inspectedScan && (() => {
         const dec = decodeScanForDisplay(inspectedScan);
+        const modalTemp = getTemporalInfo(inspectedScan.scanned_at, inspectedScan.parsed_qr_data);
         return (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-md p-4 animate-in fade-in duration-200">
             <div className="relative w-full max-w-lg rounded-2xl border border-white/15 bg-[#18181b]/95 p-6 shadow-[0_20px_60px_rgba(0,0,0,0.7)] backdrop-blur-2xl space-y-5">
@@ -756,10 +811,22 @@ export default function LiveScansTable({
                 </div>
 
                 <div className="col-span-2 p-2.5 rounded-lg bg-black/40 border border-white/5">
-                  <span className="text-neutral-500 block text-[10px] uppercase">Full Timestamp</span>
-                  <span className="font-medium text-neutral-300 mt-0.5 block">
-                    {new Date(inspectedScan.scanned_at).toLocaleString()} ({formatRelativeTime(inspectedScan.scanned_at)})
-                  </span>
+                  <span className="text-neutral-500 block text-[10px] uppercase">Temporal Log & Shift Details</span>
+                  <div className="flex items-center gap-2 mt-1 flex-wrap">
+                    <span className="px-2 py-0.5 rounded bg-white/10 text-white font-semibold text-xs">
+                      {modalTemp.dayOfWeek}
+                    </span>
+                    <span className="text-neutral-300">{modalTemp.date}</span>
+                    <span className="text-neutral-500">•</span>
+                    <span className="text-neutral-300">{modalTemp.time}</span>
+                    <span className="text-neutral-500">•</span>
+                    <span className="px-2 py-0.5 rounded bg-amber-500/20 border border-amber-500/30 text-amber-300 text-xs">
+                      {modalTemp.shift}
+                    </span>
+                    <span className="text-neutral-500 text-[11px]">
+                      ({formatRelativeTime(inspectedScan.scanned_at)})
+                    </span>
+                  </div>
                 </div>
               </div>
 
