@@ -102,49 +102,75 @@ function LoginForm() {
           </div>
         </div>
 
-        {/* Elevated Surface Card with Luminous Perimeter Border */}
-        <div className="glow-card-border relative overflow-hidden rounded-2xl border border-white/10 bg-[#0c0c0e]/90 p-6 sm:p-7 shadow-[0_0_80px_-20px_rgba(255,107,0,0.18),0_20px_50px_rgba(0,0,0,0.85)] backdrop-blur-2xl transition-all duration-300 hover:border-white/20">
-          {/* Top Hairline Sheen (Vercel signature) */}
-          <div className="pointer-events-none absolute inset-x-0 top-0 h-[1px] bg-gradient-to-r from-transparent via-white/30 to-transparent" />
-
-          {/* Biometric Identity & Arch Linux Site Logo */}
-          <div className="mb-6 flex flex-col items-center text-center">
-            <div className="relative mb-3.5 flex h-14 w-14 items-center justify-center rounded-xl border border-[#1793D1]/40 bg-gradient-to-b from-[#1793D1]/20 via-white/[0.04] to-black/70 shadow-[inset_0_1px_0_rgba(255,255,255,0.25),0_0_24px_rgba(23,147,209,0.35)] overflow-hidden">
-              {/* Outer pulsing glow ring */}
-              <div className="pointer-events-none absolute -inset-1 rounded-2xl border border-[#1793D1]/30 animate-pulse-ring" />
-
-              {/* Animated Laser Scanline Effect */}
-              <div className="pointer-events-none absolute inset-x-1 h-[2px] bg-gradient-to-r from-transparent via-[#1793D1] to-transparent shadow-[0_0_10px_rgba(23,147,209,1)] z-20 animate-scan-line" />
-
-              {/* Arch Linux Official Site Logo */}
-              <ArchLinux className="h-8 w-8 text-[#1793D1] relative z-10 drop-shadow-[0_0_10px_rgba(23,147,209,0.8)]" />
+        {/* macOS Window Card with Acrylic Vibrancy & Traffic Lights */}
+        <div className="mac-window relative overflow-hidden rounded-2xl border border-white/[0.14] transition-all duration-300">
+          {/* macOS Titlebar */}
+          <div className="mac-titlebar px-4 py-3 flex items-center justify-between border-b border-white/[0.08] bg-white/[0.02]">
+            {/* Window Controls (Traffic Lights) */}
+            <div className="flex items-center gap-2">
+              <div className="h-3 w-3 rounded-full bg-[#FF5F56] border border-[#E0443E]/80 shadow-[inset_0_1px_1px_rgba(255,255,255,0.4)] flex items-center justify-center group cursor-pointer" title="Close">
+                <span className="text-[8px] leading-none text-black/70 font-bold opacity-0 group-hover:opacity-100 transition-opacity">✕</span>
+              </div>
+              <div className="h-3 w-3 rounded-full bg-[#FFBD2E] border border-[#DEA123]/80 shadow-[inset_0_1px_1px_rgba(255,255,255,0.4)] flex items-center justify-center group cursor-pointer" title="Minimize">
+                <span className="text-[8px] leading-none text-black/70 font-bold opacity-0 group-hover:opacity-100 transition-opacity">−</span>
+              </div>
+              <div className="h-3 w-3 rounded-full bg-[#27C93F] border border-[#1AAB29]/80 shadow-[inset_0_1px_1px_rgba(255,255,255,0.4)] flex items-center justify-center group cursor-pointer" title="Zoom">
+                <span className="text-[8px] leading-none text-black/70 font-bold opacity-0 group-hover:opacity-100 transition-opacity">+</span>
+              </div>
             </div>
 
-            <h1 className="text-lg font-semibold tracking-tight text-white sm:text-xl font-sans">
-              Plantcor <span className="text-red-primary font-bold">Arch</span> System
-            </h1>
-            <p className="mt-1 text-xs text-neutral-400 tracking-normal">
-              Perimeter Access & Control Gateway
-            </p>
+            {/* Window Document Title & Proxy Icon */}
+            <div className="flex items-center gap-1.5 text-[11px] font-medium text-neutral-300 font-sans tracking-tight">
+              <ArchLinux className="h-3.5 w-3.5 text-[#1793D1]" />
+              <span>Plantcor Arch — Gateway</span>
+            </div>
+
+            {/* Window Right Status Pill */}
+            <div className="flex items-center gap-1 text-[10px] font-mono text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">
+              <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
+              <span>ONLINE</span>
+            </div>
           </div>
 
-          {/* Geist Segmented Control (Tabs) */}
-          <div className="mb-5 grid grid-cols-2 gap-1 rounded-lg border border-white/10 bg-black/60 p-1">
-            <button
-              type="button"
-              className="flex items-center justify-center gap-1.5 rounded-md border border-white/10 bg-neutral-800/90 py-1.5 text-xs font-medium text-white shadow-xs transition"
-            >
-              <IconUser size={14} className="text-neutral-300" />
-              <span>Operator Login</span>
-            </button>
-            <Link
-              href="/onboard"
-              className="flex items-center justify-center gap-1.5 rounded-md py-1.5 text-xs font-medium text-neutral-400 hover:text-white hover:bg-white/5 transition"
-            >
-              <IconDeviceMobile size={14} />
-              <span>Onboard Kiosk</span>
-            </Link>
-          </div>
+          <div className="p-6 sm:p-7">
+            {/* Biometric Identity & Arch Linux Site Logo */}
+            <div className="mb-6 flex flex-col items-center text-center">
+              <div className="relative mb-3.5 flex h-14 w-14 items-center justify-center rounded-2xl border border-[#1793D1]/40 bg-gradient-to-b from-[#1793D1]/20 via-white/[0.04] to-black/70 shadow-[inset_0_1px_0_rgba(255,255,255,0.25),0_0_24px_rgba(23,147,209,0.35)] overflow-hidden">
+                {/* Outer pulsing glow ring */}
+                <div className="pointer-events-none absolute -inset-1 rounded-2xl border border-[#1793D1]/30 animate-pulse-ring" />
+
+                {/* Animated Laser Scanline Effect */}
+                <div className="pointer-events-none absolute inset-x-1 h-[2px] bg-gradient-to-r from-transparent via-[#1793D1] to-transparent shadow-[0_0_10px_rgba(23,147,209,1)] z-20 animate-scan-line" />
+
+                {/* Arch Linux Official Site Logo */}
+                <ArchLinux className="h-8 w-8 text-[#1793D1] relative z-10 drop-shadow-[0_0_10px_rgba(23,147,209,0.8)]" />
+              </div>
+
+              <h1 className="text-lg font-semibold tracking-tight text-white sm:text-xl font-sans">
+                Plantcor <span className="text-[#007AFF] font-bold">Arch</span> System
+              </h1>
+              <p className="mt-1 text-xs text-neutral-400 tracking-normal font-sans">
+                Perimeter Access & Control Gateway
+              </p>
+            </div>
+
+            {/* macOS Segmented Control (Tabs) */}
+            <div className="mb-5 grid grid-cols-2 gap-1 rounded-xl border border-white/[0.08] bg-black/40 p-1 shadow-[inset_0_1px_2px_rgba(0,0,0,0.4)]">
+              <button
+                type="button"
+                className="flex items-center justify-center gap-1.5 rounded-lg border border-white/10 bg-white/[0.14] py-1.5 text-xs font-medium text-white shadow-[0_1px_3px_rgba(0,0,0,0.4),inset_0_1px_0_rgba(255,255,255,0.2)] transition"
+              >
+                <IconUser size={14} className="text-neutral-200" />
+                <span>Operator Login</span>
+              </button>
+              <Link
+                href="/onboard"
+                className="flex items-center justify-center gap-1.5 rounded-lg py-1.5 text-xs font-medium text-neutral-400 hover:text-white hover:bg-white/5 transition"
+              >
+                <IconDeviceMobile size={14} />
+                <span>Onboard Kiosk</span>
+              </Link>
+            </div>
 
           {/* Credentials Form */}
           <form onSubmit={handleSubmit} className="space-y-4">
@@ -315,24 +341,24 @@ function LoginForm() {
               </div>
             )}
 
-            {/* Primary Action Button with Specular Shimmer */}
+            {/* Primary Action Button - macOS Blue Push Button */}
             <button
               type="submit"
               disabled={loading}
-              className="group relative overflow-hidden flex h-10 w-full items-center justify-center gap-2 rounded-md bg-white text-black font-medium text-sm shadow-[0_1px_2px_rgba(0,0,0,0.5),0_0_0_1px_rgba(255,255,255,0.15)] transition-all duration-150 ease-out hover:bg-neutral-100 hover:shadow-[0_0_24px_rgba(255,255,255,0.25)] active:scale-[0.99] disabled:pointer-events-none disabled:opacity-50 cursor-pointer"
+              className="mac-button-primary group relative overflow-hidden flex h-10 w-full items-center justify-center gap-2 rounded-lg text-white font-medium text-sm transition-all duration-150 active:scale-[0.99] disabled:pointer-events-none disabled:opacity-50 cursor-pointer"
             >
               {/* Shimmer Light Reflection */}
-              <div className="pointer-events-none absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-black/[0.08] to-transparent animate-shimmer" />
+              <div className="pointer-events-none absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/20 to-transparent animate-shimmer" />
 
               {loading ? (
                 <>
-                  <IconLoader2 size={16} className="animate-spin text-neutral-600 relative z-10" />
-                  <span className="relative z-10">Signing in...</span>
+                  <IconLoader2 size={16} className="animate-spin text-white/90 relative z-10" />
+                  <span className="relative z-10">Authenticating...</span>
                 </>
               ) : (
                 <>
-                  <span className="relative z-10">Sign In to System</span>
-                  <kbd className="relative z-10 hidden sm:inline-flex items-center justify-center h-5 min-w-[20px] px-1.5 rounded border border-neutral-300 bg-neutral-100 font-mono text-[10px] text-neutral-600">
+                  <span className="relative z-10 font-sans">Sign In to System</span>
+                  <kbd className="relative z-10 hidden sm:inline-flex items-center justify-center h-5 min-w-[20px] px-1.5 rounded border border-white/30 bg-white/20 font-mono text-[10px] text-white">
                     ↵
                   </kbd>
                 </>
@@ -346,13 +372,14 @@ function LoginForm() {
               Need hardware scanner setup?{" "}
               <Link
                 href="/onboard"
-                className="font-medium text-white hover:underline underline-offset-4 transition"
+                className="font-medium text-[#007AFF] hover:underline underline-offset-4 transition"
               >
                 Provision Scanner
               </Link>
             </p>
           </div>
         </div>
+      </div>
 
         {/* Minimal System Watermark with Live Beacon */}
         <div className="mt-3 flex items-center justify-between px-1 text-[11px] font-mono text-neutral-500">
