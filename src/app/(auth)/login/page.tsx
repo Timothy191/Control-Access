@@ -18,7 +18,6 @@ import {
   IconMapPin,
 } from "@tabler/icons-react";
 import { useSite } from "@/components/layout/SiteContext";
-import { getOperatorsForSite } from "@/lib/sites";
 
 function LoginForm() {
   const router = useRouter();
@@ -35,7 +34,6 @@ function LoginForm() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
-  const siteOperators = getOperatorsForSite(selectedSite);
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     setCapsLockActive(e.getModifierState("CapsLock"));
@@ -129,38 +127,6 @@ function LoginForm() {
 
           {/* Credentials Form */}
           <form onSubmit={handleSubmit} className="space-y-4">
-            {/* Site Selector Dropdown */}
-            <div className="space-y-1.5">
-              <div className="flex items-center justify-between">
-                <label className="block text-xs font-medium text-neutral-300">
-                  Select Facility / Site
-                </label>
-                <span className="text-[10px] font-mono text-neutral-500">
-                  Filters Database & ID
-                </span>
-              </div>
-              <div className="relative">
-                <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-red-primary">
-                  <IconMapPin size={16} />
-                </div>
-                <select
-                  value={selectedSite}
-                  onChange={(e) => setSelectedSite(e.target.value)}
-                  className="h-10 block w-full rounded-md border border-white/10 bg-black/60 py-2 pl-9 pr-8 text-sm font-medium text-neutral-100 transition duration-150 ease-out focus:border-white/40 focus:bg-black/80 focus:outline-none focus:ring-1 focus:ring-white/30 cursor-pointer"
-                >
-                  {availableSites.map((site) => (
-                    <option
-                      key={site.id}
-                      value={site.name}
-                      className="bg-neutral-900 text-neutral-200 py-1"
-                    >
-                      {site.name} {site.shortCode !== "ALL" ? `(${site.shortCode})` : ""}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </div>
-
             {/* Operator ID Field */}
             <div className="space-y-1.5">
               <label className="block text-xs font-medium text-neutral-300">
@@ -181,35 +147,6 @@ function LoginForm() {
                   className="h-10 block w-full rounded-md border border-white/10 bg-black/50 py-2 pl-9 pr-3 text-sm text-neutral-100 placeholder:text-neutral-600 transition duration-150 ease-out focus:border-white/40 focus:bg-black/70 focus:outline-none focus:ring-1 focus:ring-white/30"
                 />
               </div>
-
-              {/* Filtered Operator Quick Suggestions */}
-              {siteOperators.length > 0 && (
-                <div className="space-y-1 pt-1">
-                  <div className="flex items-center justify-between text-[10px] font-mono text-neutral-500">
-                    <span>Assigned to {selectedSite.replace(" (Global)", "")}:</span>
-                    <span>Click to auto-fill</span>
-                  </div>
-                  <div className="flex flex-wrap gap-1.5">
-                    {siteOperators.map((op) => (
-                      <button
-                        key={op.id}
-                        type="button"
-                        onClick={() => setUsername(op.id)}
-                        className={`inline-flex items-center gap-1 rounded border px-2 py-0.5 text-[11px] font-mono transition ${
-                          username === op.id
-                            ? "border-red-primary/60 bg-red-primary/20 text-white font-semibold shadow-xs"
-                            : "border-white/10 bg-white/[0.04] text-neutral-400 hover:border-white/25 hover:text-white hover:bg-white/[0.08]"
-                        }`}
-                      >
-                        <span className="font-semibold text-neutral-200">{op.id}</span>
-                        <span className="text-[9px] text-neutral-500 font-sans truncate max-w-[85px]">
-                          {op.name.split(" ")[0]}
-                        </span>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
             </div>
 
             {/* Password Field */}
@@ -293,6 +230,38 @@ function LoginForm() {
                   </div>
                 </div>
               )}
+            </div>
+
+            {/* Select Facility / Site Dropdown (at bottom of panel) */}
+            <div className="space-y-1.5 pt-1 border-t border-white/5">
+              <div className="flex items-center justify-between">
+                <label className="block text-xs font-medium text-neutral-300">
+                  Select Facility / Site
+                </label>
+                <span className="text-[10px] font-mono text-neutral-500">
+                  Filters Database & ID
+                </span>
+              </div>
+              <div className="relative">
+                <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-red-primary">
+                  <IconMapPin size={16} />
+                </div>
+                <select
+                  value={selectedSite}
+                  onChange={(e) => setSelectedSite(e.target.value)}
+                  className="h-10 block w-full rounded-md border border-white/10 bg-black/60 py-2 pl-9 pr-8 text-sm font-medium text-neutral-100 transition duration-150 ease-out focus:border-white/40 focus:bg-black/80 focus:outline-none focus:ring-1 focus:ring-white/30 cursor-pointer"
+                >
+                  {availableSites.map((site) => (
+                    <option
+                      key={site.id}
+                      value={site.name}
+                      className="bg-neutral-900 text-neutral-200 py-1"
+                    >
+                      {site.name} {site.shortCode !== "ALL" ? `(${site.shortCode})` : ""}
+                    </option>
+                  ))}
+                </select>
+              </div>
             </div>
 
             {/* Error Message Callout */}
