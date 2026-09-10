@@ -101,3 +101,144 @@ body {
     background-color: rgba(255, 255, 255, 0.04);
   }
 }
+
+/* Elevated Visual Impact Components & Keyframes */
+@keyframes aurora-float {
+  0%, 100% {
+    transform: translate(0, 0) scale(1);
+    opacity: 0.45;
+  }
+  33% {
+    transform: translate(35px, -25px) scale(1.1);
+    opacity: 0.65;
+  }
+  66% {
+    transform: translate(-25px, 20px) scale(0.95);
+    opacity: 0.5;
+  }
+}
+
+@keyframes aurora-float-alt {
+  0%, 100% {
+    transform: translate(0, 0) scale(1);
+    opacity: 0.35;
+  }
+  33% {
+    transform: translate(-30px, 30px) scale(1.15);
+    opacity: 0.55;
+  }
+  66% {
+    transform: translate(25px, -20px) scale(1.05);
+    opacity: 0.4;
+  }
+}
+
+@keyframes shimmer {
+  0% {
+    transform: translateX(-150%);
+  }
+  100% {
+    transform: translateX(150%);
+  }
+}
+
+@keyframes radar-sweep {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes pulse-ring {
+  0% {
+    transform: scale(0.9);
+    opacity: 0.8;
+  }
+  50% {
+    transform: scale(1.15);
+    opacity: 0.3;
+  }
+  100% {
+    transform: scale(0.9);
+    opacity: 0.8;
+  }
+}
+
+@keyframes scan-line {
+  0% {
+    top: 0%;
+    opacity: 0;
+  }
+  15% {
+    opacity: 0.8;
+  }
+  85% {
+    opacity: 0.8;
+  }
+  100% {
+    top: 100%;
+    opacity: 0;
+  }
+}
+
+.animate-aurora-slow {
+  animation: aurora-float 16s ease-in-out infinite;
+}
+
+.animate-aurora-alt {
+  animation: aurora-float-alt 20s ease-in-out infinite;
+}
+
+.animate-shimmer {
+  animation: shimmer 3s infinite cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.animate-radar-sweep {
+  animation: radar-sweep 4s linear infinite;
+}
+
+.animate-pulse-ring {
+  animation: pulse-ring 3s ease-in-out infinite;
+}
+
+.animate-scan-line {
+  animation: scan-line 3.5s ease-in-out infinite;
+}
+
+.bg-cyber-grid {
+  background-image: 
+    linear-gradient(to right, rgba(255, 255, 255, 0.035) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(255, 255, 255, 0.035) 1px, transparent 1px);
+  background-size: 40px 40px;
+}
+
+.bg-dot-matrix {
+  background-image: radial-gradient(rgba(255, 255, 255, 0.08) 1px, transparent 1px);
+  background-size: 24px 24px;
+}
+
+.radial-vignette {
+  mask-image: radial-gradient(circle at center, black 35%, transparent 85%);
+  -webkit-mask-image: radial-gradient(circle at center, black 35%, transparent 85%);
+}
+
+.glow-card-border {
+  position: relative;
+}
+
+.glow-card-border::before {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  padding: 1px;
+  background: linear-gradient(135deg, rgba(255, 107, 0, 0.35), rgba(255, 255, 255, 0.05) 40%, rgba(255, 255, 255, 0.1) 70%, rgba(255, 107, 0, 0.2));
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
+}
+

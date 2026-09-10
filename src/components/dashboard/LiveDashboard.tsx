@@ -62,55 +62,84 @@ export default function LiveDashboard({
   return (
     <div className="space-y-8">
       {/* Live System Status Header */}
-      <div className="flex flex-wrap items-center justify-between gap-4 p-4 rounded-xl bg-white/5 border border-white/10">
+      <div className="flex flex-wrap items-center justify-between gap-4 p-4 rounded-xl bg-neutral-900/80 backdrop-blur-xl border border-white/10 shadow-sm">
         <div className="flex items-center gap-3">
-          <span className="relative flex h-3 w-3">
+          <span className="relative flex h-2.5 w-2.5">
             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-            <span className="relative inline-flex rounded-full h-3 w-3 bg-emerald-500"></span>
+            <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.8)]"></span>
           </span>
-          <span className="text-sm font-semibold text-emerald-400 uppercase tracking-wider">
-            Live Cloudflare Edge Sync
+          <span className="text-xs font-semibold text-emerald-400 font-mono tracking-wider uppercase">
+            Live Cloudflare Edge Sync • Connected
           </span>
         </div>
-        <div className="text-xs text-gray-400 font-mono">
-          Auto-refresh: 2.5s {lastUpdated && `| Last sync: ${lastUpdated}`}
+        <div className="text-xs text-neutral-400 font-mono">
+          Auto-refresh: 3s {lastUpdated && `• Last sync: ${lastUpdated}`}
         </div>
       </div>
 
-      {/* KPI Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <div className="bg-white/10 backdrop-blur-md rounded-xl p-6 border border-white/20 transition-all hover:bg-white/[0.12]">
-          <h3 className="text-gray-400 text-sm font-medium">Total Scans</h3>
-          <p className="text-3xl font-bold mt-2 text-white">{stats.totalScans.toLocaleString()}</p>
-          <span className="text-xs text-emerald-400 mt-1 inline-block">Real-time DB count</span>
+      {/* Elevated KPI Stats Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
+        {/* Total Scans */}
+        <div className="relative overflow-hidden rounded-xl border border-white/10 bg-[#0c0c0e]/85 p-5 backdrop-blur-xl shadow-lg transition-all duration-200 hover:border-white/25 hover:-translate-y-0.5 hover:shadow-[0_8px_30px_rgba(0,0,0,0.6)]">
+          <div className="pointer-events-none absolute inset-x-0 top-0 h-[1px] bg-gradient-to-r from-transparent via-emerald-400/40 to-transparent" />
+          <div className="flex items-center justify-between">
+            <h3 className="text-neutral-400 text-xs font-medium uppercase tracking-wider font-mono">Total Scans</h3>
+            <span className="h-2 w-2 rounded-full bg-emerald-400/80" />
+          </div>
+          <p className="text-3xl font-bold mt-2.5 text-white tracking-tight">{stats.totalScans.toLocaleString()}</p>
+          <span className="text-[11px] text-emerald-400/90 font-mono mt-1.5 inline-flex items-center gap-1">
+            <span>●</span> Real-time DB telemetry
+          </span>
         </div>
 
-        <div className="bg-white/10 backdrop-blur-md rounded-xl p-6 border border-white/20 transition-all hover:bg-white/[0.12]">
-          <h3 className="text-gray-400 text-sm font-medium">Active Devices</h3>
-          <p className="text-3xl font-bold mt-2 text-white">{stats.activeDevices.toLocaleString()}</p>
-          <span className="text-xs text-cyan-400 mt-1 inline-block">Online Gateways</span>
+        {/* Active Devices */}
+        <div className="relative overflow-hidden rounded-xl border border-white/10 bg-[#0c0c0e]/85 p-5 backdrop-blur-xl shadow-lg transition-all duration-200 hover:border-white/25 hover:-translate-y-0.5 hover:shadow-[0_8px_30px_rgba(0,0,0,0.6)]">
+          <div className="pointer-events-none absolute inset-x-0 top-0 h-[1px] bg-gradient-to-r from-transparent via-cyan-400/40 to-transparent" />
+          <div className="flex items-center justify-between">
+            <h3 className="text-neutral-400 text-xs font-medium uppercase tracking-wider font-mono">Active Devices</h3>
+            <span className="h-2 w-2 rounded-full bg-cyan-400/80" />
+          </div>
+          <p className="text-3xl font-bold mt-2.5 text-white tracking-tight">{stats.activeDevices.toLocaleString()}</p>
+          <span className="text-[11px] text-cyan-400/90 font-mono mt-1.5 inline-flex items-center gap-1">
+            <span>●</span> Online Gateways & C66
+          </span>
         </div>
 
-        <div className="bg-white/10 backdrop-blur-md rounded-xl p-6 border border-white/20 transition-all hover:bg-white/[0.12]">
-          <h3 className="text-gray-400 text-sm font-medium">Pending Approvals</h3>
-          <p className="text-3xl font-bold mt-2 text-white">{stats.pendingApprovals.toLocaleString()}</p>
-          <span className="text-xs text-amber-400 mt-1 inline-block">Awaiting Review</span>
+        {/* Pending Approvals */}
+        <div className="relative overflow-hidden rounded-xl border border-white/10 bg-[#0c0c0e]/85 p-5 backdrop-blur-xl shadow-lg transition-all duration-200 hover:border-white/25 hover:-translate-y-0.5 hover:shadow-[0_8px_30px_rgba(0,0,0,0.6)]">
+          <div className="pointer-events-none absolute inset-x-0 top-0 h-[1px] bg-gradient-to-r from-transparent via-amber-400/40 to-transparent" />
+          <div className="flex items-center justify-between">
+            <h3 className="text-neutral-400 text-xs font-medium uppercase tracking-wider font-mono">Pending Approvals</h3>
+            <span className="h-2 w-2 rounded-full bg-amber-400/80" />
+          </div>
+          <p className="text-3xl font-bold mt-2.5 text-white tracking-tight">{stats.pendingApprovals.toLocaleString()}</p>
+          <span className="text-[11px] text-amber-400/90 font-mono mt-1.5 inline-flex items-center gap-1">
+            <span>●</span> Awaiting Supervisor
+          </span>
         </div>
 
-        <div className="bg-white/10 backdrop-blur-md rounded-xl p-6 border border-white/20 transition-all hover:bg-white/[0.12]">
-          <h3 className="text-gray-400 text-sm font-medium">Muster Count</h3>
-          <p className="text-3xl font-bold mt-2 text-white">{stats.musterCount.toLocaleString()}</p>
-          <span className="text-xs text-purple-400 mt-1 inline-block">Inside Perimeter</span>
+        {/* Muster Count */}
+        <div className="relative overflow-hidden rounded-xl border border-white/10 bg-[#0c0c0e]/85 p-5 backdrop-blur-xl shadow-lg transition-all duration-200 hover:border-white/25 hover:-translate-y-0.5 hover:shadow-[0_8px_30px_rgba(0,0,0,0.6)]">
+          <div className="pointer-events-none absolute inset-x-0 top-0 h-[1px] bg-gradient-to-r from-transparent via-purple-400/40 to-transparent" />
+          <div className="flex items-center justify-between">
+            <h3 className="text-neutral-400 text-xs font-medium uppercase tracking-wider font-mono">Muster Count</h3>
+            <span className="h-2 w-2 rounded-full bg-purple-400/80" />
+          </div>
+          <p className="text-3xl font-bold mt-2.5 text-white tracking-tight">{stats.musterCount.toLocaleString()}</p>
+          <span className="text-[11px] text-purple-400/90 font-mono mt-1.5 inline-flex items-center gap-1">
+            <span>●</span> Inside Perimeter
+          </span>
         </div>
       </div>
 
       {/* Real-time Activity Panels */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Recent Scans Table */}
-        <div className="bg-white/10 backdrop-blur-md rounded-xl border border-white/20 flex flex-col h-[420px] overflow-hidden">
+        <div className="relative overflow-hidden rounded-xl border border-white/10 bg-[#0c0c0e]/85 backdrop-blur-xl shadow-lg flex flex-col h-[420px]">
+          <div className="pointer-events-none absolute inset-x-0 top-0 h-[1px] bg-gradient-to-r from-transparent via-white/20 to-transparent" />
           <div className="p-4 border-b border-white/10 flex items-center justify-between">
-            <h2 className="font-semibold text-lg">Live Access Scans</h2>
-            <span className="text-xs font-mono text-gray-400">Latest 10 logs</span>
+            <h2 className="font-semibold text-sm text-neutral-200 uppercase tracking-wider font-mono">Live Access Scans</h2>
+            <span className="text-xs font-mono text-neutral-400">Latest 10 logs</span>
           </div>
           <div className="p-4 flex-1 overflow-auto">
             {stats.recentScans && stats.recentScans.length > 0 ? (
@@ -154,10 +183,14 @@ export default function LiveDashboard({
         </div>
 
         {/* Telemetry Stream */}
-        <div className="bg-white/10 backdrop-blur-md rounded-xl border border-white/20 flex flex-col h-[420px] overflow-hidden">
+        <div className="relative overflow-hidden rounded-xl border border-white/10 bg-[#0c0c0e]/85 backdrop-blur-xl shadow-lg flex flex-col h-[420px]">
+          <div className="pointer-events-none absolute inset-x-0 top-0 h-[1px] bg-gradient-to-r from-transparent via-cyan-400/30 to-transparent" />
           <div className="p-4 border-b border-white/10 flex items-center justify-between">
-            <h2 className="font-semibold text-lg">Telemetry & Edge Stream</h2>
-            <span className="text-xs text-emerald-400 font-mono">SSE Stream Active</span>
+            <h2 className="font-semibold text-sm text-neutral-200 uppercase tracking-wider font-mono">Telemetry & Edge Stream</h2>
+            <div className="flex items-center gap-1.5 text-xs text-emerald-400 font-mono">
+              <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
+              <span>SSE Stream Active</span>
+            </div>
           </div>
           <div className="p-4 flex-1 overflow-auto space-y-2 font-mono text-xs">
             {telemetry && telemetry.length > 0 ? (

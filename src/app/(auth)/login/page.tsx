@@ -67,36 +67,46 @@ function LoginForm() {
 
   return (
     <div className="relative z-10 flex min-h-screen w-full items-center justify-center p-4 sm:p-6 lg:p-8 font-sans antialiased">
-      {/* Subtle Geist ambient glow background */}
-      <div className="pointer-events-none absolute -top-24 left-1/2 -translate-x-1/2 w-[550px] h-[550px] bg-gradient-to-b from-orange-500/10 via-red-primary/5 to-transparent blur-[140px] rounded-full" />
-      <div className="pointer-events-none absolute -bottom-24 right-1/4 w-[400px] h-[400px] bg-white/[0.02] blur-[120px] rounded-full" />
+      {/* High-tech Cyber Grid & Ambient Vignette Background */}
+      <div className="pointer-events-none absolute inset-0 bg-cyber-grid radial-vignette opacity-70" />
+
+      {/* Dual Dynamic Floating Aurora Orbs */}
+      <div className="pointer-events-none absolute -top-28 left-1/2 -translate-x-1/2 w-[600px] h-[600px] bg-gradient-to-b from-orange-500/20 via-red-primary/10 to-transparent blur-[140px] rounded-full animate-aurora-slow" />
+      <div className="pointer-events-none absolute -bottom-36 right-1/4 w-[500px] h-[500px] bg-gradient-to-tl from-emerald-500/10 via-cyan-500/5 to-transparent blur-[130px] rounded-full animate-aurora-alt" />
 
       <div className="relative w-full max-w-[430px]">
-        {/* Geist Status Bar Header */}
+        {/* Status Bar Header */}
         <div className="mb-3 flex items-center justify-between px-1 text-[11px] font-mono tracking-tight text-neutral-400">
-          <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-neutral-900/70 px-2.5 py-0.5 backdrop-blur-md">
+          <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-neutral-900/80 px-2.5 py-0.5 backdrop-blur-md shadow-xs">
             <span className="relative flex h-2 w-2">
               <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
               <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.8)]" />
             </span>
-            <span className="text-neutral-200 font-medium">Gateway Online</span>
+            <span className="text-neutral-200 font-medium">Gateway Node Active</span>
           </div>
 
-          <div className="flex items-center gap-1.5 text-neutral-400">
-            <IconShieldCheck size={14} className="text-emerald-400" />
+          <div className="flex items-center gap-1.5 text-neutral-400 font-mono text-[11px]">
+            <IconShieldCheck size={14} className="text-emerald-400 shrink-0" />
             <span className="tabular-nums">TLS 1.3 • AES-256</span>
           </div>
         </div>
 
-        {/* Geist Elevated Surface Card */}
-        <div className="relative overflow-hidden rounded-xl border border-white/10 bg-[#0a0a0c]/85 p-6 sm:p-7 shadow-[0_0_0_1px_rgba(255,255,255,0.05),0_16px_40px_rgba(0,0,0,0.8)] backdrop-blur-xl transition-all duration-200 hover:border-white/15">
+        {/* Elevated Surface Card with Luminous Perimeter Border */}
+        <div className="glow-card-border relative overflow-hidden rounded-2xl border border-white/10 bg-[#0c0c0e]/90 p-6 sm:p-7 shadow-[0_0_80px_-20px_rgba(255,107,0,0.18),0_20px_50px_rgba(0,0,0,0.85)] backdrop-blur-2xl transition-all duration-300 hover:border-white/20">
           {/* Top Hairline Sheen (Vercel signature) */}
-          <div className="pointer-events-none absolute inset-x-0 top-0 h-[1px] bg-gradient-to-r from-transparent via-white/20 to-transparent" />
+          <div className="pointer-events-none absolute inset-x-0 top-0 h-[1px] bg-gradient-to-r from-transparent via-white/30 to-transparent" />
 
-          {/* Identity & Header */}
+          {/* Biometric Identity & Scanner Emblem */}
           <div className="mb-6 flex flex-col items-center text-center">
-            <div className="relative mb-3 flex h-12 w-12 items-center justify-center rounded-lg border border-white/15 bg-gradient-to-b from-white/10 to-white/[0.02] shadow-[inset_0_1px_0_rgba(255,255,255,0.2)]">
-              <IconFingerprint size={26} className="text-white" />
+            <div className="relative mb-3.5 flex h-14 w-14 items-center justify-center rounded-xl border border-white/20 bg-gradient-to-b from-white/10 via-white/[0.04] to-black/60 shadow-[inset_0_1px_0_rgba(255,255,255,0.25),0_8px_24px_rgba(0,0,0,0.5)] overflow-hidden">
+              {/* Outer pulsing glow ring */}
+              <div className="pointer-events-none absolute -inset-1 rounded-2xl border border-orange-500/30 animate-pulse-ring" />
+
+              {/* Animated Laser Scanline Effect */}
+              <div className="pointer-events-none absolute inset-x-1 h-[2px] bg-gradient-to-r from-transparent via-emerald-400 to-transparent shadow-[0_0_10px_rgba(52,211,153,1)] z-20 animate-scan-line" />
+
+              {/* Biometric Icon */}
+              <IconFingerprint size={28} className="text-white relative z-10" />
             </div>
 
             <h1 className="text-lg font-semibold tracking-tight text-white sm:text-xl font-sans">
@@ -272,21 +282,24 @@ function LoginForm() {
               </div>
             )}
 
-            {/* Geist Primary Action Button */}
+            {/* Primary Action Button with Specular Shimmer */}
             <button
               type="submit"
               disabled={loading}
-              className="group relative flex h-10 w-full items-center justify-center gap-2 rounded-md bg-white text-black font-medium text-sm shadow-[0_1px_2px_rgba(0,0,0,0.5),0_0_0_1px_rgba(255,255,255,0.15)] transition-all duration-150 ease-out hover:bg-neutral-200 active:scale-[0.99] disabled:pointer-events-none disabled:opacity-50"
+              className="group relative overflow-hidden flex h-10 w-full items-center justify-center gap-2 rounded-md bg-white text-black font-medium text-sm shadow-[0_1px_2px_rgba(0,0,0,0.5),0_0_0_1px_rgba(255,255,255,0.15)] transition-all duration-150 ease-out hover:bg-neutral-100 hover:shadow-[0_0_24px_rgba(255,255,255,0.25)] active:scale-[0.99] disabled:pointer-events-none disabled:opacity-50 cursor-pointer"
             >
+              {/* Shimmer Light Reflection */}
+              <div className="pointer-events-none absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-black/[0.08] to-transparent animate-shimmer" />
+
               {loading ? (
                 <>
-                  <IconLoader2 size={16} className="animate-spin text-neutral-600" />
-                  <span>Signing in...</span>
+                  <IconLoader2 size={16} className="animate-spin text-neutral-600 relative z-10" />
+                  <span className="relative z-10">Signing in...</span>
                 </>
               ) : (
                 <>
-                  <span>Sign In to System</span>
-                  <kbd className="hidden sm:inline-flex items-center justify-center h-5 min-w-[20px] px-1.5 rounded border border-neutral-300 bg-neutral-100 font-mono text-[10px] text-neutral-600">
+                  <span className="relative z-10">Sign In to System</span>
+                  <kbd className="relative z-10 hidden sm:inline-flex items-center justify-center h-5 min-w-[20px] px-1.5 rounded border border-neutral-300 bg-neutral-100 font-mono text-[10px] text-neutral-600">
                     ↵
                   </kbd>
                 </>
@@ -308,10 +321,13 @@ function LoginForm() {
           </div>
         </div>
 
-        {/* Geist Minimal System Watermark */}
+        {/* Minimal System Watermark with Live Beacon */}
         <div className="mt-3 flex items-center justify-between px-1 text-[11px] font-mono text-neutral-500">
-          <span>Omarchy Linux 4.0</span>
-          <span>Station 1 // 8080</span>
+          <span className="flex items-center gap-1.5">
+            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500/90 animate-pulse" />
+            Omarchy Linux 4.0
+          </span>
+          <span>Station 1 // Port 8080</span>
         </div>
       </div>
     </div>
