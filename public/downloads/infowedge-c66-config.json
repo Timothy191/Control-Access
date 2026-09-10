@@ -1,0 +1,36 @@
+{
+  "profile_name": "Plantcor_Control_Access_C66",
+  "version": "4.0.2",
+  "device_model": "Chainway C66 Android Handheld",
+  "infowedge_version": "v2.6+",
+  "scanner_settings": {
+    "scan_mode": "Intent_and_HTTP_Webhook",
+    "intent_action": "com.rsc.scan.action",
+    "intent_string_extra": "data",
+    "intent_bytes_extra": "bytes",
+    "prefix": "",
+    "suffix": "\\n",
+    "sound_on_scan": true,
+    "vibrate_on_scan": true
+  },
+  "rfid_settings": {
+    "uhf_mode": "EPC_GEN2_ISO18000_6C",
+    "frequency": "865-868MHz_ETSI_EU_ZA",
+    "output_power_dbm": 30,
+    "auto_read_interval_ms": 100
+  },
+  "network_configuration": {
+    "server_lan_url": "http://192.168.1.79:8080/api/scanner/receive",
+    "server_public_url": "https://francisco-wing-appointment-gap.trycloudflare.com/api/scanner/receive",
+    "sse_notifications_url": "http://192.168.1.79:8080/api/scanner/notifications",
+    "content_type": "application/json",
+    "http_method": "POST",
+    "request_template": {
+      "barcodeData": "{DATA}",
+      "rfidTag": "{DATA}",
+      "deviceId": "C66-Handheld-01",
+      "deviceName": "Chainway C66",
+      "gateLocation": "Mobile Patrol C66"
+    }
+  }
+}

@@ -1,9 +1,12 @@
 import QRCode from "qrcode";
 import dgram from "node:dgram";
-import Link from "next/link";
+import fs from "node:fs/promises";
+import path from "node:path";
 import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import prisma from "@/lib/prisma";
+import DeviceOnboardingTabs from "@/components/onboard/DeviceOnboardingTabs";
+import { getRecentDeviceNotifications } from "@/lib/device-notifications";
 
 function getServerIp(): Promise<string> {
   return new Promise((resolve) => {
@@ -12,17 +15,28 @@ function getServerIp(): Promise<string> {
       socket.connect(80, "8.8.8.8", () => {
         const ip = socket.address().address;
         socket.close();
-        resolve(ip);
+        resolve(ip || "192.168.1.79");
       });
     } catch {
       socket.close();
-      resolve("127.0.0.1");
+      resolve("192.168.1.79");
     }
     socket.on("error", () => {
       socket.close();
-      resolve("127.0.0.1");
+      resolve("192.168.1.79");
     });
   });
+}
+
+async function getPublicUrl(): Promise<string> {
+  try {
+    const txtPath = path.join(process.cwd(), "public_url.txt");
+    const content = (await fs.readFile(txtPath, "utf-8")).trim();
+    if (content.startsWith("http")) return content;
+  } catch {
+    // fallback
+  }
+  return "https://francisco-wing-appointment-gap.trycloudflare.com";
 }
 
 export default async function OnboardPage({
@@ -31,188 +45,95 @@ export default async function OnboardPage({
   searchParams: Promise<{ port?: string }>;
 }) {
   const session = await auth();
-  if (!session?.user)
+  if (!session?.user) {
     redirect(`/login?callbackUrl=${encodeURIComponent("/onboard")}`);
+  }
 
   const { port } = await searchParams;
   const serverPort = port || "8080";
-  const serverIp = await getServerIp();
-
-  if (serverIp === "127.0.0.1") {
-    return (
-      <div className="p-8">
-        <div className="glass-card border-danger/40">
-          <h1 className="text-xl font-bold text-text-primary mb-2">
-            Onboarding unavailable
-          </h1>
-          <p className="text-text-secondary">
-            Could not determine the server&apos;s LAN IP, so scanner QR codes
-            would point at an unreachable address. Set the server IP explicitly
-            and retry.
-          </p>
-        </div>
-        <Link
-          href="/"
-          className="inline-block mt-4 text-text-secondary hover:text-text-primary text-sm"
-        >
-          ← Back to dashboard
-        </Link>
-      </div>
-    );
+  let serverIp = await getServerIp();
+  if (serverIp === "127.0.0.1" || !serverIp) {
+    serverIp = "192.168.1.79";
   }
 
-  // Build Config JSON (standard format for mobile auto-config)
+  const publicUrl = await getPublicUrl();
+
+  // 1. Generate Terminal Pairing QR (opens C66 terminal in browser)
+  const terminalUrl = `http://${serverIp}:${serverPort}/onboard/scanner`;
+  const scannerTerminalQr = await QRCode.toDataURL(terminalUrl, {
+    width: 260,
+    margin: 2,
+    color: { dark: "#000000", light: "#ffffff" },
+  });
+
+  // 2. Generate Infowedge Auto-Config Profile QR
   const configPayload = {
+    profile_name: "Plantcor_C66_Config",
     server_ip: serverIp,
     server_port: serverPort,
     api_endpoint: `http://${serverIp}:${serverPort}/api/scanner/receive`,
-    api_key: process.env.HARDWARE_API_KEY || "MINE-CONFIG-ABC-123",
+    public_endpoint: `${publicUrl}/api/scanner/receive`,
+    intent_action: "com.rsc.scan.action",
+    intent_data_extra: "data",
     timestamp: new Date().toISOString(),
   };
-  const configJson = JSON.stringify(configPayload);
+  const infowedgeConfigQr = await QRCode.toDataURL(
+    JSON.stringify(configPayload),
+    {
+      width: 260,
+      margin: 2,
+      color: { dark: "#000000", light: "#ffffff" },
+    }
+  );
 
-  const appDownloadUrl = `http://${serverIp}:${serverPort}/downloads/QrMobile.apk`;
-  const configUrl = `http://${serverIp}:${serverPort}/api/config/infowedge`;
-
-  const [configQrImage, appQrImage] = await Promise.all([
-    QRCode.toDataURL(configJson, { width: 220, margin: 2 }),
-    QRCode.toDataURL(appDownloadUrl, { width: 220, margin: 2 }),
+  // 3. Generate Sample Interactive Test Credentials
+  const [activeTestTagQr, deniedTestTagQr] = await Promise.all([
+    QRCode.toDataURL("RFID_EMP_003", { width: 140, margin: 1 }),
+    QRCode.toDataURL("TEST_UNAUTHORIZED_999", { width: 140, margin: 1 }),
   ]);
 
-  // Device stats
-  const [totalDevices, activeDevices, totalScansAgg] = await Promise.all([
-    prisma.devices.count(),
-    prisma.devices.count({ where: { status: "online" } }),
-    prisma.devices.aggregate({ _sum: { total_scans: true } }),
-  ]);
-  const totalScans = totalScansAgg._sum.total_scans ?? 0;
-
-  const recentDevices = await prisma.devices.findMany({
+  // 4. Fetch Registered Devices
+  const rawDevices = await prisma.devices.findMany({
     orderBy: { last_seen: "desc" },
-    take: 5,
+    take: 20,
   });
 
-  const stats = { totalDevices, activeDevices, totalScans };
+  const devices = rawDevices.map((d) => ({
+    id: d.id,
+    device_name: d.device_name,
+    device_type: d.device_type,
+    ip_address: d.ip_address,
+    mac_address: d.mac_address,
+    last_seen: d.last_seen ? d.last_seen.toISOString() : null,
+    status: d.status,
+    total_scans: d.total_scans,
+  }));
+
+  // 5. Fetch Recent Device Notifications
+  const initialNotifications = getRecentDeviceNotifications(20);
 
   return (
-    <div className="p-8">
-      <h1 className="text-2xl font-bold mb-2 text-text-primary">
-        Device Onboarding
-      </h1>
-      <p className="text-text-secondary mb-6">
-        Scan a QR code to provision a scanner or download the mobile app.
-      </p>
-
-      {/* Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-        <div className="glass-card">
-          <h2 className="text-text-secondary text-sm uppercase font-semibold">
-            Total Devices
-          </h2>
-          <p className="text-4xl font-bold mt-2 text-text-primary">
-            {stats.totalDevices}
-          </p>
-        </div>
-        <div className="glass-card">
-          <h2 className="text-text-secondary text-sm uppercase font-semibold">
-            Active Devices
-          </h2>
-          <p className="text-4xl font-bold mt-2 text-text-primary">
-            {stats.activeDevices}
-          </p>
-        </div>
-        <div className="glass-card">
-          <h2 className="text-text-secondary text-sm uppercase font-semibold">
-            Total Scans
-          </h2>
-          <p className="text-4xl font-bold mt-2 text-text-primary">
-            {stats.totalScans}
-          </p>
-        </div>
+    <div className="p-6 md:p-8 space-y-6 max-w-7xl mx-auto">
+      <div>
+        <h1 className="text-2xl font-bold tracking-tight text-white font-sans">
+          Device Onboarding & Hardware Management
+        </h1>
+        <p className="text-xs text-neutral-400 font-sans mt-1">
+          Pair Android Chainway C66 Infowedge terminals, dispatch live notifications, and inspect access-denied alerts
+        </p>
       </div>
 
-      {/* QR Codes */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-        <div className="glass-card text-center">
-          <h3 className="text-lg font-medium mb-1 text-text-primary">
-            Scanner Config
-          </h3>
-          <p className="text-sm text-text-secondary mb-4">
-            {serverIp}:{serverPort}
-          </p>
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={configQrImage}
-            alt="Scanner configuration QR code"
-            className="mx-auto"
-            width={220}
-            height={220}
-          />
-          <p className="text-xs text-text-secondary mt-3 break-all">
-            {configUrl}
-          </p>
-        </div>
-
-        <div className="glass-card text-center">
-          <h3 className="text-lg font-medium mb-1 text-text-primary">
-            Mobile App Download
-          </h3>
-          <p className="text-sm text-text-secondary mb-4">QrMobile.apk</p>
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={appQrImage}
-            alt="Mobile app download QR code"
-            className="mx-auto"
-            width={220}
-            height={220}
-          />
-          <p className="text-xs text-text-secondary mt-3 break-all">
-            {appDownloadUrl}
-          </p>
-        </div>
-      </div>
-
-      {/* Recent Devices */}
-      <h2 className="text-xl font-bold mb-4 text-text-primary">
-        Recent Devices
-      </h2>
-      <div className="glass-table overflow-x-auto">
-        <table className="min-w-full">
-          <thead>
-            <tr>
-              <th>Device</th>
-              <th>Address</th>
-              <th>Last Seen</th>
-            </tr>
-          </thead>
-          <tbody>
-            {recentDevices.length === 0 ? (
-              <tr>
-                <td
-                  colSpan={3}
-                  className="px-6 py-4 text-center text-text-secondary"
-                >
-                  No devices registered yet.
-                </td>
-              </tr>
-            ) : (
-              recentDevices.map((d) => (
-                <tr key={d.id}>
-                  <td className="whitespace-nowrap">{d.device_name}</td>
-                  <td className="whitespace-nowrap font-mono text-sm">
-                    {d.ip_address || d.mac_address || "Unknown"}
-                  </td>
-                  <td className="whitespace-nowrap">
-                    {d.last_seen
-                      ? new Date(d.last_seen).toLocaleTimeString()
-                      : "Never"}
-                  </td>
-                </tr>
-              ))
-            )}
-          </tbody>
-        </table>
-      </div>
+      <DeviceOnboardingTabs
+        serverIp={serverIp}
+        serverPort={serverPort}
+        publicUrl={publicUrl}
+        scannerTerminalQr={scannerTerminalQr}
+        infowedgeConfigQr={infowedgeConfigQr}
+        activeTestTagQr={activeTestTagQr}
+        deniedTestTagQr={deniedTestTagQr}
+        devices={devices}
+        initialNotifications={initialNotifications}
+      />
     </div>
   );
 }
