@@ -26,7 +26,7 @@ export default function Sidebar() {
   const [isOpen, setIsOpen] = useState(false);
   const [copied, setCopied] = useState(false);
 
-  const publicUrl = "https://diamond-casino-towards-wanting.trycloudflare.com";
+  const [publicUrl, setPublicUrl] = useState("https://francisco-wing-appointment-gap.trycloudflare.com");
 
   const handleCopy = () => {
     navigator.clipboard.writeText(publicUrl).catch(() => {
@@ -37,6 +37,13 @@ export default function Sidebar() {
   };
 
   useEffect(() => {
+    fetch("/api/tunnel")
+      .then((res) => res.json())
+      .then((data) => {
+        if (data?.public_url) setPublicUrl(data.public_url);
+      })
+      .catch(() => {});
+
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") setIsOpen(false);
     };
