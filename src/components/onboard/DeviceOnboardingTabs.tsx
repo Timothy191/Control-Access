@@ -20,6 +20,8 @@ import {
   IconExternalLink,
   IconBolt,
   IconBroadcast,
+  IconWifi,
+  IconCloud,
 } from "@tabler/icons-react";
 import type { DeviceNotification } from "@/lib/device-notifications";
 
@@ -65,6 +67,7 @@ export default function DeviceOnboardingTabs({
   const [notifications, setNotifications] = useState<DeviceNotification[]>(
     initialNotifications
   );
+  const [networkMode, setNetworkMode] = useState<"public" | "lan">("public");
   const [pairingDeviceId, setPairingDeviceId] = useState("Chainway-C66-01");
   const [terminalQr, setTerminalQr] = useState(scannerTerminalQr);
   const [selectedTargetDevice, setSelectedTargetDevice] = useState("ALL");
@@ -79,15 +82,15 @@ export default function DeviceOnboardingTabs({
   const [copiedText, setCopiedText] = useState<string | null>(null);
   const [feedbackToast, setFeedbackToast] = useState<string | null>(null);
 
-  // Dynamic QR Code generation when pairing device ID is modified
+  // Dynamic QR Code generation for Permanent Link
   useEffect(() => {
-    const url = `http://${serverIp}:${serverPort}/onboard/scanner?device=${encodeURIComponent(
-      pairingDeviceId.trim() || "Chainway-C66-01"
-    )}`;
+    const dev = pairingDeviceId.trim() || "Chainway-C66-01";
+    const baseUrl = networkMode === "public" ? publicUrl : `http://${serverIp}:${serverPort}`;
+    const url = `${baseUrl}/scanner?link=true&device=${encodeURIComponent(dev)}`;
     QRCode.toDataURL(url, { width: 260, margin: 2 })
       .then(setTerminalQr)
       .catch(() => {});
-  }, [pairingDeviceId, serverIp, serverPort]);
+  }, [pairingDeviceId, networkMode, publicUrl, serverIp, serverPort]);
 
   // SSE Real-Time Listener for Dispatched Notifications
   useEffect(() => {
@@ -264,80 +267,126 @@ export default function DeviceOnboardingTabs({
 
           {/* Dual Provisioning QR Cards */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* Card 1: Scanner Terminal Pairing QR */}
-            <div className="rounded-2xl border border-white/10 bg-[#18181b]/85 backdrop-blur-2xl p-6 flex flex-col justify-between items-center text-center space-y-4 shadow-xl">
-              <div>
-                <span className="text-[10px] font-mono text-[#007AFF] uppercase font-bold tracking-widest px-2.5 py-0.5 rounded-full bg-[#007AFF]/10 border border-[#007AFF]/25">
-                  Universal Terminal Web App
-                </span>
-                <h3 className="text-base font-semibold text-white mt-2">
-                  C66 Handheld Scanner Terminal
-                </h3>
-                <p className="text-xs text-neutral-400 mt-1 max-w-xs">
-                  Scan with Android C66 camera or browser to pair with real-time deny strobe alarms.
-                </p>
-              </div>
+            {/* Card 1: Universal Permanent Link & Setup QR */}
+            {(() => {
+              const matchedDevice = devices.find(
+                (d) => d.device_name.toLowerCase() === pairingDeviceId.trim().toLowerCase()
+              );
+              const baseUrl = networkMode === "public" ? publicUrl : `http://${serverIp}:${serverPort}`;
+              const terminalLinkUrl = `${baseUrl}/scanner?link=true&device=${encodeURIComponent(
+                pairingDeviceId.trim() || "Chainway-C66-01"
+              )}`;
 
-              {/* QR Image */}
-              <div className="p-3.5 rounded-2xl bg-white shadow-2xl relative group">
-                <Image
-                  src={terminalQr}
-                  alt="C66 Scanner Terminal Pairing QR"
-                  width={210}
-                  height={210}
-                  className="rounded-lg"
-                />
-              </div>
+              return (
+                <div className="rounded-2xl border border-white/10 bg-[#18181b]/85 backdrop-blur-2xl p-6 flex flex-col justify-between items-center text-center space-y-4 shadow-xl">
+                  <div>
+                    <span className="text-[10px] font-mono text-[#007AFF] uppercase font-bold tracking-widest px-2.5 py-0.5 rounded-full bg-[#007AFF]/10 border border-[#007AFF]/25">
+                      1-Scan Permanent Device Link
+                    </span>
+                    <h3 className="text-base font-semibold text-white mt-2">
+                      Universal C66 Setup &amp; Link QR
+                    </h3>
+                    <p className="text-xs text-neutral-400 mt-1 max-w-xs">
+                      Scan this QR code with your Chainway C66 camera or browser to permanently link the hardware, configure wake-lock, and enable real-time deny strobe alarms.
+                    </p>
+                  </div>
 
-              {/* Pairing Device Identity Input */}
-              <div className="w-full space-y-2">
-                <div className="flex items-center gap-2 px-2.5 py-1.5 rounded-xl bg-black/50 border border-white/10 text-left">
-                  <span className="text-[10px] font-mono text-neutral-400 uppercase shrink-0">
-                    Pair As:
-                  </span>
-                  <input
-                    type="text"
-                    value={pairingDeviceId}
-                    onChange={(e) => setPairingDeviceId(e.target.value)}
-                    placeholder="e.g. Chainway-C66-01"
-                    className="flex-1 bg-transparent text-xs text-[#007AFF] font-mono font-bold focus:outline-none"
-                  />
+                  {/* Network Mode Switcher */}
+                  <div className="flex items-center gap-1 p-1 rounded-xl bg-black/60 border border-white/10 text-[11px] font-mono w-full">
+                    <button
+                      type="button"
+                      onClick={() => setNetworkMode("public")}
+                      className={`flex-1 py-1.5 px-2 rounded-lg transition cursor-pointer flex items-center justify-center gap-1.5 ${
+                        networkMode === "public"
+                          ? "bg-[#007AFF] text-white font-semibold shadow-xs"
+                          : "text-neutral-400 hover:text-white"
+                      }`}
+                    >
+                      <IconCloud size={13} />
+                      <span>Cloudflare (Recommended)</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setNetworkMode("lan")}
+                      className={`flex-1 py-1.5 px-2 rounded-lg transition cursor-pointer flex items-center justify-center gap-1.5 ${
+                        networkMode === "lan"
+                          ? "bg-[#007AFF] text-white font-semibold shadow-xs"
+                          : "text-neutral-400 hover:text-white"
+                      }`}
+                    >
+                      <IconWifi size={13} />
+                      <span>Local Site Wi-Fi</span>
+                    </button>
+                  </div>
+
+                  {/* QR Image */}
+                  <div className="p-3.5 rounded-2xl bg-white shadow-2xl relative group">
+                    <Image
+                      src={terminalQr}
+                      alt="Universal Permanent Link QR"
+                      width={210}
+                      height={210}
+                      className="rounded-lg"
+                    />
+                  </div>
+
+                  {/* Link Status Pill */}
+                  {matchedDevice ? (
+                    <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 text-[11px] font-mono">
+                      <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
+                      <span>
+                        Permanently Linked ({matchedDevice.total_scans} total scans)
+                      </span>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-amber-500/15 border border-amber-500/30 text-amber-300 text-[11px] font-mono">
+                      <span className="h-2 w-2 rounded-full bg-amber-400 animate-ping" />
+                      <span>Scan to Link Device Permanently</span>
+                    </div>
+                  )}
+
+                  {/* Pairing Device Identity Input */}
+                  <div className="w-full space-y-2">
+                    <div className="flex items-center gap-2 px-2.5 py-1.5 rounded-xl bg-black/50 border border-white/10 text-left">
+                      <span className="text-[10px] font-mono text-neutral-400 uppercase shrink-0">
+                        Device ID:
+                      </span>
+                      <input
+                        type="text"
+                        value={pairingDeviceId}
+                        onChange={(e) => setPairingDeviceId(e.target.value)}
+                        placeholder="e.g. Chainway-C66-01"
+                        className="flex-1 bg-transparent text-xs text-[#007AFF] font-mono font-bold focus:outline-none"
+                      />
+                    </div>
+
+                    <div className="p-2 rounded-lg bg-black/40 border border-white/5 text-[11px] font-mono text-neutral-300 flex items-center justify-between">
+                      <span className="truncate max-w-[210px]">{terminalLinkUrl}</span>
+                      <button
+                        type="button"
+                        onClick={() => handleCopy(terminalLinkUrl, "terminalUrl")}
+                        className="p-1 hover:text-white text-neutral-400 cursor-pointer"
+                        title="Copy Permanent Link URL"
+                      >
+                        {copiedText === "terminalUrl" ? (
+                          <IconCheck size={14} className="text-emerald-400" />
+                        ) : (
+                          <IconCopy size={14} />
+                        )}
+                      </button>
+                    </div>
+
+                    <Link
+                      href={terminalLinkUrl}
+                      target="_blank"
+                      className="block w-full py-2 rounded-lg bg-[#007AFF]/15 hover:bg-[#007AFF]/25 border border-[#007AFF]/30 text-xs font-mono text-white text-center transition"
+                    >
+                      Launch Fullscreen Terminal as {pairingDeviceId} ➔
+                    </Link>
+                  </div>
                 </div>
-
-                <div className="p-2 rounded-lg bg-black/40 border border-white/5 text-[11px] font-mono text-neutral-300 flex items-center justify-between">
-                  <span className="truncate max-w-[210px]">{`http://${serverIp}:${serverPort}/onboard/scanner?device=${encodeURIComponent(
-                    pairingDeviceId
-                  )}`}</span>
-                  <button
-                    type="button"
-                    onClick={() =>
-                      handleCopy(
-                        `http://${serverIp}:${serverPort}/onboard/scanner?device=${encodeURIComponent(
-                          pairingDeviceId
-                        )}`,
-                        "terminalUrl"
-                      )
-                    }
-                    className="p-1 hover:text-white text-neutral-400 cursor-pointer"
-                    title="Copy URL"
-                  >
-                    {copiedText === "terminalUrl" ? (
-                      <IconCheck size={14} className="text-emerald-400" />
-                    ) : (
-                      <IconCopy size={14} />
-                    )}
-                  </button>
-                </div>
-
-                <Link
-                  href={`/onboard/scanner?device=${encodeURIComponent(pairingDeviceId)}`}
-                  target="_blank"
-                  className="block w-full py-2 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-xs font-mono text-neutral-200 text-center transition"
-                >
-                  Test Terminal as {pairingDeviceId} ➔
-                </Link>
-              </div>
-            </div>
+              );
+            })()}
 
             {/* Card 2: Chainway Infowedge Auto-Config Profile QR */}
             <div className="rounded-2xl border border-white/10 bg-[#18181b]/85 backdrop-blur-2xl p-6 flex flex-col justify-between items-center text-center space-y-4 shadow-xl">
@@ -366,17 +415,23 @@ export default function DeviceOnboardingTabs({
 
               <div className="w-full space-y-2">
                 <div className="p-2 rounded-lg bg-black/40 border border-white/5 text-[11px] font-mono text-neutral-300 flex items-center justify-between">
-                  <span className="truncate max-w-[210px]">{`http://${serverIp}:${serverPort}/api/scanner/receive`}</span>
+                  <span className="truncate max-w-[210px]">
+                    {networkMode === "public"
+                      ? `${publicUrl}/api/scanner/receive`
+                      : `http://${serverIp}:${serverPort}/api/scanner/receive`}
+                  </span>
                   <button
                     type="button"
                     onClick={() =>
                       handleCopy(
-                        `http://${serverIp}:${serverPort}/api/scanner/receive`,
+                        networkMode === "public"
+                          ? `${publicUrl}/api/scanner/receive`
+                          : `http://${serverIp}:${serverPort}/api/scanner/receive`,
                         "apiUrl"
                       )
                     }
                     className="p-1 hover:text-white text-neutral-400 cursor-pointer"
-                    title="Copy API URL"
+                    title="Copy API Webhook URL"
                   >
                     {copiedText === "apiUrl" ? (
                       <IconCheck size={14} className="text-emerald-400" />

@@ -58,8 +58,9 @@ export default async function OnboardPage({
 
   const publicUrl = await getPublicUrl();
 
-  // 1. Generate Terminal Pairing QR (opens C66 terminal in browser)
-  const terminalUrl = `http://${serverIp}:${serverPort}/onboard/scanner`;
+  // 1. Generate Universal Permanent Link QR (links C66 permanently to Control-Access)
+  const defaultDevice = "Chainway-C66-01";
+  const terminalUrl = `${publicUrl}/scanner?link=true&device=${encodeURIComponent(defaultDevice)}`;
   const scannerTerminalQr = await QRCode.toDataURL(terminalUrl, {
     width: 260,
     margin: 2,
