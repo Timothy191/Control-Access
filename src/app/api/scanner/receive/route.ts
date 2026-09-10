@@ -16,7 +16,13 @@ export async function POST(req: Request) {
       body.data ||
       body.tag ||
       "";
-    const deviceName = body.deviceName || body.device || "Chainway C66 Handheld";
+    const deviceId =
+      body.deviceId ||
+      body.device_id ||
+      body.deviceName ||
+      body.device ||
+      "Chainway C66 Handheld";
+    const deviceName = body.deviceName || body.device || deviceId;
     const deviceType = body.deviceType || (body.rfidTag ? "C66 RFID Reader" : "C66 Barcode Scanner");
     const gateLocation = body.gateLocation || body.gate || "Mobile Patrol C66";
     const scannedBy = body.scannedBy || body.operator || "C66 Operator";
@@ -109,6 +115,7 @@ export async function POST(req: Request) {
         denialReason: result.denialReason || "Access Denied",
         gateLocation,
         rawTag: rawData,
+        targetDeviceId: deviceId,
       });
     } else {
       notification = await broadcastDeviceNotification({
@@ -119,6 +126,7 @@ export async function POST(req: Request) {
         entityName: result.entityName,
         gateLocation,
         rawTag: rawData,
+        targetDeviceId: deviceId,
       });
     }
 
@@ -130,6 +138,7 @@ export async function POST(req: Request) {
       entityType: result.entityType,
       direction: result.direction,
       gateLocation,
+      targetDeviceId: deviceId,
       notificationSent: Boolean(notification),
       notification,
     });

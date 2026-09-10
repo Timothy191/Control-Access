@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
+import QRCode from "qrcode";
 import {
   IconDeviceMobile,
   IconQrcode,
@@ -60,10 +61,13 @@ export default function DeviceOnboardingTabs({
     "c66" | "notifications" | "devices" | "config"
   >("c66");
 
-  // Notifications State
+  // Notifications & Pairing State
   const [notifications, setNotifications] = useState<DeviceNotification[]>(
     initialNotifications
   );
+  const [pairingDeviceId, setPairingDeviceId] = useState("Chainway-C66-01");
+  const [terminalQr, setTerminalQr] = useState(scannerTerminalQr);
+  const [selectedTargetDevice, setSelectedTargetDevice] = useState("ALL");
   const [customTitle, setCustomTitle] = useState("Security Gate Alert");
   const [customMessage, setCustomMessage] = useState(
     "ACCESS DENIED: Unregistered credential presented at East Turnstile"
@@ -74,6 +78,16 @@ export default function DeviceOnboardingTabs({
   const [isSending, setIsSending] = useState(false);
   const [copiedText, setCopiedText] = useState<string | null>(null);
   const [feedbackToast, setFeedbackToast] = useState<string | null>(null);
+
+  // Dynamic QR Code generation when pairing device ID is modified
+  useEffect(() => {
+    const url = `http://${serverIp}:${serverPort}/onboard/scanner?device=${encodeURIComponent(
+      pairingDeviceId.trim() || "Chainway-C66-01"
+    )}`;
+    QRCode.toDataURL(url, { width: 260, margin: 2 })
+      .then(setTerminalQr)
+      .catch(() => {});
+  }, [pairingDeviceId, serverIp, serverPort]);
 
   // SSE Real-Time Listener for Dispatched Notifications
   useEffect(() => {
@@ -111,11 +125,13 @@ export default function DeviceOnboardingTabs({
     title: string;
     msg: string;
     severity: "danger" | "warning" | "success" | "info";
+    targetDeviceId?: string;
   }) => {
     setIsSending(true);
     const title = preset ? preset.title : customTitle;
     const message = preset ? preset.msg : customMessage;
     const severity = preset ? preset.severity : customSeverity;
+    const targetDeviceId = preset?.targetDeviceId || selectedTargetDevice;
 
     try {
       const res = await fetch("/api/scanner/notifications", {
@@ -127,11 +143,14 @@ export default function DeviceOnboardingTabs({
           severity,
           type: severity === "danger" ? "ACCESS_DENIED" : "ALERT",
           gateLocation: "Mobile Patrol C66",
+          targetDeviceId,
         }),
       });
 
       if (res.ok) {
-        setFeedbackToast(`Notification dispatched: "${title}"`);
+        setFeedbackToast(
+          `Dispatched to ${targetDeviceId === "ALL" ? "All Scanners" : targetDeviceId}: "${title}"`
+        );
         setTimeout(() => setFeedbackToast(null), 3500);
       }
     } catch (err) {
@@ -255,14 +274,14 @@ export default function DeviceOnboardingTabs({
                   C66 Handheld Scanner Terminal
                 </h3>
                 <p className="text-xs text-neutral-400 mt-1 max-w-xs">
-                  Scan to launch the touch-ready mobile terminal with audio chimes and denied alarms.
+                  Scan with Android C66 camera or browser to pair with real-time deny strobe alarms.
                 </p>
               </div>
 
               {/* QR Image */}
-              <div className="p-3.5 rounded-2xl bg-white shadow-2xl">
+              <div className="p-3.5 rounded-2xl bg-white shadow-2xl relative group">
                 <Image
-                  src={scannerTerminalQr}
+                  src={terminalQr}
                   alt="C66 Scanner Terminal Pairing QR"
                   width={210}
                   height={210}
@@ -270,14 +289,32 @@ export default function DeviceOnboardingTabs({
                 />
               </div>
 
+              {/* Pairing Device Identity Input */}
               <div className="w-full space-y-2">
+                <div className="flex items-center gap-2 px-2.5 py-1.5 rounded-xl bg-black/50 border border-white/10 text-left">
+                  <span className="text-[10px] font-mono text-neutral-400 uppercase shrink-0">
+                    Pair As:
+                  </span>
+                  <input
+                    type="text"
+                    value={pairingDeviceId}
+                    onChange={(e) => setPairingDeviceId(e.target.value)}
+                    placeholder="e.g. Chainway-C66-01"
+                    className="flex-1 bg-transparent text-xs text-[#007AFF] font-mono font-bold focus:outline-none"
+                  />
+                </div>
+
                 <div className="p-2 rounded-lg bg-black/40 border border-white/5 text-[11px] font-mono text-neutral-300 flex items-center justify-between">
-                  <span className="truncate max-w-[210px]">{`http://${serverIp}:${serverPort}/onboard/scanner`}</span>
+                  <span className="truncate max-w-[210px]">{`http://${serverIp}:${serverPort}/onboard/scanner?device=${encodeURIComponent(
+                    pairingDeviceId
+                  )}`}</span>
                   <button
                     type="button"
                     onClick={() =>
                       handleCopy(
-                        `http://${serverIp}:${serverPort}/onboard/scanner`,
+                        `http://${serverIp}:${serverPort}/onboard/scanner?device=${encodeURIComponent(
+                          pairingDeviceId
+                        )}`,
                         "terminalUrl"
                       )
                     }
@@ -293,11 +330,11 @@ export default function DeviceOnboardingTabs({
                 </div>
 
                 <Link
-                  href="/onboard/scanner"
+                  href={`/onboard/scanner?device=${encodeURIComponent(pairingDeviceId)}`}
                   target="_blank"
                   className="block w-full py-2 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-xs font-mono text-neutral-200 text-center transition"
                 >
-                  Test Terminal on this Browser ➔
+                  Test Terminal as {pairingDeviceId} ➔
                 </Link>
               </div>
             </div>
@@ -494,6 +531,28 @@ export default function DeviceOnboardingTabs({
               </div>
             </div>
 
+            {/* Target Scanner Selection Bar */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3 rounded-xl bg-black/40 border border-white/10">
+              <div className="text-xs font-mono text-neutral-300 flex items-center gap-2">
+                <IconDeviceMobile size={15} className="text-[#007AFF]" />
+                <span className="uppercase text-[11px] text-neutral-400 font-bold">
+                  Target Handheld Scanner:
+                </span>
+              </div>
+              <select
+                value={selectedTargetDevice}
+                onChange={(e) => setSelectedTargetDevice(e.target.value)}
+                className="h-8 rounded-lg bg-black/60 border border-white/20 px-2.5 text-xs text-white font-mono focus:border-[#007AFF] focus:outline-none"
+              >
+                <option value="ALL">📢 Broadcast to All Handhelds (ALL)</option>
+                {devices.map((d) => (
+                  <option key={d.id} value={d.device_name}>
+                    📱 {d.device_name} ({d.ip_address || "127.0.0.1"})
+                  </option>
+                ))}
+              </select>
+            </div>
+
             {/* Custom Message Dispatch Form */}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2">
               <div className="sm:col-span-1">
@@ -673,19 +732,38 @@ export default function DeviceOnboardingTabs({
                         : "Never"}
                     </td>
                     <td className="p-3 text-right">
-                      <button
-                        type="button"
-                        onClick={() =>
-                          handleSendNotification({
-                            title: `Ping -> ${d.device_name}`,
-                            msg: "Hardware connectivity check and vibration test",
-                            severity: "info",
-                          })
-                        }
-                        className="px-2.5 py-1 rounded bg-white/5 hover:bg-white/10 text-[11px] text-[#007AFF] transition cursor-pointer"
-                      >
-                        Ping Strobe
-                      </button>
+                      <div className="flex items-center justify-end gap-2">
+                        <button
+                          type="button"
+                          onClick={() =>
+                            handleSendNotification({
+                              title: `⛔ ACCESS DENIED (TEST)`,
+                              msg: `Unauthorized RFID tag intercepted by ${d.device_name}`,
+                              severity: "danger",
+                              targetDeviceId: d.device_name,
+                            })
+                          }
+                          className="px-2.5 py-1 rounded bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 text-[11px] text-red-400 font-mono transition cursor-pointer"
+                          title="Trigger full-screen Access Denied strobe on this Android scanner"
+                        >
+                          Push Deny Strobe
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            handleSendNotification({
+                              title: `Ping -> ${d.device_name}`,
+                              msg: "Hardware connectivity check and vibration test",
+                              severity: "info",
+                              targetDeviceId: d.device_name,
+                            })
+                          }
+                          className="px-2 py-1 rounded bg-white/5 hover:bg-white/10 text-[11px] text-[#007AFF] transition cursor-pointer"
+                          title="Send ping to scanner"
+                        >
+                          Ping
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}

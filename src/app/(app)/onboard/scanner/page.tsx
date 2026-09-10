@@ -11,6 +11,10 @@ import {
   IconVolume,
   IconVolumeOff,
   IconSend,
+  IconAlertTriangle,
+  IconBell,
+  IconRefresh,
+  IconSettings,
 } from "@tabler/icons-react";
 
 interface ScanResult {
@@ -31,146 +35,312 @@ interface DeviceAlert {
   entityName?: string;
   denialReason?: string;
   gateLocation?: string;
+  rawTag?: string;
+  targetDeviceId?: string;
   timestamp: string;
 }
 
 export default function C66ScannerTerminalPage() {
+  const [deviceId, setDeviceId] = useState("Chainway-C66-01");
+  const [isEditingDevice, setIsEditingDevice] = useState(false);
+  const [tempDeviceId, setTempDeviceId] = useState("");
   const [scanInput, setScanInput] = useState("");
   const [isProcessing, setIsProcessing] = useState(false);
   const [lastResult, setLastResult] = useState<ScanResult | null>(null);
   const [activeAlert, setActiveAlert] = useState<DeviceAlert | null>(null);
   const [audioEnabled, setAudioEnabled] = useState(true);
+  const [audioArmed, setAudioArmed] = useState(false);
   const [sseConnected, setSseConnected] = useState(false);
   const [recentScans, setRecentScans] = useState<ScanResult[]>([]);
   const [gateLocation, setGateLocation] = useState("Brakfontein - C66 Mobile Gate");
+  const [countdown, setCountdown] = useState(10);
   const inputRef = useRef<HTMLInputElement>(null);
+  const audioCtxRef = useRef<AudioContext | null>(null);
 
-  // Audio Synthesizer for hardware chimes and denied buzzers
-  const playSound = useCallback((type: "granted" | "denied" | "alert") => {
-    if (!audioEnabled) return;
+  // 1. Initialize Device ID from URL or LocalStorage
+  useEffect(() => {
+    if (typeof window === "undefined") return;
     try {
-      const AudioCtx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
-      if (!AudioCtx) return;
-      const ctx = new AudioCtx();
-
-      if (type === "granted") {
-        // High dual-tone chime
-        const now = ctx.currentTime;
-        const osc = ctx.createOscillator();
-        const gain = ctx.createGain();
-        osc.type = "sine";
-        osc.frequency.setValueAtTime(587.33, now); // D5
-        osc.frequency.setValueAtTime(880, now + 0.1); // A5
-        gain.gain.setValueAtTime(0.3, now);
-        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.35);
-        osc.connect(gain);
-        gain.connect(ctx.destination);
-        osc.start(now);
-        osc.stop(now + 0.35);
-      } else if (type === "denied") {
-        // Harsh buzzer / alarm tone
-        const now = ctx.currentTime;
-        const osc = ctx.createOscillator();
-        const gain = ctx.createGain();
-        osc.type = "sawtooth";
-        osc.frequency.setValueAtTime(220, now);
-        osc.frequency.setValueAtTime(160, now + 0.15);
-        osc.frequency.setValueAtTime(130, now + 0.3);
-        gain.gain.setValueAtTime(0.5, now);
-        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.6);
-        osc.connect(gain);
-        gain.connect(ctx.destination);
-        osc.start(now);
-        osc.stop(now + 0.6);
-
-        // Vibrate if available on Android device
-        if (typeof navigator !== "undefined" && navigator.vibrate) {
-          navigator.vibrate([250, 100, 250, 100, 400]);
-        }
-      } else {
-        // Warning alert ping
-        const now = ctx.currentTime;
-        const osc = ctx.createOscillator();
-        const gain = ctx.createGain();
-        osc.type = "triangle";
-        osc.frequency.setValueAtTime(440, now);
-        gain.gain.setValueAtTime(0.3, now);
-        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.25);
-        osc.connect(gain);
-        gain.connect(ctx.destination);
-        osc.start(now);
-        osc.stop(now + 0.25);
+      const urlParams = new URLSearchParams(window.location.search);
+      const urlDevice = urlParams.get("device") || urlParams.get("deviceId");
+      const stored = localStorage.getItem("c66_device_id");
+      const chosen = urlDevice || stored || "Chainway-C66-01";
+      setDeviceId(chosen);
+      setTempDeviceId(chosen);
+      if (urlDevice) {
+        localStorage.setItem("c66_device_id", urlDevice);
       }
     } catch {
-      // Audio autoplay policy catch
+      // ignore
     }
-  }, [audioEnabled]);
-
-  // Keep input focused for physical C66 hardware scanner buttons
-  useEffect(() => {
-    inputRef.current?.focus();
-    const handleClickAnywhere = () => {
-      inputRef.current?.focus();
-    };
-    window.addEventListener("click", handleClickAnywhere);
-    return () => window.removeEventListener("click", handleClickAnywhere);
   }, []);
 
-  // Connect to SSE notifications stream
+  // 2. Android Screen Wake Lock (keeps screen awake during guard shift)
   useEffect(() => {
-    let eventSource: EventSource | null = null;
-    try {
-      eventSource = new EventSource("/api/scanner/notifications");
-
-      eventSource.onopen = () => {
-        setSseConnected(true);
-      };
-
-      eventSource.onmessage = (e) => {
-        try {
-          const notif = JSON.parse(e.data);
-          if (notif && notif.type) {
-            setActiveAlert(notif);
-            if (notif.severity === "danger" || notif.type === "ACCESS_DENIED") {
-              playSound("denied");
-            } else if (notif.severity === "success") {
-              playSound("granted");
-            } else {
-              playSound("alert");
-            }
-          }
-        } catch {
-          // ignore non-json keepalive comments
+    let wakeLockSentinel: unknown = null;
+    const requestWakeLock = async () => {
+      try {
+        if (
+          "wakeLock" in navigator &&
+          (navigator as unknown as { wakeLock?: { request: (type: string) => Promise<unknown> } }).wakeLock
+        ) {
+          wakeLockSentinel = await (
+            navigator as unknown as { wakeLock: { request: (type: string) => Promise<unknown> } }
+          ).wakeLock.request("screen");
         }
-      };
+      } catch {
+        // wakeLock may fail if battery saver is on
+      }
+    };
+    requestWakeLock();
 
-      eventSource.onerror = () => {
-        setSseConnected(false);
-      };
-    } catch (err) {
-      console.error("SSE connection error:", err);
+    const handleVisibility = () => {
+      if (document.visibilityState === "visible") {
+        requestWakeLock();
+      }
+    };
+    document.addEventListener("visibilitychange", handleVisibility);
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibility);
+      if (
+        wakeLockSentinel &&
+        typeof (wakeLockSentinel as { release?: () => Promise<void> }).release === "function"
+      ) {
+        (wakeLockSentinel as { release: () => Promise<void> }).release().catch(() => {});
+      }
+    };
+  }, []);
+
+  // 3. Audio Synthesizer (hardware chimes and multi-tone alarm buzzer)
+  const armAudio = useCallback(() => {
+    try {
+      const AudioCtx =
+        window.AudioContext ||
+        (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+      if (!AudioCtx) return;
+      if (!audioCtxRef.current) {
+        audioCtxRef.current = new AudioCtx();
+      }
+      if (audioCtxRef.current.state === "suspended") {
+        audioCtxRef.current.resume();
+      }
+      setAudioArmed(true);
+
+      // Request system push notification permission on Android
+      if (typeof window !== "undefined" && "Notification" in window) {
+        if (Notification.permission === "default") {
+          Notification.requestPermission().catch(() => {});
+        }
+      }
+    } catch {
+      // ignore
     }
+  }, []);
+
+  const playSound = useCallback(
+    (type: "granted" | "denied" | "alert") => {
+      if (!audioEnabled) return;
+      try {
+        const AudioCtx =
+          window.AudioContext ||
+          (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+        if (!AudioCtx) return;
+
+        if (!audioCtxRef.current) {
+          audioCtxRef.current = new AudioCtx();
+        }
+        const ctx = audioCtxRef.current;
+        if (ctx.state === "suspended") {
+          ctx.resume();
+        }
+
+        const now = ctx.currentTime;
+
+        if (type === "granted") {
+          // Double pleasant chime (D5 -> A5)
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.type = "sine";
+          osc.frequency.setValueAtTime(587.33, now);
+          osc.frequency.setValueAtTime(880, now + 0.12);
+          gain.gain.setValueAtTime(0.35, now);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + 0.4);
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          osc.start(now);
+          osc.stop(now + 0.4);
+        } else if (type === "denied") {
+          // Triple harsh sawtooth alarm buzzer (220Hz -> 160Hz -> 110Hz)
+          [0, 0.22, 0.44].forEach((offset, idx) => {
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.type = "sawtooth";
+            const freq = idx === 0 ? 240 : idx === 1 ? 180 : 130;
+            osc.frequency.setValueAtTime(freq, now + offset);
+            osc.frequency.linearRampToValueAtTime(freq * 0.75, now + offset + 0.18);
+            gain.gain.setValueAtTime(0.6, now + offset);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + offset + 0.19);
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+            osc.start(now + offset);
+            osc.stop(now + offset + 0.19);
+          });
+        } else {
+          // Warning alert ping
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.type = "triangle";
+          osc.frequency.setValueAtTime(440, now);
+          gain.gain.setValueAtTime(0.3, now);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + 0.25);
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          osc.start(now);
+          osc.stop(now + 0.25);
+        }
+      } catch {
+        // audio policy fallback
+      }
+    },
+    [audioEnabled]
+  );
+
+  // 4. Trigger Deny Prompt with Android Vibration & Native Notification
+  const triggerDenyPrompt = useCallback(
+    (alert: DeviceAlert) => {
+      setActiveAlert(alert);
+      setCountdown(10);
+      playSound("denied");
+
+      // Hardware haptic vibration on Android C66
+      if (typeof navigator !== "undefined" && navigator.vibrate) {
+        try {
+          navigator.vibrate([300, 120, 300, 120, 500, 120, 500]);
+        } catch {
+          // ignore
+        }
+      }
+
+      // Android Heads-Up notification if minimized
+      if (
+        typeof window !== "undefined" &&
+        "Notification" in window &&
+        Notification.permission === "granted"
+      ) {
+        try {
+          new Notification(alert.title || "⛔ ACCESS DENIED", {
+            body: `${alert.entityName || "Unknown Subject"}: ${
+              alert.denialReason || alert.message
+            }`,
+            icon: "/icon.svg",
+            tag: "access-denied-alarm",
+          });
+        } catch {
+          // ignore
+        }
+      }
+    },
+    [playSound]
+  );
+
+  // 5. Keep hardware scan input focused permanently
+  useEffect(() => {
+    inputRef.current?.focus();
+    const handleClick = () => {
+      inputRef.current?.focus();
+    };
+    window.addEventListener("click", handleClick);
+    return () => window.removeEventListener("click", handleClick);
+  }, []);
+
+  // 6. Connect to SSE Real-time Push Stream (targeted to this device)
+  useEffect(() => {
+    if (!deviceId) return;
+    let eventSource: EventSource | null = null;
+    let reconnectTimer: NodeJS.Timeout | null = null;
+
+    const connect = () => {
+      try {
+        const streamUrl = `/api/scanner/notifications?deviceId=${encodeURIComponent(
+          deviceId
+        )}`;
+        eventSource = new EventSource(streamUrl);
+
+        eventSource.onopen = () => {
+          setSseConnected(true);
+        };
+
+        eventSource.onmessage = (e) => {
+          try {
+            const notif = JSON.parse(e.data);
+            if (!notif || !notif.type) return;
+
+            // Check if alert is targeted to this device or ALL
+            const isForThisDevice =
+              !notif.targetDeviceId ||
+              notif.targetDeviceId === "ALL" ||
+              notif.targetDeviceId.toLowerCase() === deviceId.toLowerCase();
+
+            if (isForThisDevice) {
+              if (notif.severity === "danger" || notif.type === "ACCESS_DENIED") {
+                triggerDenyPrompt(notif);
+              } else if (notif.severity === "success") {
+                setActiveAlert(notif);
+                playSound("granted");
+              } else {
+                setActiveAlert(notif);
+                playSound("alert");
+              }
+            }
+          } catch {
+            // ignore non-json keepalive
+          }
+        };
+
+        eventSource.onerror = () => {
+          setSseConnected(false);
+          if (eventSource) {
+            eventSource.close();
+            eventSource = null;
+          }
+          // Auto-reconnect after 3s
+          reconnectTimer = setTimeout(connect, 3000);
+        };
+      } catch (err) {
+        console.error("SSE connection error:", err);
+      }
+    };
+
+    connect();
 
     return () => {
       if (eventSource) eventSource.close();
+      if (reconnectTimer) clearTimeout(reconnectTimer);
     };
-  }, [playSound]);
+  }, [deviceId, triggerDenyPrompt, playSound]);
 
-  // Auto-dismiss alert after 6s
+  // 7. Auto-dismiss timer countdown
   useEffect(() => {
     if (!activeAlert) return;
-    const timer = setTimeout(() => {
-      setActiveAlert(null);
-    }, 6000);
-    return () => clearTimeout(timer);
+    const interval = setInterval(() => {
+      setCountdown((prev) => {
+        if (prev <= 1) {
+          setActiveAlert(null);
+          return 10;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    return () => clearInterval(interval);
   }, [activeAlert]);
 
-  // Submit scan to server
+  // 8. Submit Scan via Webhook / Keyboard Emulation
   const handleProcessScan = async (codeToScan?: string) => {
     const code = (codeToScan || scanInput).trim();
     if (!code || isProcessing) return;
 
     setIsProcessing(true);
+    armAudio(); // Unlock audio on user scan interaction
     try {
       const res = await fetch("/api/scanner/receive", {
         method: "POST",
@@ -178,8 +348,8 @@ export default function C66ScannerTerminalPage() {
         body: JSON.stringify({
           barcodeData: code,
           rfidTag: code.startsWith("RFID_") ? code : undefined,
-          deviceId: "C66-Handheld-01",
-          deviceName: "Chainway C66 Handheld",
+          deviceId,
+          deviceName: deviceId,
           deviceType: "Chainway C66 RFID/Barcode",
           gateLocation,
           operator: "Handheld Patrol",
@@ -202,13 +372,38 @@ export default function C66ScannerTerminalPage() {
       if (result.accessGranted) {
         playSound("granted");
       } else {
-        playSound("denied");
+        // PUSH AND DISPLAY DENY PROMPT IMMEDIATELY ON ANDROID SCREEN!
+        triggerDenyPrompt({
+          id: `denial_${Date.now()}`,
+          type: "ACCESS_DENIED",
+          title: "⛔ ACCESS DENIED",
+          message: data.denialReason || "Security Clearance Required",
+          severity: "danger",
+          entityName: data.entityName || "Unauthorized Subject",
+          denialReason: data.denialReason || "Security Clearance Required",
+          gateLocation: data.gateLocation || gateLocation,
+          rawTag: code,
+          targetDeviceId: deviceId,
+          timestamp: new Date().toLocaleTimeString(),
+        });
       }
 
       setScanInput("");
     } catch (err) {
       console.error("Scan dispatch error:", err);
-      playSound("denied");
+      triggerDenyPrompt({
+        id: `denial_net_${Date.now()}`,
+        type: "ACCESS_DENIED",
+        title: "⚠️ NETWORK ERROR",
+        message: "Failed to verify credential with central server",
+        severity: "danger",
+        entityName: code,
+        denialReason: "Network / Server unreachable",
+        gateLocation,
+        rawTag: code,
+        targetDeviceId: deviceId,
+        timestamp: new Date().toLocaleTimeString(),
+      });
     } finally {
       setIsProcessing(false);
       inputRef.current?.focus();
@@ -222,51 +417,113 @@ export default function C66ScannerTerminalPage() {
     }
   };
 
+  const handleSaveDeviceId = () => {
+    const clean = tempDeviceId.trim() || "Chainway-C66-01";
+    setDeviceId(clean);
+    localStorage.setItem("c66_device_id", clean);
+    setIsEditingDevice(false);
+  };
+
   return (
     <div className="min-h-screen bg-black text-neutral-100 flex flex-col font-sans select-none">
       {/* FULL-SCREEN FLASHING RED ALERT ON ACCESS DENIED */}
       {activeAlert && activeAlert.severity === "danger" && (
-        <div
-          onClick={() => setActiveAlert(null)}
-          className="fixed inset-0 z-50 flex flex-col items-center justify-center p-6 bg-red-950/95 border-8 border-red-600 animate-pulse text-center cursor-pointer"
-        >
-          <div className="h-24 w-24 rounded-full bg-red-600 text-white flex items-center justify-center shadow-[0_0_50px_rgba(239,68,68,1)] mb-6 animate-bounce">
-            <IconShieldX size={60} className="stroke-[2.5]" />
+        <div className="fixed inset-0 z-50 flex flex-col items-center justify-between p-6 bg-red-950/98 border-[8px] border-red-600 animate-pulse text-center">
+          {/* Top Strobe Pill & Countdown */}
+          <div className="w-full flex items-center justify-between pt-2">
+            <span className="text-[11px] uppercase font-mono font-bold tracking-widest text-red-200 px-3.5 py-1 rounded-full bg-red-900/90 border border-red-500/60 shadow-lg flex items-center gap-1.5">
+              <span className="h-2 w-2 rounded-full bg-red-400 animate-ping" />
+              <span>HARDWARE INTERCEPTION STROBE</span>
+            </span>
+
+            <span className="text-xs font-mono font-bold text-red-300 bg-black/60 px-2.5 py-1 rounded-lg border border-red-500/30">
+              Auto-clear in {countdown}s
+            </span>
           </div>
 
-          <span className="text-xs uppercase font-mono font-bold tracking-widest text-red-300 px-3 py-1 rounded-full bg-red-900/80 border border-red-500/50 mb-3">
-            Hardware Alarm Strobe
-          </span>
-
-          <h1 className="text-3xl sm:text-4xl font-extrabold text-white tracking-tight mb-2">
-            ACCESS DENIED
-          </h1>
-
-          <div className="max-w-md bg-black/60 rounded-2xl border border-red-500/40 p-5 mt-3 space-y-2 text-left">
-            <div className="text-sm font-mono text-neutral-300">
-              <span className="text-red-400 block text-[11px] uppercase font-bold">Subject / Name</span>
-              <strong className="text-white text-base block truncate">
-                {activeAlert.entityName || "Unregistered Credential"}
-              </strong>
+          {/* Central Alert Icon & Headline */}
+          <div className="flex flex-col items-center max-w-md w-full my-auto space-y-4">
+            <div className="h-24 w-24 rounded-full bg-red-600 text-white flex items-center justify-center shadow-[0_0_60px_rgba(239,68,68,1)] animate-bounce">
+              <IconShieldX size={64} className="stroke-[2.5]" />
             </div>
 
-            <div className="text-sm font-mono text-neutral-300 pt-2 border-t border-red-500/20">
-              <span className="text-red-400 block text-[11px] uppercase font-bold">Denial Reason</span>
-              <span className="text-red-200 font-semibold block">
-                {activeAlert.denialReason || activeAlert.message}
-              </span>
+            <div>
+              <h1 className="text-3xl sm:text-4xl font-extrabold text-white tracking-wider font-mono">
+                ACCESS DENIED
+              </h1>
+              <p className="text-red-300 text-xs font-mono mt-1">
+                Target Device: <strong className="text-white">{deviceId}</strong>
+              </p>
             </div>
 
-            {activeAlert.gateLocation && (
-              <div className="text-xs font-mono text-neutral-400 pt-1">
-                Gate: {activeAlert.gateLocation}
+            {/* Rejection Details Box */}
+            <div className="w-full bg-black/80 rounded-2xl border border-red-500/50 p-4 space-y-2.5 text-left shadow-2xl">
+              <div>
+                <span className="text-red-400 block text-[10px] uppercase font-mono font-bold">
+                  Subject / Identified Personnel
+                </span>
+                <strong className="text-white text-base block font-semibold truncate">
+                  {activeAlert.entityName || "Unregistered Credential"}
+                </strong>
               </div>
-            )}
+
+              <div className="pt-2 border-t border-red-500/20">
+                <span className="text-red-400 block text-[10px] uppercase font-mono font-bold">
+                  Security Denial Reason
+                </span>
+                <div className="flex items-start gap-1.5 mt-0.5">
+                  <IconAlertTriangle size={16} className="text-red-400 shrink-0 mt-0.5" />
+                  <span className="text-red-200 font-bold text-sm leading-tight">
+                    {activeAlert.denialReason || activeAlert.message}
+                  </span>
+                </div>
+              </div>
+
+              {activeAlert.rawTag && (
+                <div className="pt-2 border-t border-red-500/20 flex items-center justify-between text-[11px] font-mono text-neutral-400">
+                  <span>Tag / Code:</span>
+                  <code className="text-red-300 bg-red-950/60 px-2 py-0.5 rounded border border-red-500/30">
+                    {activeAlert.rawTag}
+                  </code>
+                </div>
+              )}
+
+              {activeAlert.gateLocation && (
+                <div className="text-[11px] font-mono text-neutral-400 flex items-center justify-between">
+                  <span>Gate Portal:</span>
+                  <span className="text-white font-medium">{activeAlert.gateLocation}</span>
+                </div>
+              )}
+            </div>
           </div>
 
-          <p className="text-xs font-mono text-neutral-400 mt-6 animate-pulse">
-            Tap screen anywhere to dismiss alert
-          </p>
+          {/* Action Buttons for Handheld Operator */}
+          <div className="w-full max-w-md space-y-2 pb-2">
+            <div className="grid grid-cols-2 gap-3">
+              <button
+                type="button"
+                onClick={() => setActiveAlert(null)}
+                className="h-12 rounded-xl bg-neutral-800 hover:bg-neutral-700 active:scale-[0.98] border border-white/20 text-white font-mono font-bold text-xs uppercase tracking-wider transition cursor-pointer shadow-lg"
+              >
+                Acknowledge
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setActiveAlert(null);
+                  inputRef.current?.focus();
+                }}
+                className="h-12 rounded-xl bg-red-600 hover:bg-red-500 active:scale-[0.98] text-white font-mono font-bold text-xs uppercase tracking-wider transition cursor-pointer shadow-[0_0_25px_rgba(239,68,68,0.7)] flex items-center justify-center gap-1.5"
+              >
+                <IconRefresh size={16} />
+                <span>Re-Scan</span>
+              </button>
+            </div>
+            <p className="text-[11px] font-mono text-red-300/80">
+              Tap Acknowledge or Re-Scan to resume scanning
+            </p>
+          </div>
         </div>
       )}
 
@@ -281,11 +538,17 @@ export default function C66ScannerTerminalPage() {
             <span className="hidden sm:inline">Exit</span>
           </Link>
 
-          <div className="flex items-center gap-1.5 ml-2">
+          <div className="flex items-center gap-1.5 ml-1">
             <IconDeviceMobile size={18} className="text-[#007AFF]" />
-            <span className="font-mono font-bold text-xs text-white">
-              C66 Terminal
-            </span>
+            <button
+              type="button"
+              onClick={() => setIsEditingDevice(true)}
+              className="text-xs font-mono font-bold text-white flex items-center gap-1 bg-white/5 px-2 py-0.5 rounded-lg hover:bg-white/10 transition cursor-pointer"
+              title="Change Scanner ID"
+            >
+              <span>{deviceId}</span>
+              <IconSettings size={12} className="text-neutral-400" />
+            </button>
           </div>
         </div>
 
@@ -303,34 +566,92 @@ export default function C66ScannerTerminalPage() {
                 sseConnected ? "bg-emerald-400 animate-pulse" : "bg-amber-400"
               }`}
             />
-            <span>{sseConnected ? "Push Online" : "Reconnecting"}</span>
+            <span>{sseConnected ? "Push Online" : "Connecting"}</span>
           </div>
 
           <button
             type="button"
             onClick={() => setAudioEnabled(!audioEnabled)}
-            className="p-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-neutral-300"
-            title="Toggle Audio Feedback"
+            className="p-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-neutral-300 cursor-pointer"
+            title="Toggle Audio Buzzer"
           >
-            {audioEnabled ? <IconVolume size={16} className="text-emerald-400" /> : <IconVolumeOff size={16} className="text-neutral-500" />}
+            {audioEnabled ? (
+              <IconVolume size={16} className="text-emerald-400" />
+            ) : (
+              <IconVolumeOff size={16} className="text-neutral-500" />
+            )}
           </button>
         </div>
       </header>
+
+      {/* Audio & Haptic Arming Banner (Required for Android Chrome sound autoplay) */}
+      {!audioArmed && (
+        <div
+          onClick={armAudio}
+          className="bg-amber-500/20 border-b border-amber-500/30 px-3 py-2 text-center text-xs font-mono text-amber-300 flex items-center justify-center gap-2 cursor-pointer hover:bg-amber-500/30 transition animate-pulse"
+        >
+          <IconBell size={15} />
+          <span className="font-semibold">
+            Tap here to Arm Hardware Audio Buzzer & Haptics for C66
+          </span>
+        </div>
+      )}
+
+      {/* Device ID Rename Modal */}
+      {isEditingDevice && (
+        <div className="fixed inset-0 z-40 bg-black/80 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="w-full max-w-xs bg-neutral-900 border border-white/15 rounded-2xl p-5 space-y-3">
+            <h3 className="text-sm font-bold text-white font-mono">
+              Configure Scanner ID
+            </h3>
+            <p className="text-xs text-neutral-400 font-mono">
+              Identifies this Android terminal for targeted push alerts.
+            </p>
+            <input
+              type="text"
+              value={tempDeviceId}
+              onChange={(e) => setTempDeviceId(e.target.value)}
+              placeholder="e.g. Chainway-C66-01"
+              className="w-full h-9 rounded-lg bg-black/60 border border-white/20 px-3 text-xs text-white font-mono focus:border-[#007AFF] focus:outline-none"
+            />
+            <div className="grid grid-cols-2 gap-2 pt-1">
+              <button
+                type="button"
+                onClick={() => setIsEditingDevice(false)}
+                className="h-8 rounded-lg bg-white/5 text-xs text-neutral-300 font-mono hover:bg-white/10 cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleSaveDeviceId}
+                className="h-8 rounded-lg bg-[#007AFF] text-xs text-white font-mono font-semibold hover:bg-[#0A84FF] cursor-pointer"
+              >
+                Save ID
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Main Terminal Viewport */}
       <main className="flex-1 flex flex-col p-4 max-w-lg mx-auto w-full space-y-4">
         {/* Gate Location Selector */}
         <div className="flex items-center justify-between p-2.5 rounded-xl bg-neutral-900 border border-white/10 text-xs font-mono">
-          <span className="text-neutral-400">Current Portal:</span>
+          <span className="text-neutral-400">Gate Location:</span>
           <select
             value={gateLocation}
             onChange={(e) => setGateLocation(e.target.value)}
             className="bg-black text-white text-xs px-2 py-1 rounded border border-white/10 focus:outline-none"
           >
             <option value="Brakfontein - Main Gate">Brakfontein - Main Gate</option>
-            <option value="Brakfontein - C66 Mobile Gate">Brakfontein - C66 Mobile Gate</option>
+            <option value="Brakfontein - C66 Mobile Gate">
+              Brakfontein - C66 Mobile Gate
+            </option>
             <option value="Optimum - Port 9100">Optimum - Port 9100</option>
-            <option value="Thando Tech - Remote Turnstile">Thando Tech - Remote Turnstile</option>
+            <option value="Thando Tech - Remote Turnstile">
+              Thando Tech - Remote Turnstile
+            </option>
           </select>
         </div>
 
@@ -383,11 +704,9 @@ export default function C66ScannerTerminalPage() {
               <div className="h-16 w-16 rounded-2xl bg-white/5 text-[#007AFF] flex items-center justify-center mb-3 animate-pulse">
                 <IconScan size={36} />
               </div>
-              <h2 className="text-lg font-semibold text-white">
-                Scanner Ready
-              </h2>
+              <h2 className="text-lg font-semibold text-white">Scanner Armed</h2>
               <p className="text-xs text-neutral-400 font-mono mt-1">
-                Pull C66 hardware trigger or scan barcode/RFID
+                Pull C66 hardware trigger or scan test credential below
               </p>
             </>
           )}
@@ -415,20 +734,20 @@ export default function C66ScannerTerminalPage() {
             </button>
           </div>
           <p className="text-[11px] text-neutral-500 font-mono text-center">
-            Hardware Infowedge input auto-submits on trigger release
+            Targeted Scanner: <code className="text-[#007AFF]">{deviceId}</code>
           </p>
         </div>
 
         {/* Quick Test Bench Credentials */}
         <div className="p-3.5 rounded-xl bg-neutral-900/60 border border-white/10 space-y-2">
           <span className="text-[11px] font-mono text-neutral-400 uppercase tracking-wider block">
-            Test Bench Credentials
+            Interactive Test Credentials
           </span>
           <div className="grid grid-cols-2 gap-2">
             <button
               type="button"
               onClick={() => handleProcessScan("RFID_EMP_003")}
-              className="p-2 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 text-emerald-300 text-xs font-mono text-left transition cursor-pointer"
+              className="p-2.5 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 text-emerald-300 text-xs font-mono text-left transition cursor-pointer"
             >
               <span className="font-bold block">✓ Bob Johnson</span>
               <span className="text-[10px] text-neutral-400">RFID_EMP_003 (Pass)</span>
@@ -437,10 +756,10 @@ export default function C66ScannerTerminalPage() {
             <button
               type="button"
               onClick={() => handleProcessScan("TEST_UNAUTHORIZED_999")}
-              className="p-2 rounded-lg bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 text-red-300 text-xs font-mono text-left transition cursor-pointer"
+              className="p-2.5 rounded-lg bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 text-red-300 text-xs font-mono text-left transition cursor-pointer"
             >
               <span className="font-bold block">✕ Denied Tag</span>
-              <span className="text-[10px] text-neutral-400">UNAUTH_999 (Alarm)</span>
+              <span className="text-[10px] text-neutral-400">UNAUTH_999 (Strobe)</span>
             </button>
           </div>
         </div>
@@ -449,7 +768,7 @@ export default function C66ScannerTerminalPage() {
         {recentScans.length > 0 && (
           <div className="space-y-1.5 flex-1">
             <span className="text-[11px] font-mono text-neutral-400 uppercase tracking-wider block">
-              Recent Handheld Scans
+              Recent Activity on {deviceId}
             </span>
             <div className="space-y-1">
               {recentScans.map((s, idx) => (

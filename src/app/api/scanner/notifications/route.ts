@@ -11,10 +11,20 @@ export const dynamic = "force-dynamic";
 export async function GET(request: Request) {
   const url = new URL(request.url);
   const isPoll = url.searchParams.get("poll") === "true";
+  const clientDeviceId = url.searchParams.get("deviceId") || url.searchParams.get("device");
+  const sendPast = url.searchParams.get("history") === "true";
 
   // Polling fallback mode
   if (isPoll) {
-    const recent = getRecentDeviceNotifications(20);
+    let recent = getRecentDeviceNotifications(25);
+    if (clientDeviceId && clientDeviceId !== "ALL") {
+      recent = recent.filter(
+        (n) =>
+          !n.targetDeviceId ||
+          n.targetDeviceId === "ALL" ||
+          n.targetDeviceId.toLowerCase() === clientDeviceId.toLowerCase()
+      );
+    }
     return NextResponse.json(recent);
   }
 
@@ -23,14 +33,37 @@ export async function GET(request: Request) {
     start(controller) {
       const encoder = new TextEncoder();
 
-      // Handshake initial ping and past recent notifications
+      // Handshake initial ping and client identity confirmation
       controller.enqueue(encoder.encode("retry: 2000\n\n"));
-      const past = getRecentDeviceNotifications(5);
-      past.reverse().forEach((notif) => {
-        controller.enqueue(
-          encoder.encode(`data: ${JSON.stringify(notif)}\n\n`)
-        );
-      });
+      controller.enqueue(
+        encoder.encode(
+          `event: ready\ndata: ${JSON.stringify({
+            status: "connected",
+            clientDeviceId: clientDeviceId || "ALL",
+            timestamp: new Date().toISOString(),
+          })}\n\n`
+        )
+      );
+
+      // Only send past notifications if explicitly requested (avoids re-triggering alarms on page load)
+      if (sendPast) {
+        const past = getRecentDeviceNotifications(5);
+        past.reverse().forEach((notif) => {
+          if (
+            !clientDeviceId ||
+            clientDeviceId === "ALL" ||
+            !notif.targetDeviceId ||
+            notif.targetDeviceId === "ALL" ||
+            notif.targetDeviceId.toLowerCase() === clientDeviceId.toLowerCase()
+          ) {
+            controller.enqueue(
+              encoder.encode(
+                `data: ${JSON.stringify({ ...notif, isHistorical: true })}\n\n`
+              )
+            );
+          }
+        });
+      }
 
       // Keepalive heartbeat
       const heartbeatTimer = setInterval(() => {
@@ -44,13 +77,22 @@ export async function GET(request: Request) {
       // Subscribe to new real-time notifications
       const unsubscribe = subscribeToDeviceNotifications(
         (notif: DeviceNotification) => {
-          try {
-            controller.enqueue(
-              encoder.encode(`data: ${JSON.stringify(notif)}\n\n`)
-            );
-          } catch {
-            unsubscribe();
-            clearInterval(heartbeatTimer);
+          const matchesTarget =
+            !clientDeviceId ||
+            clientDeviceId === "ALL" ||
+            !notif.targetDeviceId ||
+            notif.targetDeviceId === "ALL" ||
+            notif.targetDeviceId.toLowerCase() === clientDeviceId.toLowerCase();
+
+          if (matchesTarget) {
+            try {
+              controller.enqueue(
+                encoder.encode(`data: ${JSON.stringify(notif)}\n\n`)
+              );
+            } catch {
+              unsubscribe();
+              clearInterval(heartbeatTimer);
+            }
           }
         }
       );
