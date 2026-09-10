@@ -9,6 +9,14 @@ import { SiteProvider } from "@/components/layout/SiteContext";
 export const metadata: Metadata = {
   title: "Control-Access — Plantcor Arch System",
   description: "Mine Site Access & Gate Operations System",
+  icons: {
+    icon: [
+      { url: "/assets/arch-linux.svg", type: "image/svg+xml" },
+      { url: "/favicon.svg", type: "image/svg+xml" },
+    ],
+    shortcut: "/assets/arch-linux.svg",
+    apple: "/assets/arch-linux.svg",
+  },
 };
 
 export default function RootLayout({

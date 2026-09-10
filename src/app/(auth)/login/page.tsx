@@ -14,10 +14,10 @@ import {
   IconLoader2,
   IconKey,
   IconDeviceMobile,
-  IconFingerprint,
   IconMapPin,
 } from "@tabler/icons-react";
 import { useSite } from "@/components/layout/SiteContext";
+import { ArchLinux, Vercel, Nextjs, Turborepo } from "@thesvg/react";
 
 function LoginForm() {
   const router = useRouter();
@@ -96,17 +96,17 @@ function LoginForm() {
           {/* Top Hairline Sheen (Vercel signature) */}
           <div className="pointer-events-none absolute inset-x-0 top-0 h-[1px] bg-gradient-to-r from-transparent via-white/30 to-transparent" />
 
-          {/* Biometric Identity & Scanner Emblem */}
+          {/* Biometric Identity & Arch Linux Site Logo */}
           <div className="mb-6 flex flex-col items-center text-center">
-            <div className="relative mb-3.5 flex h-14 w-14 items-center justify-center rounded-xl border border-white/20 bg-gradient-to-b from-white/10 via-white/[0.04] to-black/60 shadow-[inset_0_1px_0_rgba(255,255,255,0.25),0_8px_24px_rgba(0,0,0,0.5)] overflow-hidden">
+            <div className="relative mb-3.5 flex h-14 w-14 items-center justify-center rounded-xl border border-[#1793D1]/40 bg-gradient-to-b from-[#1793D1]/20 via-white/[0.04] to-black/70 shadow-[inset_0_1px_0_rgba(255,255,255,0.25),0_0_24px_rgba(23,147,209,0.35)] overflow-hidden">
               {/* Outer pulsing glow ring */}
-              <div className="pointer-events-none absolute -inset-1 rounded-2xl border border-orange-500/30 animate-pulse-ring" />
+              <div className="pointer-events-none absolute -inset-1 rounded-2xl border border-[#1793D1]/30 animate-pulse-ring" />
 
               {/* Animated Laser Scanline Effect */}
-              <div className="pointer-events-none absolute inset-x-1 h-[2px] bg-gradient-to-r from-transparent via-emerald-400 to-transparent shadow-[0_0_10px_rgba(52,211,153,1)] z-20 animate-scan-line" />
+              <div className="pointer-events-none absolute inset-x-1 h-[2px] bg-gradient-to-r from-transparent via-[#1793D1] to-transparent shadow-[0_0_10px_rgba(23,147,209,1)] z-20 animate-scan-line" />
 
-              {/* Biometric Icon */}
-              <IconFingerprint size={28} className="text-white relative z-10" />
+              {/* Arch Linux Official Site Logo */}
+              <ArchLinux className="h-8 w-8 text-[#1793D1] relative z-10 drop-shadow-[0_0_10px_rgba(23,147,209,0.8)]" />
             </div>
 
             <h1 className="text-lg font-semibold tracking-tight text-white sm:text-xl font-sans">
@@ -328,6 +328,29 @@ function LoginForm() {
             Omarchy Linux 4.0
           </span>
           <span>Station 1 // Port 8080</span>
+        </div>
+
+        {/* Global Vercel & Arch Branding Ribbon */}
+        <div className="mt-4 flex items-center justify-center gap-3 text-[11px] font-mono text-neutral-500">
+          <div className="flex items-center gap-1.5 hover:text-neutral-300 transition-colors cursor-help" title="Vercel Platform">
+            <Vercel className="h-3.5 w-3.5 text-white" />
+            <span>Vercel</span>
+          </div>
+          <span className="text-neutral-700">•</span>
+          <div className="flex items-center gap-1.5 hover:text-neutral-300 transition-colors cursor-help" title="Next.js 16 (Turbopack Engine)">
+            <Nextjs className="h-3.5 w-3.5 text-white" />
+            <span>Next.js 16</span>
+          </div>
+          <span className="text-neutral-700">•</span>
+          <div className="flex items-center gap-1.5 hover:text-neutral-300 transition-colors cursor-help" title="Turborepo Monorepo & Build System">
+            <Turborepo className="h-3.5 w-3.5" />
+            <span>Turborepo</span>
+          </div>
+          <span className="text-neutral-700">•</span>
+          <div className="flex items-center gap-1.5 hover:text-[#1793D1] transition-colors cursor-help" title="Arch Linux Operating System">
+            <ArchLinux className="h-3.5 w-3.5 text-[#1793D1]" />
+            <span>Arch Linux</span>
+          </div>
         </div>
       </div>
     </div>

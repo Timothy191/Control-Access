@@ -120,3 +120,7 @@ next-env.d.ts
 # Agent skills tooling
 .agents/
 skills-lock.json
+
+# Cloudflare tunnel info
+public_url.txt
+tunnel_info.json

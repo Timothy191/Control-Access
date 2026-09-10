@@ -18,7 +18,7 @@ import {
   IconCopy,
   IconCheck,
 } from "@tabler/icons-react";
-import { ArchLinux } from "@thesvg/react";
+import { ArchLinux, Vercel, Nextjs, Turborepo } from "@thesvg/react";
 import Image from "next/image";
 
 export default function Sidebar() {
@@ -82,12 +82,17 @@ export default function Sidebar() {
       >
         <div className="p-6 flex items-center justify-between border-b border-steel/30">
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded bg-red-primary flex items-center justify-center font-bold text-lg shadow-[0_0_15px_rgba(255,107,0,0.5)]">
-              CA
+            <div className="w-9 h-9 rounded-lg bg-black/70 border border-[#1793D1]/40 flex items-center justify-center shadow-[0_0_16px_rgba(23,147,209,0.35)] shrink-0">
+              <ArchLinux className="h-5 w-5 text-[#1793D1]" />
             </div>
-            <h1 className="font-display font-bold text-xl tracking-tight text-text-primary">
-              CONTROL<span className="text-red-primary">-</span>ACCESS
-            </h1>
+            <div>
+              <h1 className="font-display font-bold text-base tracking-tight text-text-primary leading-tight">
+                PLANTCOR <span className="text-red-primary font-extrabold">ARCH</span>
+              </h1>
+              <span className="text-[10px] font-mono text-neutral-400 tracking-wider uppercase block">
+                Control-Access
+              </span>
+            </div>
           </div>
           <button
             className="p-1 text-text-secondary hover:text-text-primary hover:bg-white/5 rounded transition-colors"
@@ -164,17 +169,33 @@ export default function Sidebar() {
             </div>
           </div>
 
-          <div className="flex flex-col items-center gap-1.5 border-t border-white/5 pt-3 w-full">
-            <div>
+          <div className="flex flex-col items-center gap-2 border-t border-white/10 pt-3 w-full">
+            <div className="text-xs font-mono">
               SYSTEM STATUS:{" "}
               <span className="text-success font-bold">ONLINE</span>
             </div>
-            <div
-              className="flex items-center gap-1.5 opacity-50 hover:opacity-100 transition-opacity mt-0.5"
-              title="Powered by Omarchy Linux"
-            >
-              <ArchLinux variant="mono" className="h-4 w-4" />
-              <span>Omarchy</span>
+            {/* Global Branding Suite */}
+            <div className="flex flex-col items-center gap-1.5 w-full pt-1">
+              <span className="text-[9px] font-mono uppercase tracking-widest text-neutral-500">
+                Ecosystem & Base
+              </span>
+              <div className="flex items-center justify-center gap-2 text-neutral-400 py-1.5 px-2 rounded-md bg-white/[0.03] border border-white/10 w-full">
+                <span title="Arch Linux (System Base)" className="hover:text-[#1793D1] transition-colors cursor-help">
+                  <ArchLinux className="h-3.5 w-3.5 text-[#1793D1]" />
+                </span>
+                <span className="text-neutral-600 text-[10px]">•</span>
+                <span title="Vercel Platform" className="hover:text-white transition-colors cursor-help">
+                  <Vercel className="h-3.5 w-3.5 text-white" />
+                </span>
+                <span className="text-neutral-600 text-[10px]">•</span>
+                <span title="Next.js 16 (Turbopack)" className="hover:text-white transition-colors cursor-help">
+                  <Nextjs className="h-3.5 w-3.5 text-white" />
+                </span>
+                <span className="text-neutral-600 text-[10px]">•</span>
+                <span title="Turborepo Monorepo & Build System" className="hover:opacity-100 transition-opacity cursor-help">
+                  <Turborepo className="h-3.5 w-3.5" />
+                </span>
+              </div>
             </div>
           </div>
         </div>
