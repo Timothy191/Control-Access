@@ -753,51 +753,72 @@ export default function PermanentC66ScannerPage() {
           </select>
         </div>
 
-        {/* Big Scanner Status Card */}
+        {/* Big Scanner Status Card - Modern UI Pattern */}
         <div
-          className={`rounded-2xl border p-6 flex flex-col items-center justify-center text-center transition-all duration-200 min-h-[220px] shadow-lg ${
+          className={`relative overflow-hidden rounded-3xl border flex flex-col items-center justify-center text-center transition-all duration-500 min-h-[300px] shadow-2xl backdrop-blur-xl ${
             lastResult
               ? lastResult.accessGranted
-                ? "bg-emerald-950/40 border-emerald-500/50 shadow-[0_0_40px_rgba(52,211,153,0.2)]"
-                : "bg-red-950/40 border-red-500/50 shadow-[0_0_40px_rgba(239,68,68,0.25)]"
-              : "bg-neutral-900/80 border-white/15"
+                ? "bg-emerald-950/20 border-emerald-500/30 shadow-[0_0_80px_rgba(16,185,129,0.15)]"
+                : "bg-red-950/20 border-red-500/30 shadow-[0_0_80px_rgba(239,68,68,0.15)]"
+              : "bg-[#0A0A0A]/60 border-white/10"
           }`}
         >
+          {/* Subtle Grid Background */}
+          <div className="absolute inset-0 bg-[url('/grid.svg')] bg-center [mask-image:linear-gradient(180deg,white,rgba(255,255,255,0))] opacity-10 pointer-events-none" />
+
           {lastResult ? (
             lastResult.accessGranted ? (
-              <>
-                <div className="h-16 w-16 rounded-2xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center mb-3">
-                  <IconShieldCheck size={40} className="stroke-[2.5]" />
+              <div className="relative z-10 flex flex-col items-center animate-in zoom-in-95 duration-300">
+                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-40 h-40 bg-emerald-500/20 blur-[50px] rounded-full -z-10" />
+                <div className="relative mb-4">
+                  {/* Modern QR/Scan Corner Reticles */}
+                  <div className="absolute -top-2 -left-2 w-4 h-4 border-t-2 border-l-2 border-emerald-400 rounded-tl" />
+                  <div className="absolute -top-2 -right-2 w-4 h-4 border-t-2 border-r-2 border-emerald-400 rounded-tr" />
+                  <div className="absolute -bottom-2 -left-2 w-4 h-4 border-b-2 border-l-2 border-emerald-400 rounded-bl" />
+                  <div className="absolute -bottom-2 -right-2 w-4 h-4 border-b-2 border-r-2 border-emerald-400 rounded-br" />
+                  <div className="h-20 w-20 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 flex items-center justify-center backdrop-blur-md">
+                    <IconShieldCheck size={48} stroke={1.5} />
+                  </div>
                 </div>
-                <h2 className="text-2xl font-bold text-emerald-300 font-mono tracking-wider">
+                <h2 className="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-b from-emerald-200 to-emerald-500 font-sans tracking-tight">
                   ACCESS GRANTED
                 </h2>
-                <p className="text-white font-semibold text-lg mt-1 truncate max-w-[280px]">
+                <p className="text-white font-bold text-xl mt-2 truncate max-w-[300px]">
                   {lastResult.entityName}
                 </p>
-                <div className="flex items-center gap-2 mt-2 text-xs font-mono text-emerald-400/80">
+                <div className="flex items-center justify-center flex-wrap gap-2 mt-4 text-[10px] font-mono text-emerald-400/70 uppercase tracking-widest bg-emerald-950/40 px-4 py-2 rounded-full border border-emerald-500/20">
                   <span>{lastResult.direction}</span>
-                  <span>•</span>
+                  <span className="w-1 h-1 rounded-full bg-emerald-500/50" />
                   <span>{lastResult.gateLocation}</span>
-                  <span>•</span>
+                  <span className="w-1 h-1 rounded-full bg-emerald-500/50" />
                   <span>{lastResult.timestamp}</span>
                 </div>
-              </>
+              </div>
             ) : (
-              <>
-                <div className="h-16 w-16 rounded-2xl bg-red-500/20 text-red-400 flex items-center justify-center mb-3 animate-pulse">
-                  <IconShieldX size={40} className="stroke-[2.5]" />
+              <div className="relative z-10 flex flex-col items-center animate-in zoom-in-95 duration-300">
+                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-40 h-40 bg-red-500/20 blur-[50px] rounded-full -z-10" />
+                <div className="relative mb-4">
+                  <div className="absolute -top-2 -left-2 w-4 h-4 border-t-2 border-l-2 border-red-500 rounded-tl" />
+                  <div className="absolute -top-2 -right-2 w-4 h-4 border-t-2 border-r-2 border-red-500 rounded-tr" />
+                  <div className="absolute -bottom-2 -left-2 w-4 h-4 border-b-2 border-l-2 border-red-500 rounded-bl" />
+                  <div className="absolute -bottom-2 -right-2 w-4 h-4 border-b-2 border-r-2 border-red-500 rounded-br" />
+                  <div className="h-20 w-20 rounded-2xl bg-red-500/10 border border-red-500/20 text-red-500 flex items-center justify-center backdrop-blur-md animate-pulse">
+                    <IconShieldX size={48} stroke={1.5} />
+                  </div>
                 </div>
-                <h2 className="text-2xl font-bold text-red-400 font-mono tracking-wider">
+                <h2 className="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-b from-red-300 to-red-600 font-sans tracking-tight">
                   ACCESS DENIED
                 </h2>
-                <p className="text-white font-semibold text-base mt-1 truncate max-w-[280px]">
+                <p className="text-white font-bold text-lg mt-2 truncate max-w-[300px]">
                   {lastResult.entityName}
                 </p>
-                <p className="text-xs text-red-300 font-mono mt-1 px-3 py-1 rounded bg-red-950/60 border border-red-500/30">
-                  {lastResult.denialReason || "Security Restriction"}
-                </p>
-              </>
+                <div className="mt-4 px-4 py-2 rounded-xl bg-red-500/10 border border-red-500/20 flex items-center gap-2">
+                  <IconAlertTriangle size={16} className="text-red-400" />
+                  <p className="text-xs text-red-300 font-mono">
+                    {lastResult.denialReason || "Security Restriction"}
+                  </p>
+                </div>
+              </div>
             )
           ) : (
             <>

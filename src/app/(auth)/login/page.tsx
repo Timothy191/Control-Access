@@ -4,7 +4,7 @@ import { Suspense, useState, useMemo } from "react";
 import { signIn } from "next-auth/react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import {
+import { 
   IconLock,
   IconUser,
   IconShieldCheck,
@@ -16,6 +16,7 @@ import {
   IconDeviceMobile,
   IconMapPin,
   IconChevronDown,
+  IconTerminal2
 } from "@tabler/icons-react";
 import { useSite } from "@/components/layout/SiteContext";
 import { getOperatorsForSite } from "@/lib/sites";
@@ -84,6 +85,18 @@ function LoginForm() {
       {/* Dual Dynamic Floating Aurora Orbs */}
       <div className="pointer-events-none absolute -top-28 left-1/2 -translate-x-1/2 w-[600px] h-[600px] bg-gradient-to-b from-orange-500/20 via-red-primary/10 to-transparent blur-[140px] rounded-full animate-aurora-slow" />
       <div className="pointer-events-none absolute -bottom-36 right-1/4 w-[500px] h-[500px] bg-gradient-to-tl from-emerald-500/10 via-cyan-500/5 to-transparent blur-[130px] rounded-full animate-aurora-alt" />
+      {/* AI Agent Dev Access Link */}
+      <Link 
+        href="/chat"
+        className="absolute bottom-4 left-4 z-50 flex items-center gap-2 px-3 py-1.5 rounded-full bg-black/40 border border-white/10 text-neutral-400 hover:text-white hover:border-emerald-500/50 hover:bg-emerald-500/10 transition-all font-mono text-[10px] uppercase tracking-wider group"
+      >
+        <span className="relative flex h-1.5 w-1.5">
+          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+          <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500"></span>
+        </span>
+        <IconTerminal2 size={14} className="group-hover:text-emerald-400 transition-colors" />
+        <span className="group-hover:text-emerald-400 transition-colors">AI Console</span>
+      </Link>
 
       <div className="relative w-full max-w-[430px]">
         {/* Status Bar Header */}

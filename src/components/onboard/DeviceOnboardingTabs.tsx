@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import QRCode from "qrcode";
+import PremiumQRCode from "./PremiumQRCode";
 import {
   IconDeviceMobile,
   IconQrcode,
@@ -69,7 +69,6 @@ export default function DeviceOnboardingTabs({
   );
   const [networkMode, setNetworkMode] = useState<"public" | "lan">("public");
   const [pairingDeviceId, setPairingDeviceId] = useState("Chainway-C66-01");
-  const [terminalQr, setTerminalQr] = useState(scannerTerminalQr);
   const [selectedTargetDevice, setSelectedTargetDevice] = useState("ALL");
   const [customTitle, setCustomTitle] = useState("Security Gate Alert");
   const [customMessage, setCustomMessage] = useState(
@@ -81,16 +80,6 @@ export default function DeviceOnboardingTabs({
   const [isSending, setIsSending] = useState(false);
   const [copiedText, setCopiedText] = useState<string | null>(null);
   const [feedbackToast, setFeedbackToast] = useState<string | null>(null);
-
-  // Dynamic QR Code generation for Permanent Link
-  useEffect(() => {
-    const dev = pairingDeviceId.trim() || "Chainway-C66-01";
-    const baseUrl = networkMode === "public" ? publicUrl : `http://${serverIp}:${serverPort}`;
-    const url = `${baseUrl}/scanner?link=true&device=${encodeURIComponent(dev)}`;
-    QRCode.toDataURL(url, { width: 260, margin: 2 })
-      .then(setTerminalQr)
-      .catch(() => {});
-  }, [pairingDeviceId, networkMode, publicUrl, serverIp, serverPort]);
 
   // SSE Real-Time Listener for Dispatched Notifications
   useEffect(() => {
@@ -320,13 +309,12 @@ export default function DeviceOnboardingTabs({
                   </div>
 
                   {/* QR Image */}
-                  <div className="p-3.5 rounded-2xl bg-white shadow-2xl relative group">
-                    <Image
-                      src={terminalQr}
-                      alt="Universal Permanent Link QR"
-                      width={210}
-                      height={210}
-                      className="rounded-lg"
+                  <div className="flex justify-center mt-2 mb-2">
+                    <PremiumQRCode
+                      value={terminalLinkUrl}
+                      title="Terminal Setup QR"
+                      subtitle="Scan to link device"
+                      downloadName={`terminal-setup-${pairingDeviceId.trim() || "C66"}.png`}
                     />
                   </div>
 
@@ -403,13 +391,12 @@ export default function DeviceOnboardingTabs({
               </div>
 
               {/* QR Image */}
-              <div className="p-3.5 rounded-2xl bg-white shadow-2xl">
-                <Image
-                  src={infowedgeConfigQr}
-                  alt="Infowedge Auto Config QR"
-                  width={210}
-                  height={210}
-                  className="rounded-lg"
+              <div className="flex justify-center mt-2 mb-2">
+                <PremiumQRCode
+                  value={infowedgeConfigQr}
+                  title="Infowedge Config"
+                  subtitle="Scan to set API endpoint"
+                  downloadName="infowedge-config-qr.png"
                 />
               </div>
 
@@ -469,13 +456,12 @@ export default function DeviceOnboardingTabs({
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               {/* Test 1: Granted Scan */}
               <div className="p-4 rounded-xl bg-emerald-950/20 border border-emerald-500/30 flex items-center gap-4">
-                <div className="p-2 rounded-xl bg-white shrink-0">
-                  <Image
-                    src={activeTestTagQr}
-                    alt="Active Tag QR"
-                    width={100}
-                    height={100}
-                    className="rounded"
+                <div className="shrink-0 flex items-center justify-center">
+                  <PremiumQRCode
+                    value={activeTestTagQr}
+                    title="Active Test Tag"
+                    subtitle="RFID_EMP_003"
+                    downloadName="test-active-qr.png"
                   />
                 </div>
                 <div className="min-w-0 space-y-1 text-xs">
@@ -494,13 +480,12 @@ export default function DeviceOnboardingTabs({
 
               {/* Test 2: Denied Scan */}
               <div className="p-4 rounded-xl bg-red-950/20 border border-red-500/30 flex items-center gap-4">
-                <div className="p-2 rounded-xl bg-white shrink-0">
-                  <Image
-                    src={deniedTestTagQr}
-                    alt="Denied Tag QR"
-                    width={100}
-                    height={100}
-                    className="rounded"
+                <div className="shrink-0 flex items-center justify-center">
+                  <PremiumQRCode
+                    value={deniedTestTagQr}
+                    title="Denied Test Tag"
+                    subtitle="TEST_UNAUTHORIZED_999"
+                    downloadName="test-denied-qr.png"
                   />
                 </div>
                 <div className="min-w-0 space-y-1 text-xs">

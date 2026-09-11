@@ -127,8 +127,31 @@ export default function InteractiveStatCard({
 
   const activeCoord = hoveredIndex !== null && coords[hoveredIndex] ? coords[hoveredIndex] : null;
 
+  const cardRef = useRef<HTMLDivElement>(null);
+
+  const handleCardMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (!cardRef.current) return;
+    const rect = cardRef.current.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    cardRef.current.style.setProperty("--mouse-x", `${x}px`);
+    cardRef.current.style.setProperty("--mouse-y", `${y}px`);
+  };
+
   return (
-    <div className="group relative overflow-hidden rounded-xl border border-white/[0.12] bg-[#141418]/80 p-3.5 backdrop-blur-xl shadow-md transition-all duration-200 hover:border-white/20 hover:-translate-y-0.5 hover:shadow-[0_12px_32px_rgba(0,0,0,0.5)] flex flex-col justify-between">
+    <div 
+      ref={cardRef}
+      onMouseMove={handleCardMouseMove}
+      className="group relative h-[190px] w-full overflow-hidden rounded-xl bg-black border border-white/10 p-5 transition-colors hover:border-white/20 flex flex-col justify-between"
+    >
+      {/* Vercel Spotlight Glow */}
+      <div 
+        className="pointer-events-none absolute -inset-px opacity-0 transition duration-300 group-hover:opacity-100"
+        style={{
+          background: `radial-gradient(600px circle at var(--mouse-x, 50%) var(--mouse-y, 50%), ${accentColor}1A, transparent 40%)`
+        }}
+      />
+      
       {/* Top Hairline Sheen with Accent Glow */}
       <div
         className="pointer-events-none absolute inset-x-0 top-0 h-[1.5px] opacity-80"
@@ -138,7 +161,7 @@ export default function InteractiveStatCard({
       />
 
       {/* Header Row: Icon, Title & Time Range Switcher */}
-      <div className="flex items-center justify-between gap-2">
+      <div className="relative z-10 flex items-center justify-between gap-2">
         <div className="flex items-center gap-2.5">
           {/* Custom Mac-styled Icon Well */}
           <div className="relative flex h-8 w-8 items-center justify-center rounded-lg bg-black/50 border border-white/10 shadow-[inset_0_1px_0_rgba(255,255,255,0.15)] shrink-0 overflow-hidden">

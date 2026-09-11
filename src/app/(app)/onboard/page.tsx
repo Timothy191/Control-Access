@@ -1,4 +1,4 @@
-import QRCode from "qrcode";
+
 import dgram from "node:dgram";
 import fs from "node:fs/promises";
 import path from "node:path";
@@ -60,12 +60,7 @@ export default async function OnboardPage({
 
   // 1. Generate Universal Permanent Link QR (links C66 permanently to Control-Access)
   const defaultDevice = "Chainway-C66-01";
-  const terminalUrl = `${publicUrl}/scanner?link=true&device=${encodeURIComponent(defaultDevice)}`;
-  const scannerTerminalQr = await QRCode.toDataURL(terminalUrl, {
-    width: 260,
-    margin: 2,
-    color: { dark: "#000000", light: "#ffffff" },
-  });
+  const scannerTerminalQr = `${publicUrl}/scanner?link=true&device=${encodeURIComponent(defaultDevice)}`;
 
   // 2. Generate Infowedge Auto-Config Profile QR
   const configPayload = {
@@ -78,20 +73,11 @@ export default async function OnboardPage({
     intent_data_extra: "data",
     timestamp: new Date().toISOString(),
   };
-  const infowedgeConfigQr = await QRCode.toDataURL(
-    JSON.stringify(configPayload),
-    {
-      width: 260,
-      margin: 2,
-      color: { dark: "#000000", light: "#ffffff" },
-    }
-  );
+  const infowedgeConfigQr = JSON.stringify(configPayload);
 
   // 3. Generate Sample Interactive Test Credentials
-  const [activeTestTagQr, deniedTestTagQr] = await Promise.all([
-    QRCode.toDataURL("RFID_EMP_003", { width: 140, margin: 1 }),
-    QRCode.toDataURL("TEST_UNAUTHORIZED_999", { width: 140, margin: 1 }),
-  ]);
+  const activeTestTagQr = "RFID_EMP_003";
+  const deniedTestTagQr = "TEST_UNAUTHORIZED_999";
 
   // 4. Fetch Registered Devices
   const rawDevices = await prisma.devices.findMany({
