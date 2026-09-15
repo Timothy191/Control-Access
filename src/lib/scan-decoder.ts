@@ -1,6 +1,57 @@
 import prisma from "@/lib/prisma";
 import { decodeQrData, type DecodedQr } from "./qr-decode";
 
+export interface ResolvedEntityBase {
+  id: number;
+  code: string;
+  name: string;
+  position: string | null;
+  department: string | null;
+  area: string | null;
+  status: string;
+  rfid_tag: string | null;
+  qr_code: string | null;
+}
+
+export interface ResolvedEmployeeEntity extends ResolvedEntityBase {
+  type: "employee";
+  medical: string | null;
+  medical_expiry: Date | null;
+  induction: string | null;
+  induction_expiry: Date | null;
+  is_contractor: boolean;
+  contractor_company: string | null;
+  access_level?: string | null;
+  certifications?: string | null;
+}
+
+export interface ResolvedVehicleEntity extends ResolvedEntityBase {
+  type: "vehicle";
+  medical_expiry?: null;
+  induction_expiry?: null;
+  is_contractor?: false;
+}
+
+export interface ResolvedVisitorEntity extends ResolvedEntityBase {
+  type: "visitor";
+  medical_expiry?: null;
+  induction_expiry?: null;
+  is_contractor?: false;
+}
+
+export interface ResolvedEquipmentEntity extends ResolvedEntityBase {
+  type: "equipment";
+  medical_expiry?: null;
+  induction_expiry?: null;
+  is_contractor?: false;
+}
+
+export type ResolvedEntity =
+  | ResolvedEmployeeEntity
+  | ResolvedVehicleEntity
+  | ResolvedVisitorEntity
+  | ResolvedEquipmentEntity;
+
 export interface FullyDecodedScan {
   raw_data: string;
   format: string;
@@ -21,6 +72,14 @@ export interface FullyDecodedScan {
     name: string;
     status: string;
     type: string;
+    medical?: string | null;
+    medical_expiry?: Date | null;
+    induction?: string | null;
+    induction_expiry?: Date | null;
+    is_contractor?: boolean;
+    contractor_company?: string | null;
+    access_level?: string | null;
+    certifications?: string | null;
   } | null;
   audit_summary: string;
 }
@@ -59,6 +118,36 @@ export function extractCandidateCodes(raw: string): string[] {
     candidates.add(inner.replace(/^(RFID_|QR_|TAG_)/i, "").replace(/_/g, ""));
   }
 
+  // URL query parameter parsing e.g. ?id=EMP_CODE or /scan?id=EMP_CODE
+  if (trimmed.includes("?")) {
+    try {
+      const qStr = trimmed.slice(trimmed.indexOf("?") + 1);
+      const params = new URLSearchParams(qStr);
+      const queryId =
+        params.get("id") ||
+        params.get("emp_code") ||
+        params.get("code") ||
+        params.get("tag") ||
+        params.get("employee_id");
+      if (queryId) {
+        const clean = queryId.trim();
+        candidates.add(clean);
+        candidates.add(clean.toUpperCase());
+        const stripped = clean
+          .replace(/^(RFID_|QR_|TAG_|UID:|EPC:|EPC)/i, "")
+          .trim();
+        if (stripped) {
+          candidates.add(stripped);
+          candidates.add(stripped.toUpperCase());
+          candidates.add(stripped.replace(/_/g, ""));
+          candidates.add(stripped.replace(/_/g, "").toUpperCase());
+        }
+      }
+    } catch {
+      // Ignore query parse error
+    }
+  }
+
   return Array.from(candidates).filter((c) => c.length > 0);
 }
 
@@ -69,7 +158,9 @@ export function extractCandidateCodes(raw: string): string[] {
  * visitors (rfid_tag, qr_code, name),
  * equipment (rfid_tag, qr_code, radio_id).
  */
-export async function resolveEntityFromDatabase(rawTagOrCode: string) {
+export async function resolveEntityFromDatabase(
+  rawTagOrCode: string
+): Promise<ResolvedEntity | null> {
   const codes = extractCandidateCodes(rawTagOrCode);
 
   // 1. Check Employees
@@ -86,6 +177,12 @@ export async function resolveEntityFromDatabase(rawTagOrCode: string) {
     });
 
     if (employee) {
+      const isContractor = Boolean(
+        employee.is_contractor ||
+        (employee.contractor_company && employee.contractor_company.trim().length > 0) ||
+        (employee.job_title && /contractor/i.test(employee.job_title))
+      );
+
       return {
         type: "employee" as const,
         id: employee.id,
@@ -97,6 +194,14 @@ export async function resolveEntityFromDatabase(rawTagOrCode: string) {
         status: employee.status,
         rfid_tag: employee.rfid_tag,
         qr_code: employee.qr_code,
+        medical: employee.medical || null,
+        medical_expiry: employee.medical_expiry || null,
+        induction: employee.induction || null,
+        induction_expiry: employee.induction_expiry || null,
+        is_contractor: isContractor,
+        contractor_company: employee.contractor_company || null,
+        access_level: employee.access_level || "STANDARD",
+        certifications: employee.certifications || null,
       };
     }
   }
@@ -105,7 +210,13 @@ export async function resolveEntityFromDatabase(rawTagOrCode: string) {
   for (const code of codes) {
     const vehicle = await prisma.vehicles.findFirst({
       where: {
-        OR: [{ rfid_tag: code }, { qr_code: code }, { fleet_id: code }],
+        OR: [
+          { rfid_tag: code },
+          { qr_code: code },
+          { fleet_id: code },
+          { machine_id: code },
+          { license_plate: code },
+        ],
       },
     });
 
@@ -115,12 +226,15 @@ export async function resolveEntityFromDatabase(rawTagOrCode: string) {
         id: vehicle.id,
         code: vehicle.fleet_id,
         name: `Vehicle ${vehicle.fleet_id}`,
-        position: "Fleet Asset",
+        position: vehicle.vehicle_type || "Fleet Asset",
         department: "Transport & Logistics",
         area: "Haulage",
         status: vehicle.status,
         rfid_tag: vehicle.rfid_tag,
         qr_code: vehicle.qr_code,
+        medical_expiry: null,
+        induction_expiry: null,
+        is_contractor: false as const,
       };
     }
   }
@@ -145,6 +259,9 @@ export async function resolveEntityFromDatabase(rawTagOrCode: string) {
         status: visitor.status,
         rfid_tag: visitor.rfid_tag,
         qr_code: visitor.qr_code,
+        medical_expiry: null,
+        induction_expiry: null,
+        is_contractor: false as const,
       };
     }
   }
@@ -153,7 +270,12 @@ export async function resolveEntityFromDatabase(rawTagOrCode: string) {
   for (const code of codes) {
     const eq = await prisma.equipment.findFirst({
       where: {
-        OR: [{ rfid_tag: code }, { qr_code: code }, { radio_id: code }],
+        OR: [
+          { rfid_tag: code },
+          { qr_code: code },
+          { radio_id: code },
+          { barcode: code },
+        ],
       },
     });
 
@@ -163,12 +285,15 @@ export async function resolveEntityFromDatabase(rawTagOrCode: string) {
         id: eq.id,
         code: eq.radio_id,
         name: `Radio/Equipment ${eq.radio_id}`,
-        position: "Comm Equipment",
+        position: eq.equipment_type || "Comm Equipment",
         department: "Operations",
         area: "Pit Area",
         status: eq.status,
         rfid_tag: eq.rfid_tag,
         qr_code: eq.qr_code,
+        medical_expiry: null,
+        induction_expiry: null,
+        is_contractor: false as const,
       };
     }
   }
@@ -340,6 +465,22 @@ export async function decodePendingScan(
           name: matchedRecord.name,
           status: matchedRecord.status,
           type: matchedRecord.type,
+          medical: (matchedRecord as ResolvedEmployeeEntity).medical ?? null,
+          medical_expiry:
+            (matchedRecord as ResolvedEmployeeEntity).medical_expiry ?? null,
+          induction:
+            (matchedRecord as ResolvedEmployeeEntity).induction ?? null,
+          induction_expiry:
+            (matchedRecord as ResolvedEmployeeEntity).induction_expiry ?? null,
+          is_contractor:
+            (matchedRecord as ResolvedEmployeeEntity).is_contractor ?? false,
+          contractor_company:
+            (matchedRecord as ResolvedEmployeeEntity).contractor_company ??
+            null,
+          access_level:
+            (matchedRecord as ResolvedEmployeeEntity).access_level ?? null,
+          certifications:
+            (matchedRecord as ResolvedEmployeeEntity).certifications ?? null,
         }
       : null,
     audit_summary: auditSummary,

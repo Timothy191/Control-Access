@@ -16,9 +16,9 @@ export default function GlobalBackground() {
       {/* Fallback CSS background (behind video if it fails, or overlaid if opacity adjusted) */}
       <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-[#1a1a1a] via-black to-black opacity-80" />
 
-      {/* Red ambient glows */}
-      <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] rounded-full bg-red-primary/10 blur-[120px] mix-blend-screen animate-pulse" />
-      <div className="absolute bottom-[-10%] right-[-10%] w-[30%] h-[30%] rounded-full bg-red-dark/10 blur-[100px] mix-blend-screen" />
+      {/* Subtle industrial ambient glows */}
+      <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] rounded-full bg-[#007AFF]/10 blur-[120px] mix-blend-screen animate-pulse" />
+      <div className="absolute bottom-[-10%] right-[-10%] w-[30%] h-[30%] rounded-full bg-cyan-500/5 blur-[100px] mix-blend-screen" />
     </div>
   );
 }

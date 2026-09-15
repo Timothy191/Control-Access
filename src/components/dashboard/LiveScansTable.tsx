@@ -287,10 +287,10 @@ export default function LiveScansTable({
               <button
                 type="button"
                 onClick={onRefresh}
-                className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg border border-white/10 bg-white/[0.04] hover:bg-white/[0.08] text-xs font-mono text-neutral-300 transition cursor-pointer"
+                className="flex items-center gap-2 min-h-[36px] px-3 py-1.5 rounded-lg border border-white/10 bg-white/[0.04] hover:bg-white/[0.08] active:scale-[0.98] text-xs font-mono text-neutral-300 transition cursor-pointer"
                 title="Refresh Live Scans"
               >
-                <IconRefresh size={14} className="text-neutral-400" />
+                <IconRefresh size={15} className="text-neutral-400" />
                 <span className="hidden sm:inline">Refresh</span>
               </button>
             )}
@@ -299,39 +299,39 @@ export default function LiveScansTable({
               type="button"
               onClick={handleExportCSV}
               disabled={filteredScans.length === 0}
-              className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg border border-white/10 bg-white/[0.04] hover:bg-white/[0.08] disabled:opacity-40 text-xs font-mono text-neutral-300 transition cursor-pointer"
+              className="flex items-center gap-2 min-h-[36px] px-3 py-1.5 rounded-lg border border-white/10 bg-white/[0.04] hover:bg-white/[0.08] active:scale-[0.98] disabled:opacity-40 text-xs font-mono text-neutral-300 transition cursor-pointer"
               title="Export Filtered Scans as CSV"
             >
-              <IconDownload size={14} className="text-neutral-400" />
+              <IconDownload size={15} className="text-neutral-400" />
               <span className="hidden sm:inline">Export CSV</span>
             </button>
 
             {/* View Mode Toggle: Table Data Grid vs Card Grid */}
-            <div className="flex items-center rounded-lg border border-white/10 bg-black/40 p-0.5">
+            <div className="flex items-center rounded-lg border border-white/10 bg-black/40 p-1">
               <button
                 type="button"
                 onClick={() => setViewMode("table")}
-                className={`flex items-center gap-1 px-2 py-1 rounded-md text-xs font-mono transition cursor-pointer ${
+                className={`flex items-center gap-1.5 min-h-[32px] px-2.5 py-1 rounded-md text-xs font-mono transition cursor-pointer ${
                   viewMode === "table"
                     ? "bg-white/15 text-white font-semibold shadow-xs"
                     : "text-neutral-400 hover:text-neutral-200"
                 }`}
                 title="Table Data Grid View"
               >
-                <IconLayoutList size={14} />
+                <IconLayoutList size={15} />
                 <span className="hidden md:inline">Table</span>
               </button>
               <button
                 type="button"
                 onClick={() => setViewMode("grid")}
-                className={`flex items-center gap-1 px-2 py-1 rounded-md text-xs font-mono transition cursor-pointer ${
+                className={`flex items-center gap-1.5 min-h-[32px] px-2.5 py-1 rounded-md text-xs font-mono transition cursor-pointer ${
                   viewMode === "grid"
                     ? "bg-white/15 text-white font-semibold shadow-xs"
                     : "text-neutral-400 hover:text-neutral-200"
                 }`}
                 title="Cards Grid View"
               >
-                <IconLayoutGrid size={14} />
+                <IconLayoutGrid size={15} />
                 <span className="hidden md:inline">Cards</span>
               </button>
             </div>
@@ -341,24 +341,24 @@ export default function LiveScansTable({
         {/* Search Input & Interactive Filter Badges */}
         <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
           {/* Quick Search Input */}
-          <div className="relative flex-1 min-w-[220px] max-w-md">
+          <div className="relative flex-1 min-w-[240px] max-w-md">
             <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-neutral-500">
-              <IconSearch size={14} />
+              <IconSearch size={16} />
             </div>
             <input
               type="text"
               placeholder="Search by decoded name, tag, gate, reason, ID..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="h-8 w-full appearance-none rounded-lg border border-white/[0.12] bg-black/40 pl-8 pr-3 text-xs text-neutral-100 placeholder:text-neutral-500 focus:border-[#007AFF] focus:bg-black/60 focus:outline-none focus:ring-1 focus:ring-[#007AFF]/40"
+              className="h-10 w-full appearance-none rounded-xl border border-white/[0.12] bg-black/40 pl-9 pr-3 text-xs sm:text-sm text-neutral-100 placeholder:text-neutral-500 focus:border-[#007AFF] focus:bg-black/60 focus:outline-none focus:ring-1 focus:ring-[#007AFF]/40"
             />
             {search && (
               <button
                 type="button"
                 onClick={() => setSearch("")}
-                className="absolute inset-y-0 right-0 flex items-center pr-2.5 text-neutral-500 hover:text-neutral-200 cursor-pointer"
+                className="absolute inset-y-0 right-0 flex items-center pr-3 text-neutral-500 hover:text-neutral-200 cursor-pointer min-h-[36px]"
               >
-                <IconX size={12} />
+                <IconX size={14} />
               </button>
             )}
           </div>
@@ -366,14 +366,14 @@ export default function LiveScansTable({
           {/* Filter Badges: Direction & Status */}
           <div className="flex flex-wrap items-center gap-2 text-xs">
             {/* Direction Filter */}
-            <div className="flex items-center gap-1 rounded-lg border border-white/10 bg-black/30 p-0.5 text-[11px] font-mono">
-              <span className="px-1.5 text-neutral-500 hidden sm:inline">DIR:</span>
+            <div className="flex items-center gap-1 rounded-lg border border-white/10 bg-black/30 p-1 text-xs font-mono">
+              <span className="px-1.5 text-neutral-500 hidden sm:inline text-[11px]">DIR:</span>
               {(["ALL", "IN", "OUT"] as const).map((dir) => (
                 <button
                   key={dir}
                   type="button"
                   onClick={() => setDirectionFilter(dir)}
-                  className={`px-2 py-0.5 rounded transition cursor-pointer ${
+                  className={`min-h-[30px] px-2.5 py-1 rounded-md transition cursor-pointer text-xs ${
                     directionFilter === dir
                       ? "bg-white/15 text-white font-semibold"
                       : "text-neutral-400 hover:text-neutral-200"
@@ -385,8 +385,8 @@ export default function LiveScansTable({
             </div>
 
             {/* Status Filter */}
-            <div className="flex items-center gap-1 rounded-lg border border-white/10 bg-black/30 p-0.5 text-[11px] font-mono">
-              <span className="px-1.5 text-neutral-500 hidden sm:inline">STATUS:</span>
+            <div className="flex items-center gap-1 rounded-lg border border-white/10 bg-black/30 p-1 text-xs font-mono">
+              <span className="px-1.5 text-neutral-500 hidden sm:inline text-[11px]">STATUS:</span>
               {(
                 [
                   { key: "ALL", label: `All (${counts.all})` },
@@ -399,7 +399,7 @@ export default function LiveScansTable({
                   key={st.key}
                   type="button"
                   onClick={() => setStatusFilter(st.key)}
-                  className={`px-2 py-0.5 rounded transition cursor-pointer flex items-center gap-1 ${
+                  className={`min-h-[30px] px-2.5 py-1 rounded-md transition cursor-pointer flex items-center gap-1.5 text-xs ${
                     statusFilter === st.key
                       ? st.key === "PENDING"
                         ? "bg-amber-500/25 text-amber-300 border border-amber-500/40 font-semibold"
@@ -586,10 +586,10 @@ export default function LiveScansTable({
                           e.stopPropagation();
                           setInspectedScan(scan);
                         }}
-                        className="p-1 rounded-md text-neutral-400 hover:text-white hover:bg-white/10 transition cursor-pointer"
+                        className="min-h-[36px] min-w-[36px] inline-flex items-center justify-center rounded-lg text-neutral-400 hover:text-white hover:bg-white/10 transition cursor-pointer"
                         title="View Full Decoded Telemetry"
                       >
-                        <IconEye size={15} />
+                        <IconEye size={16} />
                       </button>
                     </td>
                   </tr>
@@ -710,7 +710,7 @@ export default function LiveScansTable({
         const dec = decodeScanForDisplay(inspectedScan);
         const modalTemp = getTemporalInfo(inspectedScan.scanned_at, inspectedScan.parsed_qr_data);
         return (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-md p-4 animate-in fade-in duration-200">
+          <div className="fixed inset-0 z-35 flex items-center justify-center bg-black/75 backdrop-blur-md p-4 animate-in fade-in duration-200">
             <div className="relative w-full max-w-lg rounded-2xl border border-white/15 bg-[#18181b]/95 p-6 shadow-[0_20px_60px_rgba(0,0,0,0.7)] backdrop-blur-2xl space-y-5">
               {/* macOS Titlebar */}
               <div className="flex items-center justify-between pb-3 border-b border-white/10">
@@ -718,11 +718,11 @@ export default function LiveScansTable({
                   <button
                     type="button"
                     onClick={() => setInspectedScan(null)}
-                    className="h-3 w-3 rounded-full bg-[#FF5F56] border border-[#E0443E]/80 hover:opacity-80 transition cursor-pointer"
+                    className="h-3.5 w-3.5 rounded-full bg-[#FF5F56] border border-[#E0443E]/80 hover:opacity-80 transition cursor-pointer"
                     title="Close Modal"
                   />
-                  <div className="h-3 w-3 rounded-full bg-[#FFBD2E] border border-[#DEA123]/80" />
-                  <div className="h-3 w-3 rounded-full bg-[#27C93F] border border-[#1AAB29]/80" />
+                  <div className="h-3.5 w-3.5 rounded-full bg-[#FFBD2E] border border-[#DEA123]/80" />
+                  <div className="h-3.5 w-3.5 rounded-full bg-[#27C93F] border border-[#1AAB29]/80" />
                 </div>
                 <div className="text-xs font-mono text-neutral-300 font-semibold">
                   Scan Audit Event #{inspectedScan.id}
@@ -730,9 +730,9 @@ export default function LiveScansTable({
                 <button
                   type="button"
                   onClick={() => setInspectedScan(null)}
-                  className="text-neutral-400 hover:text-white transition cursor-pointer"
+                  className="min-h-[36px] min-w-[36px] flex items-center justify-center rounded-lg text-neutral-400 hover:text-white hover:bg-white/10 transition cursor-pointer"
                 >
-                  <IconX size={16} />
+                  <IconX size={18} />
                 </button>
               </div>
 
@@ -831,20 +831,20 @@ export default function LiveScansTable({
               </div>
 
               {/* Modal Actions */}
-              <div className="flex items-center justify-between pt-2 border-t border-white/10">
+              <div className="flex items-center justify-between gap-3 pt-3 border-t border-white/10">
                 <button
                   type="button"
                   onClick={() => handleCopyScan(inspectedScan)}
-                  className="px-3 py-1.5 rounded-lg border border-white/15 bg-white/5 hover:bg-white/10 text-xs font-mono text-neutral-200 transition cursor-pointer flex items-center gap-1.5"
+                  className="min-h-[44px] px-4 py-2.5 rounded-xl border border-white/15 bg-white/5 hover:bg-white/10 active:scale-[0.98] text-xs font-mono text-neutral-200 transition cursor-pointer flex items-center gap-2"
                 >
                   {copiedId === inspectedScan.id ? (
                     <>
-                      <IconCheck size={14} className="text-emerald-400" />
+                      <IconCheck size={16} className="text-emerald-400" />
                       <span>Copied JSON</span>
                     </>
                   ) : (
                     <>
-                      <IconId size={14} />
+                      <IconId size={16} />
                       <span>Copy JSON Log</span>
                     </>
                   )}
@@ -853,7 +853,7 @@ export default function LiveScansTable({
                 <button
                   type="button"
                   onClick={() => setInspectedScan(null)}
-                  className="px-4 py-1.5 rounded-lg bg-[#007AFF] hover:bg-[#0A84FF] text-white text-xs font-medium transition cursor-pointer"
+                  className="min-h-[44px] px-6 py-2.5 rounded-xl bg-[#007AFF] hover:bg-[#0A84FF] active:scale-[0.98] text-white text-xs sm:text-sm font-medium transition cursor-pointer"
                 >
                   Done
                 </button>

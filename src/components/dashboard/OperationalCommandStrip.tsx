@@ -307,16 +307,16 @@ export default function OperationalCommandStrip({
             </div>
           </div>
 
-          {/* RIGHT: Operational Quick Actions (macOS Buttons) */}
-          <div className="flex items-center flex-wrap gap-2 sm:justify-end">
+          {/* RIGHT: Operational Quick Actions (Industrial / Kiosk Touch Standards) */}
+          <div className="flex items-center flex-wrap gap-2.5 sm:justify-end">
             {/* Gate Override Button */}
             <button
               type="button"
               onClick={() => setShowOverrideModal(true)}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-white/15 bg-white/[0.06] hover:bg-white/[0.12] active:scale-[0.98] text-xs font-sans font-medium text-neutral-200 transition shadow-[inset_0_1px_0_rgba(255,255,255,0.1)] cursor-pointer"
+              className="flex items-center gap-2 min-h-[48px] px-4 py-2.5 rounded-xl border border-white/15 bg-white/[0.06] hover:bg-white/[0.12] active:scale-[0.98] active:brightness-90 text-xs sm:text-sm font-sans font-medium text-neutral-200 transition shadow-[inset_0_1px_0_rgba(255,255,255,0.1)] cursor-pointer"
               title="Trigger Momentary Gate Unlock Pulse"
             >
-              <IconDoor size={14} className="text-[#007AFF]" />
+              <IconDoor size={16} className="text-[#007AFF]" />
               <span>Gate Override</span>
             </button>
 
@@ -325,35 +325,35 @@ export default function OperationalCommandStrip({
               type="button"
               onClick={handleInstantSync}
               disabled={isSyncing}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-white/15 bg-white/[0.06] hover:bg-white/[0.12] active:scale-[0.98] disabled:opacity-50 text-xs font-sans font-medium text-neutral-200 transition shadow-[inset_0_1px_0_rgba(255,255,255,0.1)] cursor-pointer"
+              className="flex items-center gap-2 min-h-[48px] px-4 py-2.5 rounded-xl border border-white/15 bg-white/[0.06] hover:bg-white/[0.12] active:scale-[0.98] active:brightness-90 disabled:opacity-50 text-xs sm:text-sm font-sans font-medium text-neutral-200 transition shadow-[inset_0_1px_0_rgba(255,255,255,0.1)] cursor-pointer"
               title="Force Immediate Data Sync"
             >
               <IconRefresh
-                size={14}
+                size={16}
                 className={`text-neutral-300 ${isSyncing ? "animate-spin text-[#007AFF]" : ""}`}
               />
               <span className="hidden sm:inline">Sync</span>
             </button>
 
-            {/* Emergency Lockdown Toggle Button */}
+            {/* Emergency Lockdown Toggle Button - Glove Action Standard */}
             {isLockdown ? (
               <button
                 type="button"
                 onClick={() => handleToggleLockdown(false)}
-                className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 active:scale-[0.98] text-white text-xs font-sans font-semibold transition shadow-md shadow-emerald-950 cursor-pointer"
+                className="flex items-center gap-2 min-h-[48px] px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 active:scale-[0.98] active:brightness-90 text-white text-xs sm:text-sm font-sans font-semibold transition shadow-md shadow-emerald-950 cursor-pointer"
                 title="Deactivate Perimeter Lockdown"
               >
-                <IconLockOpen size={14} />
+                <IconLockOpen size={16} />
                 <span>Release Lockdown</span>
               </button>
             ) : (
               <button
                 type="button"
                 onClick={() => setShowLockdownModal(true)}
-                className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg border border-red-500/35 bg-red-500/10 hover:bg-red-500/20 active:scale-[0.98] text-xs font-sans font-medium text-red-300 transition shadow-[inset_0_1px_0_rgba(239,68,68,0.15)] cursor-pointer"
+                className="flex items-center gap-2 min-h-[48px] px-5 py-2.5 rounded-xl border border-red-500/40 bg-red-500/15 hover:bg-red-500/25 active:scale-[0.98] active:brightness-90 text-xs sm:text-sm font-sans font-semibold text-red-200 transition shadow-[inset_0_1px_0_rgba(239,68,68,0.2)] cursor-pointer"
                 title="Initiate Emergency Site Lockdown"
               >
-                <IconShieldExclamation size={14} className="text-red-400" />
+                <IconShieldExclamation size={16} className="text-red-400" />
                 <span>Lockdown</span>
               </button>
             )}
@@ -403,7 +403,7 @@ export default function OperationalCommandStrip({
 
       {/* MODAL 1: Gate Override Dialog */}
       {showOverrideModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-md p-4 animate-in fade-in duration-200">
+        <div className="fixed inset-0 z-35 flex items-center justify-center bg-black/75 backdrop-blur-md p-4 animate-in fade-in duration-200">
           <div className="relative w-full max-w-lg rounded-2xl border border-white/15 bg-[#18181b]/95 p-6 shadow-[0_20px_60px_rgba(0,0,0,0.7)] backdrop-blur-2xl space-y-5">
             {/* macOS Titlebar */}
             <div className="flex items-center justify-between pb-3 border-b border-white/10">
@@ -411,11 +411,11 @@ export default function OperationalCommandStrip({
                 <button
                   type="button"
                   onClick={() => setShowOverrideModal(false)}
-                  className="h-3 w-3 rounded-full bg-[#FF5F56] border border-[#E0443E]/80 hover:opacity-80 transition cursor-pointer"
+                  className="h-3.5 w-3.5 rounded-full bg-[#FF5F56] border border-[#E0443E]/80 hover:opacity-80 transition cursor-pointer"
                   title="Close"
                 />
-                <div className="h-3 w-3 rounded-full bg-[#FFBD2E] border border-[#DEA123]/80" />
-                <div className="h-3 w-3 rounded-full bg-[#27C93F] border border-[#1AAB29]/80" />
+                <div className="h-3.5 w-3.5 rounded-full bg-[#FFBD2E] border border-[#DEA123]/80" />
+                <div className="h-3.5 w-3.5 rounded-full bg-[#27C93F] border border-[#1AAB29]/80" />
               </div>
               <div className="text-xs font-mono text-neutral-300 font-semibold">
                 Gate Override Pulse Dispatch
@@ -423,9 +423,9 @@ export default function OperationalCommandStrip({
               <button
                 type="button"
                 onClick={() => setShowOverrideModal(false)}
-                className="text-neutral-400 hover:text-white transition cursor-pointer"
+                className="min-h-[36px] min-w-[36px] flex items-center justify-center rounded-lg text-neutral-400 hover:text-white hover:bg-white/10 transition cursor-pointer"
               >
-                <IconX size={16} />
+                <IconX size={18} />
               </button>
             </div>
 
@@ -439,7 +439,7 @@ export default function OperationalCommandStrip({
                   <select
                     value={selectedGate}
                     onChange={(e) => setSelectedGate(e.target.value)}
-                    className="w-full h-9 rounded-lg border border-white/15 bg-black/50 px-3 pr-8 text-neutral-100 text-xs font-medium focus:border-[#007AFF] focus:outline-none appearance-none cursor-pointer"
+                    className="w-full h-12 rounded-xl border border-white/15 bg-black/50 px-3.5 pr-8 text-neutral-100 text-sm font-medium focus:border-[#007AFF] focus:outline-none appearance-none cursor-pointer"
                   >
                     {availableGates.map((gate) => (
                       <option key={gate} value={gate} className="bg-neutral-900 text-neutral-100">
@@ -448,8 +448,8 @@ export default function OperationalCommandStrip({
                     ))}
                   </select>
                   <IconChevronDown
-                    size={14}
-                    className="pointer-events-none absolute right-3 top-2.5 text-neutral-400"
+                    size={16}
+                    className="pointer-events-none absolute right-3.5 top-3.5 text-neutral-400"
                   />
                 </div>
               </div>
@@ -459,7 +459,7 @@ export default function OperationalCommandStrip({
                 <label className="block text-neutral-400 font-mono mb-1.5 text-[11px] uppercase tracking-wider">
                   Momentary Unlock Duration
                 </label>
-                <div className="grid grid-cols-3 gap-2">
+                <div className="grid grid-cols-3 gap-2.5">
                   {[
                     { sec: 15, label: "15s (Pedestrian)" },
                     { sec: 30, label: "30s (Vehicle)" },
@@ -469,7 +469,7 @@ export default function OperationalCommandStrip({
                       key={d.sec}
                       type="button"
                       onClick={() => setPulseDuration(d.sec)}
-                      className={`py-2 px-3 rounded-lg border text-xs font-mono transition cursor-pointer ${
+                      className={`h-12 min-h-[48px] px-3 rounded-xl border text-xs font-mono transition active:scale-[0.98] cursor-pointer flex items-center justify-center text-center ${
                         pulseDuration === d.sec
                           ? "bg-[#007AFF] border-[#007AFF] text-white font-semibold shadow-sm"
                           : "bg-white/5 border-white/10 text-neutral-300 hover:bg-white/10"
@@ -491,33 +491,33 @@ export default function OperationalCommandStrip({
                   value={overrideReason}
                   onChange={(e) => setOverrideReason(e.target.value)}
                   placeholder="e.g. VIP Contractor Escort, RFID Failure Bypass"
-                  className="w-full h-9 rounded-lg border border-white/15 bg-black/50 px-3 text-neutral-100 text-xs placeholder:text-neutral-500 focus:border-[#007AFF] focus:outline-none"
+                  className="w-full h-12 rounded-xl border border-white/15 bg-black/50 px-3.5 text-neutral-100 text-sm placeholder:text-neutral-500 focus:border-[#007AFF] focus:outline-none"
                 />
               </div>
 
-              <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-300 text-[11px] flex items-start gap-2">
-                <IconAlertTriangle size={16} className="shrink-0 mt-0.5 text-amber-400" />
-                <span>
+              <div className="p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-300 text-xs flex items-start gap-2.5">
+                <IconAlertTriangle size={18} className="shrink-0 mt-0.5 text-amber-400" />
+                <span className="leading-relaxed">
                   This command triggers a hardware relay pulse to temporarily unlock the selected access barrier. An audit record will be logged immediately.
                 </span>
               </div>
             </div>
 
             {/* Modal Footer */}
-            <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-white/10">
+            <div className="flex items-center justify-end gap-3 pt-3 border-t border-white/10">
               <button
                 type="button"
                 onClick={() => setShowOverrideModal(false)}
-                className="px-4 py-1.5 rounded-lg border border-white/15 bg-white/5 hover:bg-white/10 text-neutral-300 text-xs font-medium transition cursor-pointer"
+                className="min-h-[48px] px-5 py-2.5 rounded-xl border border-white/15 bg-white/5 hover:bg-white/10 active:scale-[0.98] text-neutral-300 text-xs sm:text-sm font-medium transition cursor-pointer"
               >
                 Cancel
               </button>
               <button
                 type="button"
                 onClick={handleSendGateOverride}
-                className="px-4 py-1.5 rounded-lg bg-[#007AFF] hover:bg-[#0A84FF] text-white text-xs font-semibold transition shadow-md cursor-pointer flex items-center gap-1.5"
+                className="min-h-[48px] px-6 py-2.5 rounded-xl bg-[#007AFF] hover:bg-[#0A84FF] active:scale-[0.98] active:brightness-90 text-white text-xs sm:text-sm font-semibold transition shadow-md cursor-pointer flex items-center gap-2"
               >
-                <IconLockOpen size={14} />
+                <IconLockOpen size={16} />
                 <span>Send Unlock Pulse ({pulseDuration}s)</span>
               </button>
             </div>
@@ -527,7 +527,7 @@ export default function OperationalCommandStrip({
 
       {/* MODAL 2: Emergency Lockdown Guarded Confirmation Dialog */}
       {showLockdownModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-md p-4 animate-in fade-in duration-200">
+        <div className="fixed inset-0 z-35 flex items-center justify-center bg-black/85 backdrop-blur-md p-4 animate-in fade-in duration-200">
           <div className="relative w-full max-w-lg rounded-2xl border border-red-500/40 bg-[#1a0f0f]/95 p-6 shadow-[0_20px_60px_rgba(239,68,68,0.25)] backdrop-blur-2xl space-y-5">
             {/* macOS Titlebar */}
             <div className="flex items-center justify-between pb-3 border-b border-red-500/20">
@@ -535,22 +535,22 @@ export default function OperationalCommandStrip({
                 <button
                   type="button"
                   onClick={() => setShowLockdownModal(false)}
-                  className="h-3 w-3 rounded-full bg-[#FF5F56] border border-[#E0443E]/80 hover:opacity-80 transition cursor-pointer"
+                  className="h-3.5 w-3.5 rounded-full bg-[#FF5F56] border border-[#E0443E]/80 hover:opacity-80 transition cursor-pointer"
                   title="Close"
                 />
-                <div className="h-3 w-3 rounded-full bg-[#FFBD2E] border border-[#DEA123]/80" />
-                <div className="h-3 w-3 rounded-full bg-[#27C93F] border border-[#1AAB29]/80" />
+                <div className="h-3.5 w-3.5 rounded-full bg-[#FFBD2E] border border-[#DEA123]/80" />
+                <div className="h-3.5 w-3.5 rounded-full bg-[#27C93F] border border-[#1AAB29]/80" />
               </div>
               <div className="text-xs font-mono text-red-400 font-bold uppercase tracking-wider flex items-center gap-1.5">
-                <IconShieldExclamation size={15} />
+                <IconShieldExclamation size={16} />
                 <span>Emergency Perimeter Lockdown Protocol</span>
               </div>
               <button
                 type="button"
                 onClick={() => setShowLockdownModal(false)}
-                className="text-neutral-400 hover:text-white transition cursor-pointer"
+                className="min-h-[36px] min-w-[36px] flex items-center justify-center rounded-lg text-neutral-400 hover:text-white hover:bg-white/10 transition cursor-pointer"
               >
-                <IconX size={16} />
+                <IconX size={18} />
               </button>
             </div>
 
@@ -560,7 +560,7 @@ export default function OperationalCommandStrip({
                   <IconFlame size={16} />
                   <span>High-Priority Security Action</span>
                 </div>
-                <p className="text-[11px] leading-relaxed">
+                <p className="text-xs leading-relaxed">
                   Activating Emergency Lockdown restricts all automated gate turnstiles and vehicle barriers across <strong>{selectedSite}</strong>. Standard RFID credentials will be held for supervisor clearance until the restriction is lifted.
                 </p>
               </div>
@@ -570,7 +570,7 @@ export default function OperationalCommandStrip({
                 <label className="block text-neutral-400 font-mono mb-1.5 text-[11px] uppercase tracking-wider">
                   Quick Incident Reason Preset
                 </label>
-                <div className="flex flex-wrap gap-1.5">
+                <div className="flex flex-wrap gap-2">
                   {[
                     "Unscheduled Evacuation",
                     "Perimeter Breach",
@@ -582,9 +582,9 @@ export default function OperationalCommandStrip({
                       key={chip}
                       type="button"
                       onClick={() => setLockdownReasonInput(chip)}
-                      className={`px-2.5 py-1 rounded-md text-[11px] font-mono border transition cursor-pointer ${
+                      className={`min-h-[40px] px-3.5 py-2 rounded-lg text-xs font-mono border transition active:scale-[0.98] cursor-pointer ${
                         lockdownReasonInput === chip
-                          ? "bg-red-500/30 border-red-500/60 text-red-200 font-semibold"
+                          ? "bg-red-500/30 border-red-500/60 text-red-200 font-semibold shadow-xs"
                           : "bg-white/5 border-white/10 text-neutral-300 hover:bg-white/10"
                       }`}
                     >
@@ -604,26 +604,26 @@ export default function OperationalCommandStrip({
                   value={lockdownReasonInput}
                   onChange={(e) => setLockdownReasonInput(e.target.value)}
                   placeholder="Describe emergency reason"
-                  className="w-full h-9 rounded-lg border border-red-500/30 bg-black/60 px-3 text-red-100 text-xs placeholder:text-neutral-600 focus:border-red-500 focus:outline-none"
+                  className="w-full h-12 rounded-xl border border-red-500/30 bg-black/60 px-3.5 text-red-100 text-sm placeholder:text-neutral-600 focus:border-red-500 focus:outline-none"
                 />
               </div>
             </div>
 
             {/* Modal Footer */}
-            <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-red-500/20">
+            <div className="flex items-center justify-end gap-3 pt-3 border-t border-red-500/20">
               <button
                 type="button"
                 onClick={() => setShowLockdownModal(false)}
-                className="px-4 py-1.5 rounded-lg border border-white/15 bg-white/5 hover:bg-white/10 text-neutral-300 text-xs font-medium transition cursor-pointer"
+                className="min-h-[48px] px-5 py-2.5 rounded-xl border border-white/15 bg-white/5 hover:bg-white/10 active:scale-[0.98] text-neutral-300 text-xs sm:text-sm font-medium transition cursor-pointer"
               >
                 Cancel
               </button>
               <button
                 type="button"
                 onClick={() => handleToggleLockdown(true, lockdownReasonInput)}
-                className="px-4 py-1.5 rounded-lg bg-red-600 hover:bg-red-500 text-white text-xs font-bold transition shadow-lg shadow-red-950 cursor-pointer flex items-center gap-1.5"
+                className="min-h-[56px] h-14 px-6 rounded-xl bg-red-600 hover:bg-red-500 active:scale-[0.98] active:brightness-90 text-white text-xs sm:text-sm font-bold transition shadow-lg shadow-red-950 cursor-pointer flex items-center gap-2"
               >
-                <IconShieldExclamation size={15} />
+                <IconShieldExclamation size={18} />
                 <span>Confirm Immediate Lockdown</span>
               </button>
             </div>

@@ -1,8 +1,7 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { broadcastDeviceNotification } from "@/lib/device-notifications";
-import fs from "node:fs/promises";
-import path from "node:path";
+import { getTunnelUrl } from "@/lib/tunnel";
 
 export async function POST(req: Request) {
   try {
@@ -13,14 +12,7 @@ export async function POST(req: Request) {
     const deviceType = body.deviceType || "Chainway C66 Android Handheld";
     const gateLocation = body.gateLocation || "Brakfontein - Main Gate";
 
-    let publicUrl = "https://francisco-wing-appointment-gap.trycloudflare.com";
-    try {
-      const txtPath = path.join(process.cwd(), "public_url.txt");
-      const content = (await fs.readFile(txtPath, "utf-8")).trim();
-      if (content.startsWith("http")) publicUrl = content;
-    } catch {
-      // fallback
-    }
+    const publicUrl = await getTunnelUrl();
 
     // Find or update/create device in SQLite database
     const existing = await prisma.devices.findFirst({

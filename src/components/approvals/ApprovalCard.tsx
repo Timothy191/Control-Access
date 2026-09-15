@@ -207,7 +207,7 @@ export default function ApprovalCard({ approval, decoded }: ApprovalCardProps) {
           value={comment}
           onChange={(e) => setComment(e.target.value)}
           placeholder="Supervisor audit note (optional)..."
-          className="w-full h-8 rounded-lg border border-white/10 bg-black/50 px-3 text-neutral-200 placeholder:text-neutral-600 text-xs focus:border-[#007AFF] focus:outline-none"
+          className="w-full min-h-[38px] h-9.5 rounded-lg border border-white/10 bg-black/50 px-3 text-neutral-200 placeholder:text-neutral-600 text-xs focus:border-[#007AFF] focus:outline-none"
         />
 
         {error && <p className="text-xs text-rose-400">{error}</p>}
@@ -217,9 +217,9 @@ export default function ApprovalCard({ approval, decoded }: ApprovalCardProps) {
             type="button"
             onClick={handleApprove}
             disabled={isPending}
-            className="flex-1 h-8 rounded-lg bg-[#30D158] hover:bg-[#28B84D] active:scale-[0.98] disabled:opacity-50 text-black font-semibold text-xs transition shadow-md flex items-center justify-center gap-1.5 cursor-pointer"
+            className="flex-1 min-h-[38px] h-9.5 rounded-lg bg-[#30D158] hover:bg-[#28B84D] active:scale-[0.98] disabled:opacity-50 text-black font-semibold text-xs transition shadow-md flex items-center justify-center gap-1.5 cursor-pointer px-4"
           >
-            <IconCheck size={14} className="stroke-[2.5]" />
+            <IconCheck size={16} className="stroke-[2.5]" />
             <span>{isPending ? "Authorizing..." : "Approve & Enroll"}</span>
           </button>
 
@@ -227,9 +227,9 @@ export default function ApprovalCard({ approval, decoded }: ApprovalCardProps) {
             type="button"
             onClick={handleReject}
             disabled={isPending}
-            className="px-3 h-8 rounded-lg border border-red-500/30 bg-red-500/10 hover:bg-red-500/20 active:scale-[0.98] disabled:opacity-50 text-red-300 text-xs font-medium transition cursor-pointer flex items-center gap-1"
+            className="px-4 min-h-[38px] h-9.5 rounded-lg border border-red-500/30 bg-red-500/10 hover:bg-red-500/20 active:scale-[0.98] disabled:opacity-50 text-red-300 text-xs font-medium transition cursor-pointer flex items-center gap-1.5"
           >
-            <IconX size={14} />
+            <IconX size={16} />
             <span>Reject</span>
           </button>
         </div>

@@ -1,6 +1,9 @@
 import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import prisma from "@/lib/prisma";
+import EquipmentExplorer from "@/components/equipment/EquipmentExplorer";
+
+export const dynamic = "force-dynamic";
 
 export default async function EquipmentPage() {
   const session = await auth();
@@ -9,40 +12,37 @@ export default async function EquipmentPage() {
 
   const equipment = await prisma.equipment.findMany({
     orderBy: { created_at: "desc" },
+    include: {
+      assigned_to: {
+        select: {
+          id: true,
+          emp_code: true,
+          first_name: true,
+          surname: true,
+        },
+      },
+    },
   });
 
-  return (
-    <div className="p-8">
-      <h1 className="text-2xl font-bold mb-4 text-text-primary">
-        Equipment Management
-      </h1>
+  const formattedEquipment = equipment.map((item) => ({
+    id: item.id,
+    radio_id: item.radio_id,
+    equipment_type: item.equipment_type,
+    model_name: item.model_name,
+    serial_number: item.serial_number,
+    barcode: item.barcode,
+    rfid_tag: item.rfid_tag,
+    qr_code: item.qr_code,
+    status: item.status,
+    calibration_expiry: item.calibration_expiry ? item.calibration_expiry.toISOString() : null,
+    registration_expiry: item.registration_expiry ? item.registration_expiry.toISOString() : null,
+    assigned_to: item.assigned_to,
+    created_at: item.created_at.toISOString(),
+  }));
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        {equipment.map((item) => (
-          <div key={item.id} className="glass-card">
-            <h3 className="font-semibold text-lg mb-1 text-text-primary">
-              Radio: {item.radio_id}
-            </h3>
-            <p className="text-sm text-text-secondary mb-2 font-mono">
-              QR: {item.qr_code || "N/A"}
-            </p>
-            <span
-              className={`px-2 py-0.5 text-xs font-medium rounded border ${
-                item.status === "Active"
-                  ? "bg-success/20 text-success border-success/30"
-                  : "bg-danger/20 text-danger border-danger/30"
-              }`}
-            >
-              {item.status}
-            </span>
-          </div>
-        ))}
-        {equipment.length === 0 && (
-          <div className="glass-card col-span-full text-center text-text-secondary py-8">
-            No equipment registered.
-          </div>
-        )}
-      </div>
+  return (
+    <div className="p-4 sm:p-8 max-w-7xl mx-auto">
+      <EquipmentExplorer equipment={formattedEquipment} />
     </div>
   );
 }

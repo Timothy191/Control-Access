@@ -1,7 +1,5 @@
 import { NextResponse } from "next/server";
-import { PrismaClient } from "@prisma/client";
-
-const prisma = new PrismaClient();
+import prisma from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -29,19 +27,6 @@ export async function GET(req: Request) {
         }
       : { status: "online" };
 
-    const musterWhere = {
-      direction: "IN",
-      access_granted: true,
-      ...(site
-        ? {
-            OR: [
-              { gate_location: { contains: site } },
-              { employee: { area: { contains: site } } },
-            ],
-          }
-        : {}),
-    };
-
     const [totalScans, activeDevices, pendingApprovals, recentScans] = await Promise.all([
       prisma.gate_logs.count({ where: gateLogWhere }),
       prisma.devices.count({ where: deviceWhere }),
@@ -53,16 +38,40 @@ export async function GET(req: Request) {
       }),
     ]);
 
-    // Calculate muster count: individuals whose most recent scan was 'IN' for this site
-    const musterCount = await prisma.gate_logs.count({
-      where: musterWhere,
+    // Calculate mathematically real muster count:
+    // Determine unique individuals/entities whose latest granted scan was 'IN'
+    const grantedLogs = await prisma.gate_logs.findMany({
+      where: {
+        access_granted: true,
+        ...(site
+          ? {
+              OR: [
+                { gate_location: { contains: site } },
+                { employee: { area: { contains: site } } },
+              ],
+            }
+          : {}),
+      },
+      orderBy: { id: "desc" },
     });
+
+    const seenEntities = new Set<string>();
+    let musterCount = 0;
+    for (const log of grantedLogs) {
+      const key = log.entity_name || log.qr_data || `log_${log.id}`;
+      if (!seenEntities.has(key)) {
+        seenEntities.add(key);
+        if (log.direction === "IN") {
+          musterCount++;
+        }
+      }
+    }
 
     return NextResponse.json({
       totalScans,
-      activeDevices: activeDevices || 1, // At least the server itself
+      activeDevices, // 100% Real DB count (no fake || 1 fallback)
       pendingApprovals,
-      musterCount,
+      musterCount, // 100% Real on-site headcount (deduplicated latest direction)
       recentScans,
       updatedAt: new Date().toISOString(),
     }, {
@@ -80,3 +89,4 @@ export async function GET(req: Request) {
     );
   }
 }
+

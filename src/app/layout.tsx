@@ -27,7 +27,7 @@ export default function RootLayout({
   return (
     <html lang="en" className={`${GeistSans.variable} ${GeistMono.variable} dark`}>
       <body
-        className={`${GeistSans.className} antialiased flex h-screen bg-transparent relative overflow-hidden font-sans`}
+        className={`${GeistSans.className} antialiased min-h-screen bg-black text-neutral-100 relative overflow-x-hidden font-sans`}
       >
         <GlobalBackground />
         <SessionProvider>

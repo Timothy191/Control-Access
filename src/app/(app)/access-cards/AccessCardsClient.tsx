@@ -3,7 +3,29 @@
 import { useState } from "react";
 import { IconIdBadge2, IconUserPlus, IconUserCancel, IconPrinter, IconCheck, IconX, IconQrcode, IconNfc } from "@tabler/icons-react";
 
-export default function AccessCardsClient({ employees, visitors }: { employees: any[], visitors: any[] }) {
+export interface DirectoryEmployee {
+  id: number;
+  emp_code: string;
+  first_name: string;
+  surname: string;
+  rfid_tag?: string | null;
+  qr_code?: string | null;
+}
+
+export interface DirectoryVisitor {
+  id: number;
+  name: string;
+  rfid_tag?: string | null;
+  qr_code?: string | null;
+}
+
+export default function AccessCardsClient({
+  employees,
+  visitors,
+}: {
+  employees: DirectoryEmployee[];
+  visitors: DirectoryVisitor[];
+}) {
   const [activeAction, setActiveAction] = useState<"ASSIGN" | "REVOKE" | "PRINT" | null>(null);
   
   // Form States
@@ -14,7 +36,7 @@ export default function AccessCardsClient({ employees, visitors }: { employees: 
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<{type: 'success'|'error', text: string} | null>(null);
 
-  const getList = () => entityType === "EMPLOYEE" ? employees : visitors;
+  const getList = (): (DirectoryEmployee | DirectoryVisitor)[] => entityType === "EMPLOYEE" ? employees : visitors;
 
   const handleAction = async (endpoint: string) => {
     setLoading(true);
@@ -32,7 +54,7 @@ export default function AccessCardsClient({ employees, visitors }: { employees: 
       } else {
         setMessage({ type: 'error', text: data.error || "Action failed." });
       }
-    } catch (err) {
+    } catch {
       setMessage({ type: 'error', text: "Network error occurred." });
     } finally {
       setLoading(false);
@@ -44,6 +66,19 @@ export default function AccessCardsClient({ employees, visitors }: { employees: 
   const handlePrint = () => {
     const printWindow = window.open('', '', 'width=800,height=600');
     if (!printWindow) return;
+
+    let displayName = 'SELECT A PERSON';
+    let displayRole = 'VISITOR - GUEST';
+    if (selectedEntity) {
+      if ('first_name' in selectedEntity) {
+        displayName = `${selectedEntity.first_name} ${selectedEntity.surname}`;
+        displayRole = `EMPLOYEE - ${selectedEntity.emp_code}`;
+      } else {
+        displayName = selectedEntity.name || 'GUEST';
+        displayRole = 'VISITOR - GUEST';
+      }
+    }
+
     const html = `
       <html>
         <head>
@@ -73,8 +108,8 @@ export default function AccessCardsClient({ employees, visitors }: { employees: 
             <div class="header">PLANTCOR MINING SITE</div>
             <div class="photo-box">PHOTO</div>
             <div class="details">
-              <div class="name">${entityType === 'EMPLOYEE' ? (selectedEntity?.first_name + ' ' + selectedEntity?.surname) : selectedEntity?.name || 'SELECT A PERSON'}</div>
-              <div class="role">${entityType === 'EMPLOYEE' ? 'EMPLOYEE' : 'VISITOR'} - ${entityType === 'EMPLOYEE' ? selectedEntity?.emp_code : 'GUEST'}</div>
+              <div class="name">${displayName}</div>
+              <div class="role">${displayRole}</div>
             </div>
             <div class="qr-placeholder"></div>
             <div class="footer">Property of Plantcor. Return if found.</div>
@@ -106,10 +141,10 @@ export default function AccessCardsClient({ employees, visitors }: { employees: 
         
         <div 
           onClick={() => setActiveAction("ASSIGN")} 
-          className={`relative overflow-hidden bg-black/40 backdrop-blur-xl border ${activeAction === 'ASSIGN' ? 'border-blue-500 shadow-[0_0_30px_rgba(59,130,246,0.15)]' : 'border-white/5 hover:border-white/20'} rounded-3xl p-6 transition-all duration-300 cursor-pointer group`}
+          className={`relative overflow-hidden bg-black/40 backdrop-blur-xl border ${activeAction === 'ASSIGN' ? 'border-[#007AFF] shadow-[0_0_30px_rgba(0,122,255,0.2)]' : 'border-white/10 hover:border-white/20'} rounded-3xl p-6 transition-all duration-300 cursor-pointer group active:scale-[0.99]`}
         >
-          <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500/10 rounded-bl-full -z-10 group-hover:bg-blue-500/20 transition-colors" />
-          <div className="h-14 w-14 rounded-2xl bg-blue-500/10 border border-blue-500/20 text-blue-400 flex items-center justify-center mb-5 group-hover:scale-110 group-hover:rotate-3 transition-transform shadow-inner">
+          <div className="absolute top-0 right-0 w-32 h-32 bg-[#007AFF]/10 rounded-bl-full -z-10 group-hover:bg-[#007AFF]/20 transition-colors" />
+          <div className="h-14 w-14 rounded-2xl bg-[#007AFF]/15 border border-[#007AFF]/30 text-[#007AFF] flex items-center justify-center mb-5 group-hover:scale-110 group-hover:rotate-3 transition-transform shadow-inner">
             <IconUserPlus size={26} stroke={1.5} />
           </div>
           <h2 className="text-lg font-bold text-white mb-2">Assign Credential</h2>
@@ -118,10 +153,10 @@ export default function AccessCardsClient({ employees, visitors }: { employees: 
 
         <div 
           onClick={() => setActiveAction("REVOKE")} 
-          className={`relative overflow-hidden bg-black/40 backdrop-blur-xl border ${activeAction === 'REVOKE' ? 'border-red-500 shadow-[0_0_30px_rgba(239,68,68,0.15)]' : 'border-white/5 hover:border-white/20'} rounded-3xl p-6 transition-all duration-300 cursor-pointer group`}
+          className={`relative overflow-hidden bg-black/40 backdrop-blur-xl border ${activeAction === 'REVOKE' ? 'border-rose-500 shadow-[0_0_30px_rgba(244,63,94,0.2)]' : 'border-white/10 hover:border-white/20'} rounded-3xl p-6 transition-all duration-300 cursor-pointer group active:scale-[0.99]`}
         >
-          <div className="absolute top-0 right-0 w-32 h-32 bg-red-500/5 rounded-bl-full -z-10 group-hover:bg-red-500/10 transition-colors" />
-          <div className="h-14 w-14 rounded-2xl bg-red-500/10 border border-red-500/20 text-red-500 flex items-center justify-center mb-5 group-hover:scale-110 group-hover:-rotate-3 transition-transform shadow-inner">
+          <div className="absolute top-0 right-0 w-32 h-32 bg-rose-500/5 rounded-bl-full -z-10 group-hover:bg-rose-500/10 transition-colors" />
+          <div className="h-14 w-14 rounded-2xl bg-rose-500/15 border border-rose-500/30 text-rose-400 flex items-center justify-center mb-5 group-hover:scale-110 group-hover:-rotate-3 transition-transform shadow-inner">
             <IconUserCancel size={26} stroke={1.5} />
           </div>
           <h2 className="text-lg font-bold text-white mb-2">Revoke Access</h2>
@@ -130,10 +165,10 @@ export default function AccessCardsClient({ employees, visitors }: { employees: 
 
         <div 
           onClick={() => setActiveAction("PRINT")} 
-          className={`relative overflow-hidden bg-black/40 backdrop-blur-xl border ${activeAction === 'PRINT' ? 'border-emerald-500 shadow-[0_0_30px_rgba(16,185,129,0.15)]' : 'border-white/5 hover:border-white/20'} rounded-3xl p-6 transition-all duration-300 cursor-pointer group`}
+          className={`relative overflow-hidden bg-black/40 backdrop-blur-xl border ${activeAction === 'PRINT' ? 'border-emerald-500 shadow-[0_0_30px_rgba(16,185,129,0.2)]' : 'border-white/10 hover:border-white/20'} rounded-3xl p-6 transition-all duration-300 cursor-pointer group active:scale-[0.99]`}
         >
           <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/5 rounded-bl-full -z-10 group-hover:bg-emerald-500/10 transition-colors" />
-          <div className="h-14 w-14 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 flex items-center justify-center mb-5 group-hover:scale-110 transition-transform shadow-inner">
+          <div className="h-14 w-14 rounded-2xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 flex items-center justify-center mb-5 group-hover:scale-110 transition-transform shadow-inner">
             <IconPrinter size={26} stroke={1.5} />
           </div>
           <h2 className="text-lg font-bold text-white mb-2">Print ID Badge</h2>
@@ -204,12 +239,18 @@ export default function AccessCardsClient({ employees, visitors }: { employees: 
                 <div className="relative">
                   <select value={entityId} onChange={(e) => setEntityId(e.target.value)} className="w-full h-14 bg-black/50 border border-white/10 rounded-xl px-4 text-sm text-white focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/50 transition-all appearance-none">
                     <option value="">-- Search Directory --</option>
-                    {getList().map((e: any) => (
-                      <option key={e.id} value={e.id}>
-                        {entityType === 'EMPLOYEE' ? `${e.emp_code} • ${e.first_name} ${e.surname}` : e.name}
-                        {e.rfid_tag ? ` [Bound]` : ''}
-                      </option>
-                    ))}
+                    {getList().map((e) => {
+                      const emp = e as DirectoryEmployee;
+                      const vis = e as DirectoryVisitor;
+                      return (
+                        <option key={e.id} value={e.id}>
+                          {entityType === "EMPLOYEE"
+                            ? `${emp.emp_code} • ${emp.first_name} ${emp.surname}`
+                            : vis.name}
+                          {e.rfid_tag ? ` [Bound]` : ""}
+                        </option>
+                      );
+                    })}
                   </select>
                   <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-neutral-500">▼</div>
                 </div>
@@ -239,17 +280,17 @@ export default function AccessCardsClient({ employees, visitors }: { employees: 
 
             <div className="pt-4">
               {activeAction === "ASSIGN" && (
-                <button disabled={loading || !entityId || !cardData} onClick={() => handleAction("/api/cards/assign")} className="w-full h-14 bg-white text-black hover:bg-neutral-200 font-bold rounded-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-[0_0_20px_rgba(255,255,255,0.1)] hover:shadow-[0_0_30px_rgba(255,255,255,0.2)]">
+                <button disabled={loading || !entityId || !cardData} onClick={() => handleAction("/api/cards/assign")} className="w-full h-14 min-h-[56px] bg-[#007AFF] hover:bg-[#0A84FF] text-white font-bold rounded-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-[0_0_20px_rgba(0,122,255,0.3)] hover:shadow-[0_0_30px_rgba(0,122,255,0.5)] active:scale-[0.99] cursor-pointer">
                   {loading ? "Provisioning..." : "Provision Credential"}
                 </button>
               )}
               {activeAction === "REVOKE" && (
-                <button disabled={loading || !entityId} onClick={() => handleAction("/api/cards/revoke")} className="w-full h-14 bg-red-500/10 text-red-500 hover:bg-red-500 hover:text-white border border-red-500/30 font-bold rounded-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed">
+                <button disabled={loading || !entityId} onClick={() => handleAction("/api/cards/revoke")} className="w-full h-14 min-h-[56px] bg-rose-500/15 text-rose-300 hover:bg-rose-500 hover:text-white border border-rose-500/30 font-bold rounded-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed active:scale-[0.99] cursor-pointer">
                   {loading ? "Revoking..." : "Execute Revocation"}
                 </button>
               )}
               {activeAction === "PRINT" && (
-                <button disabled={!entityId} onClick={handlePrint} className="w-full h-14 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white font-bold rounded-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-[0_0_20px_rgba(16,185,129,0.2)]">
+                <button disabled={!entityId} onClick={handlePrint} className="w-full h-14 min-h-[56px] bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold rounded-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-[0_0_20px_rgba(16,185,129,0.2)] active:scale-[0.99] cursor-pointer">
                   <IconPrinter size={20} /> Dispatch to Magicard Neo 300
                 </button>
               )}
@@ -265,7 +306,7 @@ export default function AccessCardsClient({ employees, visitors }: { employees: 
                   <ul className="text-[11px] text-neutral-400 font-mono leading-relaxed space-y-1 list-disc list-inside">
                     <li>Verify Magicard Neo 300 active connection</li>
                     <li>Ensure blank CR80 PVC stock is loaded</li>
-                    <li>Browser print dialog: Margins to "None"</li>
+                    <li>Browser print dialog: Margins to &quot;None&quot;</li>
                   </ul>
                 </div>
               </div>

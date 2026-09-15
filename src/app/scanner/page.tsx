@@ -16,9 +16,13 @@ import {
   IconSettings,
   IconCheck,
   IconDownload,
-  IconBolt,
+  IconKey,
+  IconCamera,
+  IconX,
   IconWifi,
   IconCloud,
+  IconArrowLeft,
+  IconLayoutDashboard,
 } from "@tabler/icons-react";
 
 interface ScanResult {
@@ -44,6 +48,52 @@ interface DeviceAlert {
   timestamp: string;
 }
 
+interface KeySession {
+  sessionId: string;
+  keyId: string;
+  machineId: string;
+  requiredCertification?: string | null;
+  state: string;
+  expiresAt: string;
+  expiresAtTimestamp: number;
+}
+
+interface WakeLockSentinelLike {
+  release: () => Promise<void>;
+}
+
+interface ChainwayHardwareInterface {
+  scanBarcode?: () => void;
+  triggerLaser?: () => void;
+  readRfid?: () => void;
+  openScanner?: () => void;
+  closeScanner?: () => void;
+  successFeedback?: () => void;
+  errorFeedback?: () => void;
+  saveTunnelConfig?: (tunnelUrl: string, deviceId: string) => void;
+  applyZeroTouchConfig?: (json: string) => boolean;
+  getDeviceInfo?: () => string;
+}
+interface BarcodeDetectorInstance {
+  detect: (source: ImageBitmapSource) => Promise<Array<{ rawValue: string }>>;
+}
+interface BarcodeDetectorConstructor {
+  new (options?: { formats: string[] }): BarcodeDetectorInstance;
+}
+interface BeforeInstallPromptEvent extends Event {
+  prompt: () => Promise<void>;
+  userChoice: Promise<{ outcome: "accepted" | "dismissed" }>;
+}
+
+type CustomWindow = Window & typeof globalThis & {
+  chainway?: ChainwayHardwareInterface;
+  ChainwayBarcode?: ChainwayHardwareInterface;
+  ChainwayHardware?: ChainwayHardwareInterface;
+  onBarcodeScanned?: (code: string) => void;
+  onNativeScanReceived?: (code: string) => void;
+  BarcodeDetector?: BarcodeDetectorConstructor;
+};
+
 export default function PermanentC66ScannerPage() {
   const [deviceId, setDeviceId] = useState("Chainway-C66-01");
   const [isPermanentlyLinked, setIsPermanentlyLinked] = useState(false);
@@ -61,27 +111,46 @@ export default function PermanentC66ScannerPage() {
   const [gateLocation, setGateLocation] = useState("Brakfontein - Main Gate");
   const [countdown, setCountdown] = useState(10);
   const [activeConnectionMode, setActiveConnectionMode] = useState<"LAN" | "Cloudflare">("LAN");
-  const [installPrompt, setInstallPrompt] = useState<any>(null);
+  const [installPrompt, setInstallPrompt] = useState<BeforeInstallPromptEvent | null>(null);
   const [isInstalled, setIsInstalled] = useState(false);
+  const [cameraActive, setCameraActive] = useState(false);
+
+  // Key Control State Machine
+  const [activeKeySession, setActiveKeySession] = useState<KeySession | null>(null);
+  const [keyCountdown, setKeyCountdown] = useState<number>(30);
+
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const mediaStreamRef = useRef<MediaStream | null>(null);
 
   const inputRef = useRef<HTMLInputElement>(null);
   const audioCtxRef = useRef<AudioContext | null>(null);
 
-  // 1. Permanent Device Link Ceremony on Mount
+  // 1. Service Worker & Permanent Device Link Ceremony on Mount
   useEffect(() => {
     if (typeof window === "undefined") return;
 
-    // Check if running as standalone PWA
-    if (window.matchMedia("(display-mode: standalone)").matches) {
-      setIsInstalled(true);
+    // Register Service Worker
+    if ("serviceWorker" in navigator) {
+      navigator.serviceWorker.register("/sw.js").catch(() => {});
     }
 
     const urlParams = new URLSearchParams(window.location.search);
     const urlDevice = urlParams.get("device") || urlParams.get("deviceId");
     const storedDevice = localStorage.getItem("plantcor_device_id");
     const chosenDevice = urlDevice || storedDevice || "Chainway-C66-01";
-    setDeviceId(chosenDevice);
-    setTempDeviceId(chosenDevice);
+
+    queueMicrotask(() => {
+      if (window.matchMedia("(display-mode: standalone)").matches) {
+        setIsInstalled(true);
+      }
+      setDeviceId(chosenDevice);
+      setTempDeviceId(chosenDevice);
+      const isCf =
+        window.location.hostname.includes("trycloudflare.com") ||
+        window.location.hostname.includes("cloudflare") ||
+        window.location.protocol === "https:";
+      setActiveConnectionMode(isCf ? "Cloudflare" : "LAN");
+    });
 
     const performPermanentLink = async (devId: string) => {
       try {
@@ -98,46 +167,50 @@ export default function PermanentC66ScannerPage() {
         if (res.ok) {
           localStorage.setItem("plantcor_device_id", devId);
           localStorage.setItem("plantcor_device_linked", "true");
-          localStorage.setItem("plantcor_linked_at", new Date().toISOString());
           setIsPermanentlyLinked(true);
           setLinkBannerVisible(true);
-          setTimeout(() => setLinkBannerVisible(false), 6000);
+          setTimeout(() => setLinkBannerVisible(false), 5000);
         }
-      } catch (e) {
-        console.warn("Permanent link heartbeat error:", e);
-        setIsPermanentlyLinked(Boolean(localStorage.getItem("plantcor_device_linked")));
+      } catch {
+        setIsPermanentlyLinked(
+          Boolean(localStorage.getItem("plantcor_device_linked"))
+        );
       }
     };
 
     performPermanentLink(chosenDevice);
 
-    // Detect if on Cloudflare Tunnel or local LAN
-    if (window.location.hostname.includes("trycloudflare.com") || window.location.hostname.includes("cloudflare")) {
-      setActiveConnectionMode("Cloudflare");
-    } else {
-      setActiveConnectionMode("LAN");
-    }
+    const handleOnline = () => setSseConnected(true);
+    const handleOffline = () => setSseConnected(false);
+    window.addEventListener("online", handleOnline);
+    window.addEventListener("offline", handleOffline);
 
-    // Capture PWA beforeinstallprompt
-    const handleBeforeInstall = (e: any) => {
+    const handleBeforeInstall = (e: Event) => {
       e.preventDefault();
-      setInstallPrompt(e);
+      setInstallPrompt(e as BeforeInstallPromptEvent);
     };
     window.addEventListener("beforeinstallprompt", handleBeforeInstall);
-    return () => window.removeEventListener("beforeinstallprompt", handleBeforeInstall);
+    return () => {
+      window.removeEventListener("beforeinstallprompt", handleBeforeInstall);
+      window.removeEventListener("online", handleOnline);
+      window.removeEventListener("offline", handleOffline);
+    };
   }, [gateLocation]);
 
-  // 2. Android Screen WakeLock (Permanent Screen On)
+  // 2. Android Screen WakeLock
   useEffect(() => {
-    let sentinel: any = null;
+    let sentinel: WakeLockSentinelLike | null = null;
     const requestLock = async () => {
       try {
-        if ("wakeLock" in navigator && (navigator as any).wakeLock) {
-          sentinel = await (navigator as any).wakeLock.request("screen");
+        if ("wakeLock" in navigator) {
+          const nav = navigator as unknown as {
+            wakeLock: { request: (type: string) => Promise<WakeLockSentinelLike> };
+          };
+          if (nav.wakeLock) {
+            sentinel = await nav.wakeLock.request("screen");
+          }
         }
-      } catch {
-        // ignore
-      }
+      } catch {}
     };
     requestLock();
 
@@ -170,15 +243,12 @@ export default function PermanentC66ScannerPage() {
       }
       setAudioArmed(true);
 
-      // Notification permission request
       if (typeof window !== "undefined" && "Notification" in window) {
         if (Notification.permission === "default") {
           Notification.requestPermission().catch(() => {});
         }
       }
-    } catch {
-      // ignore
-    }
+    } catch {}
   }, []);
 
   const playSound = useCallback(
@@ -214,7 +284,7 @@ export default function PermanentC66ScannerPage() {
           osc.start(now);
           osc.stop(now + 0.45);
         } else if (type === "denied") {
-          // Harsh triple sawtooth alarm buzzer
+          // Triple sawtooth alarm buzzer
           [0, 0.22, 0.44].forEach((offset, idx) => {
             const osc = ctx.createOscillator();
             const gain = ctx.createGain();
@@ -230,7 +300,7 @@ export default function PermanentC66ScannerPage() {
             osc.stop(now + offset + 0.19);
           });
         } else {
-          // Alert ping
+          // Warning alert ping
           const osc = ctx.createOscillator();
           const gain = ctx.createGain();
           osc.type = "triangle";
@@ -242,9 +312,7 @@ export default function PermanentC66ScannerPage() {
           osc.start(now);
           osc.stop(now + 0.25);
         }
-      } catch {
-        // ignore
-      }
+      } catch {}
     },
     [audioEnabled]
   );
@@ -256,25 +324,19 @@ export default function PermanentC66ScannerPage() {
       setCountdown(10);
       playSound("denied");
 
-      // Hardware haptic vibration
       if (typeof navigator !== "undefined" && navigator.vibrate) {
         try {
           navigator.vibrate([400, 150, 400, 150, 600, 150, 600]);
-        } catch {
-          // ignore
-        }
+        } catch {}
       }
 
-      // Chainway C66 Native Bridge API Call
-      if (typeof window !== "undefined" && (window as any).ChainwayHardware) {
+      const customWin = typeof window !== "undefined" ? (window as unknown as CustomWindow) : null;
+      if (customWin?.ChainwayHardware) {
         try {
-          (window as any).ChainwayHardware.errorFeedback();
-        } catch {
-          // ignore
-        }
+          customWin.ChainwayHardware.errorFeedback?.();
+        } catch {}
       }
 
-      // Android push notification
       if (
         typeof window !== "undefined" &&
         "Notification" in window &&
@@ -288,9 +350,7 @@ export default function PermanentC66ScannerPage() {
             icon: "/icon.svg",
             tag: "access-denied-alarm",
           });
-        } catch {
-          // ignore
-        }
+        } catch {}
       }
     },
     [playSound]
@@ -300,7 +360,9 @@ export default function PermanentC66ScannerPage() {
   useEffect(() => {
     inputRef.current?.focus();
     const handleTap = () => {
-      inputRef.current?.focus();
+      if (!cameraActive && !isEditingDevice) {
+        inputRef.current?.focus();
+      }
     };
     window.addEventListener("click", handleTap);
     window.addEventListener("touchstart", handleTap);
@@ -308,35 +370,60 @@ export default function PermanentC66ScannerPage() {
       window.removeEventListener("click", handleTap);
       window.removeEventListener("touchstart", handleTap);
     };
-  }, []);
+  }, [cameraActive, isEditingDevice]);
 
   // 6. Connect to SSE Stream (Targeted to this Device ID)
   useEffect(() => {
     if (!deviceId) return;
     let es: EventSource | null = null;
-    let timer: NodeJS.Timeout | null = null;
+    let reconnectTimer: NodeJS.Timeout | null = null;
+    let watchdogTimer: NodeJS.Timeout | null = null;
+    let retryCount = 0;
+    let isSubscribed = true;
+
+    const resetWatchdog = () => {
+      if (watchdogTimer) clearTimeout(watchdogTimer);
+      watchdogTimer = setTimeout(() => {
+        if (!isSubscribed) return;
+        console.warn("[Scanner SSE] Watchdog expired (40s). Reconnecting...");
+        if (es) { es.close(); es = null; }
+        scheduleReconnect();
+      }, 40_000);
+    };
+
+    const scheduleReconnect = () => {
+      if (!isSubscribed || reconnectTimer) return;
+      setSseConnected(false);
+      const delay = Math.min(1000 * Math.pow(1.5, retryCount), 30_000) + Math.floor(Math.random() * 500);
+      retryCount++;
+      reconnectTimer = setTimeout(() => {
+        reconnectTimer = null;
+        connect();
+      }, delay);
+    };
 
     const connect = () => {
+      if (!isSubscribed) return;
+      if (watchdogTimer) clearTimeout(watchdogTimer);
       try {
-        const streamUrl = `/api/scanner/notifications?deviceId=${encodeURIComponent(
-          deviceId
-        )}`;
+        const streamUrl = `/api/events?deviceId=${encodeURIComponent(deviceId)}`;
         es = new EventSource(streamUrl);
-
         es.onopen = () => {
+          if (!isSubscribed) return;
           setSseConnected(true);
+          retryCount = 0;
+          resetWatchdog();
         };
-
         es.onmessage = (e) => {
+          if (!isSubscribed) return;
+          resetWatchdog();
           try {
             const notif = JSON.parse(e.data);
             if (!notif || !notif.type) return;
-
             const isForThisDevice =
               !notif.targetDeviceId ||
               notif.targetDeviceId === "ALL" ||
               notif.targetDeviceId.toLowerCase() === deviceId.toLowerCase();
-
             if (isForThisDevice) {
               if (notif.severity === "danger" || notif.type === "ACCESS_DENIED") {
                 triggerDenyPrompt(notif);
@@ -348,33 +435,30 @@ export default function PermanentC66ScannerPage() {
                 playSound("alert");
               }
             }
-          } catch {
-            // ignore non-json keepalive
-          }
+          } catch {}
         };
-
+        es.addEventListener("ping", () => {
+          if (isSubscribed) resetWatchdog();
+        });
         es.onerror = () => {
-          setSseConnected(false);
-          if (es) {
-            es.close();
-            es = null;
-          }
-          timer = setTimeout(connect, 3500);
+          if (!isSubscribed) return;
+          if (es) { es.close(); es = null; }
+          scheduleReconnect();
         };
       } catch (err) {
         console.error("SSE connection error:", err);
       }
     };
-
     connect();
-
     return () => {
+      isSubscribed = false;
       if (es) es.close();
-      if (timer) clearTimeout(timer);
+      if (reconnectTimer) clearTimeout(reconnectTimer);
+      if (watchdogTimer) clearTimeout(watchdogTimer);
     };
   }, [deviceId, triggerDenyPrompt, playSound]);
 
-  // 7. Auto-dismiss Countdown Timer
+  // 7. Auto-dismiss Alert Countdown Timer
   useEffect(() => {
     if (!activeAlert) return;
     const interval = setInterval(() => {
@@ -389,14 +473,200 @@ export default function PermanentC66ScannerPage() {
     return () => clearInterval(interval);
   }, [activeAlert]);
 
-  // 8. Process Scan via Physical Trigger or Input
+  // 7.5 Key Custody 30s Countdown Timer
+  useEffect(() => {
+    if (!activeKeySession) return;
+    const interval = setInterval(() => {
+      const remaining = Math.max(
+        0,
+        Math.ceil((activeKeySession.expiresAtTimestamp - Date.now()) / 1000)
+      );
+      setKeyCountdown(remaining);
+      if (remaining <= 0) {
+        setActiveKeySession(null);
+        triggerDenyPrompt({
+          id: `timeout_${Date.now()}`,
+          type: "ACCESS_DENIED",
+          title: "⏱️ KEY TIMEOUT EXPIRED",
+          message: "30-second operator badge verification window elapsed",
+          severity: "danger",
+          entityName: `Key ${activeKeySession.machineId}`,
+          denialReason: "Key verification timeout expired (30s window exceeded)",
+          gateLocation,
+          targetDeviceId: deviceId,
+          timestamp: new Date().toLocaleTimeString(),
+        });
+      }
+    }, 500);
+    return () => clearInterval(interval);
+  }, [activeKeySession, triggerDenyPrompt, gateLocation, deviceId]);
+
+  // 8. Process Scan (Handles standard gate scan OR key custody state machine)
   const handleProcessScan = async (codeToScan?: string) => {
     const code = (codeToScan || scanInput).trim();
     if (!code || isProcessing) return;
 
     setIsProcessing(true);
     armAudio();
+
     try {
+      // Branch 0: Zero-Touch QR Provisioning Interception
+      if (code.trim().startsWith("{")) {
+        try {
+          const config = JSON.parse(code.trim());
+          if (
+            config.deviceId ||
+            config.tunnelUrl ||
+            config.serverUrl ||
+            config.gateProfile
+          ) {
+            const newDeviceId = config.deviceId || deviceId;
+            const newGateLocation =
+              config.gateProfile?.gateName ||
+              config.gateProfile?.gateId ||
+              gateLocation;
+
+            setDeviceId(newDeviceId);
+            setTempDeviceId(newDeviceId);
+            setGateLocation(newGateLocation);
+            localStorage.setItem("plantcor_device_id", newDeviceId);
+
+            const isCf = Boolean(
+              config.tunnelUrl && !config.tunnelUrl.includes("127.0.0.1")
+            );
+            setActiveConnectionMode(isCf ? "Cloudflare" : "LAN");
+
+            const customWin = window as unknown as CustomWindow;
+            if (
+              customWin?.ChainwayHardware?.saveTunnelConfig &&
+              (config.tunnelUrl || config.serverUrl)
+            ) {
+              customWin.ChainwayHardware.saveTunnelConfig(
+                config.tunnelUrl || config.serverUrl,
+                newDeviceId
+              );
+            }
+            if (customWin?.ChainwayHardware?.applyZeroTouchConfig) {
+              customWin.ChainwayHardware.applyZeroTouchConfig(code.trim());
+            }
+            if (customWin?.ChainwayHardware?.successFeedback) {
+              customWin.ChainwayHardware.successFeedback();
+            }
+
+            try {
+              await fetch("/api/devices/link", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  deviceId: newDeviceId,
+                  deviceType: "Chainway C66 Android Handheld",
+                  gateLocation: newGateLocation,
+                }),
+              });
+            } catch {}
+
+            localStorage.setItem("plantcor_device_linked", "true");
+            setIsPermanentlyLinked(true);
+            setLinkBannerVisible(true);
+            setTimeout(() => setLinkBannerVisible(false), 5000);
+            playSound("granted");
+
+            const result: ScanResult = {
+              accessGranted: true,
+              denialReason: null,
+              entityName: `Zero-Touch Provisioned: ${newDeviceId}`,
+              direction: "CONFIG",
+              gateLocation: newGateLocation,
+              timestamp: new Date().toLocaleTimeString(),
+            };
+            setLastResult(result);
+            setRecentScans((prev) => [result, ...prev.slice(0, 9)]);
+            setScanInput("");
+            return;
+          }
+        } catch (err) {
+          console.error("Zero-Touch QR parsing error:", err);
+        }
+      }
+
+      // Branch A: If currently in "Awaiting Operator Verification" state for Key Control
+      if (activeKeySession) {
+        const keyRes = await fetch("/api/scanner/key-custody", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            action: "verify",
+            sessionId: activeKeySession.sessionId,
+            badgeTag: code,
+            deviceId,
+            gateLocation,
+            scannedBy: "Chainway C66 Operator",
+          }),
+        });
+
+        const keyData = await keyRes.json();
+        setActiveKeySession(null);
+
+        if (keyData.status === "GRANTED") {
+          playSound("granted");
+          const result: ScanResult = {
+            accessGranted: true,
+            denialReason: null,
+            entityName: `${keyData.operatorName} (Key for ${keyData.machineId})`,
+            direction: "CHECKOUT",
+            gateLocation,
+            timestamp: new Date().toLocaleTimeString(),
+          };
+          setLastResult(result);
+          setRecentScans((prev) => [result, ...prev.slice(0, 9)]);
+        } else {
+          triggerDenyPrompt({
+            id: `key_denial_${Date.now()}`,
+            type: "ACCESS_DENIED",
+            title: "⛔ KEY CHECKOUT DENIED",
+            message: keyData.denialReason || "Operator Verification Failed",
+            severity: "danger",
+            entityName: keyData.operatorName || code,
+            denialReason: keyData.denialReason || "Compliance check failed",
+            gateLocation,
+            rawTag: code,
+            targetDeviceId: deviceId,
+            timestamp: new Date().toLocaleTimeString(),
+          });
+        }
+        setScanInput("");
+        return;
+      }
+
+      // Branch B: If tag is a Key Tag e.g. "KEY-CAT-797F-01" or starts with "KEY_" / "KEY-"
+      const isKeyTag =
+        code.toUpperCase().startsWith("KEY-") ||
+        code.toUpperCase().startsWith("KEY_") ||
+        code.toUpperCase().startsWith("KEY");
+
+      if (isKeyTag) {
+        const keyRes = await fetch("/api/scanner/key-custody", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            action: "initiate",
+            keyTag: code,
+            deviceId,
+            gateLocation,
+          }),
+        });
+
+        const keyData = await keyRes.json();
+        if (keyData.success && keyData.session) {
+          setActiveKeySession(keyData.session);
+          setKeyCountdown(30);
+          playSound("alert");
+          setScanInput("");
+          return;
+        }
+      }
+
+      // Branch C: Standard Gate Access Scan
       const res = await fetch("/api/scanner/receive", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -464,14 +734,66 @@ export default function PermanentC66ScannerPage() {
     }
   };
 
-  // 8.5 Native Android Bridge (Chainway C66)
+  // Native Android Bridge hook
   useEffect(() => {
     if (typeof window !== "undefined") {
-      (window as any).onNativeScanReceived = (barcode: string) => {
+      const customWin = window as unknown as CustomWindow;
+      customWin.onNativeScanReceived = (barcode: string) => {
         handleProcessScan(barcode);
       };
     }
   });
+
+  // Camera Fallback Scanner Activation
+  const startCamera = async () => {
+    setCameraActive(true);
+    armAudio();
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: "environment" },
+      });
+      mediaStreamRef.current = stream;
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+        videoRef.current.play();
+      }
+
+      // Use native BarcodeDetector if available
+      const customWin = window as unknown as CustomWindow;
+      if (customWin.BarcodeDetector) {
+        const detector = new customWin.BarcodeDetector({
+          formats: ["qr_code", "code_128", "ean_13", "data_matrix"],
+        });
+
+        const interval = setInterval(async () => {
+          if (!videoRef.current || !cameraActive) {
+            clearInterval(interval);
+            return;
+          }
+          try {
+            const barcodes = await detector.detect(videoRef.current);
+            if (barcodes && barcodes.length > 0) {
+              const code = barcodes[0].rawValue;
+              stopCamera();
+              handleProcessScan(code);
+            }
+          } catch {}
+        }, 300);
+      }
+    } catch (e) {
+      console.error("Camera access failed:", e);
+      setCameraActive(false);
+    }
+  };
+
+  const stopCamera = () => {
+    if (mediaStreamRef.current) {
+      mediaStreamRef.current.getTracks().forEach((track) => track.stop());
+      mediaStreamRef.current = null;
+    }
+    setCameraActive(false);
+    inputRef.current?.focus();
+  };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Enter") {
@@ -510,11 +832,10 @@ export default function PermanentC66ScannerPage() {
   };
 
   return (
-    <div className="min-h-screen bg-black text-neutral-100 flex flex-col font-sans select-none overflow-x-hidden">
-      {/* FULL-SCREEN FLASHING RED STROBE ALERT ON ACCESS DENIED */}
+    <div className="kiosk-container w-full h-dvh overflow-hidden overscroll-contain bg-black text-neutral-100 flex flex-col font-sans select-none pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]">
+      {/* FULL-SCREEN RED STROBE ALERT ON ACCESS DENIED */}
       {activeAlert && activeAlert.severity === "danger" && (
-        <div className="fixed inset-0 z-50 flex flex-col items-center justify-between p-6 bg-red-950/98 border-[10px] border-red-600 animate-pulse text-center">
-          {/* Top Header Pill */}
+        <div className="fixed inset-0 z-45 flex flex-col items-center justify-between p-6 bg-red-950/98 border-[10px] border-red-600 animate-pulse text-center">
           <div className="w-full flex items-center justify-between pt-2">
             <span className="text-[11px] uppercase font-mono font-bold tracking-widest text-red-200 px-3.5 py-1 rounded-full bg-red-900/90 border border-red-500/60 shadow-lg flex items-center gap-1.5">
               <span className="h-2.5 w-2.5 rounded-full bg-red-400 animate-ping" />
@@ -526,7 +847,6 @@ export default function PermanentC66ScannerPage() {
             </span>
           </div>
 
-          {/* Central Alert Icon & Headline */}
           <div className="flex flex-col items-center max-w-md w-full my-auto space-y-4">
             <div className="h-28 w-28 rounded-full bg-red-600 text-white flex items-center justify-center shadow-[0_0_80px_rgba(239,68,68,1)] animate-bounce">
               <IconShieldX size={72} className="stroke-[2.5]" />
@@ -541,7 +861,6 @@ export default function PermanentC66ScannerPage() {
               </p>
             </div>
 
-            {/* Rejection Details Box */}
             <div className="w-full bg-black/85 rounded-2xl border border-red-500/50 p-4 space-y-2.5 text-left shadow-2xl">
               <div>
                 <span className="text-red-400 block text-[10px] uppercase font-mono font-bold">
@@ -582,13 +901,12 @@ export default function PermanentC66ScannerPage() {
             </div>
           </div>
 
-          {/* Action Buttons for Handheld Operator */}
           <div className="w-full max-w-md space-y-2 pb-2">
             <div className="grid grid-cols-2 gap-3">
               <button
                 type="button"
                 onClick={() => setActiveAlert(null)}
-                className="h-14 rounded-xl bg-neutral-800 hover:bg-neutral-700 active:scale-[0.98] border border-white/20 text-white font-mono font-bold text-xs uppercase tracking-wider transition cursor-pointer shadow-lg"
+                className="h-14 min-h-[56px] rounded-xl bg-neutral-800 hover:bg-neutral-700 active:scale-[0.98] active:brightness-90 border border-white/20 text-white font-mono font-bold text-xs uppercase tracking-wider transition cursor-pointer shadow-lg"
               >
                 Acknowledge
               </button>
@@ -599,7 +917,7 @@ export default function PermanentC66ScannerPage() {
                   setActiveAlert(null);
                   inputRef.current?.focus();
                 }}
-                className="h-14 rounded-xl bg-red-600 hover:bg-red-500 active:scale-[0.98] text-white font-mono font-bold text-xs uppercase tracking-wider transition cursor-pointer shadow-[0_0_30px_rgba(239,68,68,0.7)] flex items-center justify-center gap-1.5"
+                className="h-14 min-h-[56px] rounded-xl bg-red-600 hover:bg-red-500 active:scale-[0.98] active:brightness-90 text-white font-mono font-bold text-xs uppercase tracking-wider transition cursor-pointer shadow-[0_0_30px_rgba(239,68,68,0.7)] flex items-center justify-center gap-2"
               >
                 <IconRefresh size={18} />
                 <span>Re-Scan Trigger</span>
@@ -612,89 +930,114 @@ export default function PermanentC66ScannerPage() {
         </div>
       )}
 
-      {/* Permanent Link Confirmation Toast */}
-      {linkBannerVisible && (
-        <div className="fixed top-2 inset-x-4 z-40 p-3.5 rounded-2xl bg-emerald-950/95 border border-emerald-500/50 text-emerald-200 text-xs font-mono shadow-2xl flex items-center justify-between gap-3 animate-in slide-in-from-top-3">
-          <div className="flex items-center gap-2.5">
-            <div className="h-7 w-7 rounded-lg bg-emerald-500/20 text-emerald-400 flex items-center justify-center">
-              <IconCheck size={16} />
+      {/* KEY CONTROL STATE MACHINE BANNER */}
+      {activeKeySession && (
+        <div className="bg-amber-950/95 border-b-2 border-amber-500 p-4 animate-pulse">
+          <div className="max-w-lg mx-auto flex items-center justify-between gap-3 font-mono">
+            <div className="flex items-center gap-3">
+              <div className="h-10 w-10 rounded-xl bg-amber-500/20 text-amber-400 flex items-center justify-center border border-amber-500/40">
+                <IconKey size={24} />
+              </div>
+              <div>
+                <strong className="text-white text-sm block">
+                  KEY SCANNED: {activeKeySession.machineId}
+                </strong>
+                <span className="text-amber-300 text-xs">
+                  Scan Operator Badge to verify compliance
+                </span>
+              </div>
             </div>
-            <div>
-              <strong className="block text-white font-bold">PERMANENTLY LINKED TO SYSTEM</strong>
-              <span className="text-[11px] text-emerald-300/80">
-                Device bound as <code>{deviceId}</code> • Auto-reconnect active
+
+            <div className="flex items-center gap-3">
+              <span className="text-2xl font-black text-amber-400 block font-mono">
+                {keyCountdown}s
               </span>
+              <button
+                type="button"
+                onClick={() => setActiveKeySession(null)}
+                className="min-h-[48px] px-3.5 py-2 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 text-xs font-mono font-bold text-amber-200 border border-amber-500/40 active:scale-[0.98] transition cursor-pointer"
+              >
+                Cancel
+              </button>
             </div>
           </div>
-          <button
-            type="button"
-            onClick={() => setLinkBannerVisible(false)}
-            className="text-xs text-emerald-400 hover:text-white"
-          >
-            ✕
-          </button>
         </div>
       )}
 
-      {/* Terminal Top Bar */}
+      {/* Terminal Header */}
       <header className="p-3 bg-neutral-900 border-b border-white/10 flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <div className="flex items-center gap-1.5">
-            <IconDeviceMobile size={20} className="text-[#007AFF]" />
-            <button
-              type="button"
-              onClick={() => setIsEditingDevice(true)}
-              className="text-xs font-mono font-bold text-white flex items-center gap-1 bg-white/5 px-2.5 py-1 rounded-lg hover:bg-white/10 transition cursor-pointer"
-              title="Configure Scanner ID"
-            >
-              <span>{deviceId}</span>
-              <IconSettings size={13} className="text-neutral-400" />
-            </button>
-          </div>
+        <div className="flex items-center gap-2 sm:gap-3">
+          <Link
+            href="/"
+            className="min-h-[48px] px-3.5 py-2 rounded-xl bg-white/5 hover:bg-white/10 active:scale-[0.98] text-white flex items-center gap-2 text-xs font-mono font-bold transition border border-white/10"
+            title="Return to Admin Dashboard"
+          >
+            <IconArrowLeft size={18} className="text-[#007AFF]" />
+            <span className="hidden sm:inline">Dashboard</span>
+          </Link>
+
+          <div className="h-6 w-[1px] bg-white/10 hidden sm:block" />
+
+          <IconDeviceMobile size={22} className="text-[#007AFF] hidden xs:block" />
+          <button
+            type="button"
+            onClick={() => setIsEditingDevice(true)}
+            className="min-h-[48px] px-3.5 py-2 text-xs sm:text-sm font-mono font-bold text-white flex items-center gap-2 bg-white/5 rounded-xl hover:bg-white/10 active:scale-[0.98] transition cursor-pointer"
+            title="Configure Scanner ID"
+          >
+            <span>{deviceId}</span>
+            <IconSettings size={15} className="text-neutral-400" />
+          </button>
         </div>
 
-        {/* Status Badges */}
         <div className="flex items-center gap-2 text-xs font-mono">
-          {/* Connection Mode Indicator */}
           <div
-            className={`flex items-center gap-1 px-2 py-0.5 rounded-full border text-[10px] ${
+            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-[10px] font-mono ${
               activeConnectionMode === "LAN"
                 ? "bg-blue-500/10 text-blue-300 border-blue-500/30"
                 : "bg-orange-500/10 text-orange-300 border-orange-500/30"
             }`}
-            title={`Connected via ${activeConnectionMode}`}
           >
-            {activeConnectionMode === "LAN" ? <IconWifi size={12} /> : <IconCloud size={12} />}
+            {activeConnectionMode === "LAN" ? <IconWifi size={13} /> : <IconCloud size={13} />}
             <span>{activeConnectionMode}</span>
           </div>
 
-          {/* SSE Live Push */}
           <div
-            className={`flex items-center gap-1 px-2 py-0.5 rounded-full border text-[10px] ${
+            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-[10px] font-mono ${
               sseConnected
                 ? "bg-emerald-500/10 text-emerald-300 border-emerald-500/30"
                 : "bg-amber-500/10 text-amber-300 border-amber-500/30"
             }`}
           >
             <span
-              className={`h-1.5 w-1.5 rounded-full ${
+              className={`h-2 w-2 rounded-full ${
                 sseConnected ? "bg-emerald-400 animate-pulse" : "bg-amber-400"
               }`}
             />
             <span>{sseConnected ? "Push Live" : "Syncing"}</span>
           </div>
 
-          {/* Audio Toggle */}
+          {/* Camera Scanner Button */}
+          <button
+            type="button"
+            onClick={cameraActive ? stopCamera : startCamera}
+            className="touch-target-industrial min-h-[48px] min-w-[48px] flex items-center justify-center rounded-xl bg-white/5 hover:bg-white/10 active:scale-[0.98] text-[#007AFF] cursor-pointer"
+            title="Camera Barcode Scanner"
+          >
+            <IconCamera size={20} />
+          </button>
+
+          {/* Audio Buzzer Toggle */}
           <button
             type="button"
             onClick={() => setAudioEnabled(!audioEnabled)}
-            className="p-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-neutral-300 cursor-pointer"
+            className="touch-target-industrial min-h-[48px] min-w-[48px] flex items-center justify-center rounded-xl bg-white/5 hover:bg-white/10 active:scale-[0.98] text-neutral-300 cursor-pointer"
             title="Toggle Alarm Tone"
           >
             {audioEnabled ? (
-              <IconVolume size={16} className="text-emerald-400" />
+              <IconVolume size={20} className="text-emerald-400" />
             ) : (
-              <IconVolumeOff size={16} className="text-neutral-500" />
+              <IconVolumeOff size={20} className="text-neutral-500" />
             )}
           </button>
         </div>
@@ -704,26 +1047,26 @@ export default function PermanentC66ScannerPage() {
       {installPrompt && !isInstalled && (
         <div className="p-3 bg-gradient-to-r from-[#007AFF]/20 via-[#007AFF]/10 to-transparent border-b border-[#007AFF]/30 flex items-center justify-between gap-3 text-xs font-mono">
           <div className="flex items-center gap-2">
-            <IconDownload size={16} className="text-[#007AFF]" />
-            <span className="text-white">Install Plantcor C66 Scanner as Android Home App</span>
+            <IconDownload size={18} className="text-[#007AFF]" />
+            <span className="text-white">Install Control-Access PWA on Android</span>
           </div>
           <button
             type="button"
             onClick={handleInstallApp}
-            className="px-3 py-1 rounded-lg bg-[#007AFF] hover:bg-[#0A84FF] text-white font-bold text-xs transition cursor-pointer shrink-0"
+            className="min-h-[48px] px-4 py-2 rounded-xl bg-[#007AFF] hover:bg-[#0A84FF] text-white font-bold text-xs cursor-pointer"
           >
-            Install App ➔
+            Install App
           </button>
         </div>
       )}
 
-      {/* Audio & Haptic Arming Banner */}
+      {/* Audio Arming Alert */}
       {!audioArmed && (
         <div
           onClick={armAudio}
-          className="bg-amber-500/20 border-b border-amber-500/30 px-3 py-2.5 text-center text-xs font-mono text-amber-300 flex items-center justify-center gap-2 cursor-pointer hover:bg-amber-500/30 transition animate-pulse"
+          className="min-h-[48px] bg-amber-500/20 border-b border-amber-500/30 px-4 py-3 text-center text-xs font-mono text-amber-300 flex items-center justify-center gap-2.5 cursor-pointer hover:bg-amber-500/30 active:scale-[0.99] transition animate-pulse"
         >
-          <IconBell size={16} />
+          <IconBell size={18} />
           <span className="font-bold">
             Tap here to Arm Hardware Audio Buzzer & Haptic Vibration
           </span>
@@ -731,172 +1074,207 @@ export default function PermanentC66ScannerPage() {
       )}
 
       {/* Main Terminal Viewport */}
-      <main className="flex-1 flex flex-col p-4 max-w-lg mx-auto w-full space-y-4">
-        {/* Permanent Link Status Ribbon */}
-        <div className="flex items-center justify-between p-2.5 rounded-xl bg-neutral-900 border border-white/10 text-xs font-mono">
+      <main className="flex-1 scroll-contained p-4 max-w-lg mx-auto w-full space-y-4">
+        {/* Gate Selection */}
+        <div className="flex items-center justify-between p-3 rounded-2xl bg-neutral-900 border border-white/10 text-xs font-mono">
           <div className="flex items-center gap-2">
-            <span className="h-2 w-2 rounded-full bg-emerald-400 shadow-[0_0_6px_rgba(52,211,153,0.8)]" />
+            <span className="h-2 w-2 rounded-full bg-emerald-400" />
             <span className="text-neutral-300 font-semibold">
-              {isPermanentlyLinked ? "Permanently Bound" : "Linking to Server..."}
+              {isPermanentlyLinked ? "Permanently Bound" : "Linking..."}
             </span>
           </div>
           <select
             value={gateLocation}
             onChange={(e) => setGateLocation(e.target.value)}
-            className="bg-black text-white text-xs px-2 py-1 rounded border border-white/10 focus:outline-none max-w-[180px] truncate"
+            className="h-12 rounded-xl bg-black text-white text-xs sm:text-sm px-3 py-2 border border-white/10 focus:outline-none max-w-[200px] truncate"
           >
             <option value="Brakfontein - Main Gate">Brakfontein - Main Gate</option>
             <option value="Brakfontein - C66 Mobile Gate">Brakfontein - C66 Mobile</option>
             <option value="Haulage Gate 2">Haulage Gate 2</option>
             <option value="Pit Security Post">Pit Security Post</option>
-            <option value="Visitor Reception">Visitor Reception</option>
           </select>
         </div>
 
-        {/* Big Scanner Status Card - Modern UI Pattern */}
+        {/* Camera Scanner Viewfinder Modal / Optical Camera HUD */}
+        {cameraActive && (
+          <div className="relative rounded-3xl overflow-hidden border-2 border-[#007AFF] bg-black">
+            <video ref={videoRef} className="w-full h-64 object-cover" />
+            {/* Optical Camera HUD Reticle & Targeting Grid */}
+            <div className="absolute inset-0 pointer-events-none flex flex-col items-center justify-center">
+              <div className="relative w-48 h-48 border-2 border-dashed border-[#007AFF]/60 rounded-2xl flex items-center justify-center">
+                <div className="absolute -top-1 -left-1 w-4 h-4 border-t-2 border-l-2 border-[#007AFF]" />
+                <div className="absolute -top-1 -right-1 w-4 h-4 border-t-2 border-r-2 border-[#007AFF]" />
+                <div className="absolute -bottom-1 -left-1 w-4 h-4 border-b-2 border-l-2 border-[#007AFF]" />
+                <div className="absolute -bottom-1 -right-1 w-4 h-4 border-b-2 border-r-2 border-[#007AFF]" />
+                <div className="w-full h-0.5 bg-[#007AFF] shadow-[0_0_8px_#007AFF] opacity-75" />
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={stopCamera}
+              className="absolute top-3 right-3 min-h-[48px] min-w-[48px] rounded-full bg-black/70 text-white flex items-center justify-center"
+            >
+              <IconX size={20} />
+            </button>
+            <div className="absolute bottom-2 inset-x-0 text-center text-xs font-mono text-white bg-black/60 py-1">
+              OPTICAL CAMERA HUD: Point camera at barcode or QR code
+            </div>
+          </div>
+        )}
+
+        {/* Main Status Display */}
         <div
-          className={`relative overflow-hidden rounded-3xl border flex flex-col items-center justify-center text-center transition-all duration-500 min-h-[300px] shadow-2xl backdrop-blur-xl ${
-            lastResult
+          className={`relative overflow-hidden rounded-3xl border flex flex-col items-center justify-center text-center transition-all duration-300 min-h-[260px] shadow-2xl backdrop-blur-xl ${
+            activeKeySession
+              ? "bg-amber-950/30 border-amber-500/50 shadow-[0_0_80px_rgba(245,158,11,0.15)]"
+              : lastResult
               ? lastResult.accessGranted
                 ? "bg-emerald-950/20 border-emerald-500/30 shadow-[0_0_80px_rgba(16,185,129,0.15)]"
                 : "bg-red-950/20 border-red-500/30 shadow-[0_0_80px_rgba(239,68,68,0.15)]"
               : "bg-[#0A0A0A]/60 border-white/10"
           }`}
         >
-          {/* Subtle Grid Background */}
-          <div className="absolute inset-0 bg-[url('/grid.svg')] bg-center [mask-image:linear-gradient(180deg,white,rgba(255,255,255,0))] opacity-10 pointer-events-none" />
-
-          {lastResult ? (
+          {activeKeySession ? (
+            <div className="relative z-10 flex flex-col items-center animate-in zoom-in-95 duration-200">
+              <div className="h-16 w-16 rounded-2xl bg-amber-500/20 border border-amber-500/40 text-amber-400 flex items-center justify-center mb-3">
+                <IconKey size={36} />
+              </div>
+              <h2 className="text-2xl font-black text-amber-300 font-mono">
+                AWAITING OPERATOR BADGE
+              </h2>
+              <p className="text-white font-bold text-lg mt-1">
+                Machine: {activeKeySession.machineId}
+              </p>
+              <div className="mt-3 px-4 py-1.5 rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-300 font-mono text-xs">
+                Timeout in {keyCountdown} seconds
+              </div>
+            </div>
+          ) : lastResult ? (
             lastResult.accessGranted ? (
-              <div className="relative z-10 flex flex-col items-center animate-in zoom-in-95 duration-300">
-                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-40 h-40 bg-emerald-500/20 blur-[50px] rounded-full -z-10" />
-                <div className="relative mb-4">
-                  {/* Modern QR/Scan Corner Reticles */}
-                  <div className="absolute -top-2 -left-2 w-4 h-4 border-t-2 border-l-2 border-emerald-400 rounded-tl" />
-                  <div className="absolute -top-2 -right-2 w-4 h-4 border-t-2 border-r-2 border-emerald-400 rounded-tr" />
-                  <div className="absolute -bottom-2 -left-2 w-4 h-4 border-b-2 border-l-2 border-emerald-400 rounded-bl" />
-                  <div className="absolute -bottom-2 -right-2 w-4 h-4 border-b-2 border-r-2 border-emerald-400 rounded-br" />
-                  <div className="h-20 w-20 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 flex items-center justify-center backdrop-blur-md">
-                    <IconShieldCheck size={48} stroke={1.5} />
-                  </div>
+              <div className="relative z-10 flex flex-col items-center animate-in zoom-in-95 duration-200">
+                <div className="h-16 w-16 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 flex items-center justify-center mb-3">
+                  <IconShieldCheck size={40} />
                 </div>
-                <h2 className="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-b from-emerald-200 to-emerald-500 font-sans tracking-tight">
+                <h2 className="text-2xl font-black text-emerald-400 font-mono">
                   ACCESS GRANTED
                 </h2>
-                <p className="text-white font-bold text-xl mt-2 truncate max-w-[300px]">
+                <p className="text-white font-bold text-lg mt-1 truncate max-w-[280px]">
                   {lastResult.entityName}
                 </p>
-                <div className="flex items-center justify-center flex-wrap gap-2 mt-4 text-[10px] font-mono text-emerald-400/70 uppercase tracking-widest bg-emerald-950/40 px-4 py-2 rounded-full border border-emerald-500/20">
+                <div className="flex items-center gap-2 mt-3 text-[11px] font-mono text-emerald-400/80 bg-emerald-950/40 px-3 py-1 rounded-full border border-emerald-500/20">
                   <span>{lastResult.direction}</span>
-                  <span className="w-1 h-1 rounded-full bg-emerald-500/50" />
-                  <span>{lastResult.gateLocation}</span>
-                  <span className="w-1 h-1 rounded-full bg-emerald-500/50" />
+                  <span>•</span>
                   <span>{lastResult.timestamp}</span>
                 </div>
               </div>
             ) : (
-              <div className="relative z-10 flex flex-col items-center animate-in zoom-in-95 duration-300">
-                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-40 h-40 bg-red-500/20 blur-[50px] rounded-full -z-10" />
-                <div className="relative mb-4">
-                  <div className="absolute -top-2 -left-2 w-4 h-4 border-t-2 border-l-2 border-red-500 rounded-tl" />
-                  <div className="absolute -top-2 -right-2 w-4 h-4 border-t-2 border-r-2 border-red-500 rounded-tr" />
-                  <div className="absolute -bottom-2 -left-2 w-4 h-4 border-b-2 border-l-2 border-red-500 rounded-bl" />
-                  <div className="absolute -bottom-2 -right-2 w-4 h-4 border-b-2 border-r-2 border-red-500 rounded-br" />
-                  <div className="h-20 w-20 rounded-2xl bg-red-500/10 border border-red-500/20 text-red-500 flex items-center justify-center backdrop-blur-md animate-pulse">
-                    <IconShieldX size={48} stroke={1.5} />
-                  </div>
+              <div className="relative z-10 flex flex-col items-center animate-in zoom-in-95 duration-200">
+                <div className="h-16 w-16 rounded-2xl bg-red-500/10 border border-red-500/20 text-red-500 flex items-center justify-center mb-3 animate-pulse">
+                  <IconShieldX size={40} />
                 </div>
-                <h2 className="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-b from-red-300 to-red-600 font-sans tracking-tight">
+                <h2 className="text-2xl font-black text-red-400 font-mono">
                   ACCESS DENIED
                 </h2>
-                <p className="text-white font-bold text-lg mt-2 truncate max-w-[300px]">
+                <p className="text-white font-bold text-base mt-1 truncate max-w-[280px]">
                   {lastResult.entityName}
                 </p>
-                <div className="mt-4 px-4 py-2 rounded-xl bg-red-500/10 border border-red-500/20 flex items-center gap-2">
-                  <IconAlertTriangle size={16} className="text-red-400" />
-                  <p className="text-xs text-red-300 font-mono">
-                    {lastResult.denialReason || "Security Restriction"}
-                  </p>
+                <div className="mt-2 px-3 py-1 rounded-xl bg-red-500/10 border border-red-500/20 text-xs text-red-300 font-mono">
+                  {lastResult.denialReason || "Security Restriction"}
                 </div>
               </div>
             )
           ) : (
             <>
               <div className="h-16 w-16 rounded-2xl bg-white/5 text-[#007AFF] flex items-center justify-center mb-3 animate-pulse">
-                <IconScan size={40} />
+                <IconScan size={38} />
               </div>
-              <h2 className="text-xl font-semibold text-white">Scanner Armed</h2>
-              <p className="text-xs text-neutral-400 font-mono mt-1 max-w-xs">
-                Pull C66 hardware scan trigger or tap a test credential below
+              <h2 className="text-lg font-semibold text-white font-mono">Scanner Armed</h2>
+              <p className="text-xs text-neutral-400 font-mono mt-1">
+                Pull C66 yellow trigger or scan test badge below
               </p>
             </>
           )}
         </div>
 
-        {/* Input Bar (Hardware Scan Catcher) */}
+        {/* Input Bar */}
         <div className="space-y-2">
-          <div className="relative">
+          <div className="relative flex items-center">
             <input
               ref={inputRef}
               type="text"
               value={scanInput}
               onChange={(e) => setScanInput(e.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder="Hardware trigger listener active..."
-              className="w-full h-12 rounded-xl bg-neutral-900 border border-white/20 pl-4 pr-12 text-sm font-mono text-white placeholder:text-neutral-500 focus:border-[#007AFF] focus:outline-none focus:ring-1 focus:ring-[#007AFF]"
+              placeholder={activeKeySession ? "Scan operator badge..." : "Hardware scan trigger listener active..."}
+              className="w-full h-16 rounded-2xl bg-neutral-900 border border-white/20 pl-4 pr-16 text-base font-mono text-white placeholder:text-neutral-500 focus:border-[#007AFF] focus:outline-none"
             />
             <button
               type="button"
               onClick={() => handleProcessScan()}
               disabled={isProcessing || !scanInput.trim()}
-              className="absolute right-2 top-2 h-8 w-8 rounded-lg bg-[#007AFF] text-white flex items-center justify-center disabled:opacity-30 cursor-pointer"
+              className="absolute right-2 top-2 h-12 w-12 min-h-[48px] min-w-[48px] touch-target-industrial rounded-xl bg-[#007AFF] hover:bg-[#0A84FF] active:scale-[0.98] text-white flex items-center justify-center disabled:opacity-30 cursor-pointer shadow-md"
+              title="Dispatch scan trigger"
             >
-              <IconSend size={15} />
+              <IconSend size={18} />
             </button>
-          </div>
-          <div className="flex items-center justify-between text-[11px] text-neutral-500 font-mono">
-            <span>Hardware: Chainway C66</span>
-            <span>Trigger Mode: Auto-Capture</span>
           </div>
         </div>
 
-        {/* Quick Test Bench Credentials */}
-        <div className="p-3.5 rounded-xl bg-neutral-900/60 border border-white/10 space-y-2">
+        {/* Interactive Key Control & Verification Test Bench */}
+        <div className="p-4 rounded-2xl bg-neutral-900/60 border border-white/10 space-y-2.5">
           <span className="text-[11px] font-mono text-neutral-400 uppercase tracking-wider block">
-            Instant Test Verification
+            Test Bench Credentials
           </span>
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-2 gap-3">
+            <button
+              type="button"
+              onClick={() => handleProcessScan("KEY-CAT-797F-01")}
+              className="min-h-[48px] p-3 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 active:scale-[0.98] border border-amber-500/30 text-amber-300 text-xs font-mono text-left transition cursor-pointer flex flex-col justify-center"
+            >
+              <span className="font-bold block text-xs">🔑 Cat 797F Key</span>
+              <span className="text-[10px] text-neutral-400">KEY-CAT-797F-01</span>
+            </button>
+
             <button
               type="button"
               onClick={() => handleProcessScan("RFID_EMP_003")}
-              className="p-2.5 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 text-emerald-300 text-xs font-mono text-left transition cursor-pointer"
+              className="min-h-[48px] p-3 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 active:scale-[0.98] border border-emerald-500/30 text-emerald-300 text-xs font-mono text-left transition cursor-pointer flex flex-col justify-center"
             >
-              <span className="font-bold block">✓ Bob Johnson</span>
-              <span className="text-[10px] text-neutral-400">RFID_EMP_003 (Pass)</span>
+              <span className="font-bold block text-xs">✓ Bob Johnson</span>
+              <span className="text-[10px] text-neutral-400">EMP003 (Certified)</span>
             </button>
 
             <button
               type="button"
-              onClick={() => handleProcessScan("TEST_UNAUTHORIZED_999")}
-              className="p-2.5 rounded-lg bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 text-red-300 text-xs font-mono text-left transition cursor-pointer"
+              onClick={() => handleProcessScan("TEST_EXPIRED_MED_001")}
+              className="min-h-[48px] p-3 rounded-xl bg-red-500/10 hover:bg-red-500/20 active:scale-[0.98] border border-red-500/30 text-red-300 text-xs font-mono text-left transition cursor-pointer flex flex-col justify-center"
             >
-              <span className="font-bold block">✕ Denied Tag</span>
-              <span className="text-[10px] text-neutral-400">UNAUTH_999 (Alarm)</span>
+              <span className="font-bold block text-xs">✕ Expired Med</span>
+              <span className="text-[10px] text-neutral-400">Medical Expired</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => handleProcessScan("TEST_UNINDUCTED_001")}
+              className="min-h-[48px] p-3 rounded-xl bg-red-500/10 hover:bg-red-500/20 active:scale-[0.98] border border-red-500/30 text-red-300 text-xs font-mono text-left transition cursor-pointer flex flex-col justify-center"
+            >
+              <span className="font-bold block text-xs">✕ Uninducted</span>
+              <span className="text-[10px] text-neutral-400">Contractor Uninducted</span>
             </button>
           </div>
         </div>
 
-        {/* Recent Scanner History */}
+        {/* Recent Scans */}
         {recentScans.length > 0 && (
-          <div className="space-y-1.5 flex-1 pb-4">
+          <div className="space-y-2 flex-1 pb-4">
             <span className="text-[11px] font-mono text-neutral-400 uppercase tracking-wider block">
               Recent Scans on {deviceId}
             </span>
-            <div className="space-y-1">
+            <div className="space-y-1.5">
               {recentScans.map((s, idx) => (
                 <div
                   key={idx}
-                  className="p-2 rounded-lg bg-neutral-900 border border-white/5 flex items-center justify-between text-xs font-mono"
+                  className="p-2.5 rounded-xl bg-neutral-900 border border-white/5 flex items-center justify-between text-xs font-mono"
                 >
                   <div className="flex items-center gap-2 truncate">
                     <span
@@ -906,18 +1284,15 @@ export default function PermanentC66ScannerPage() {
                     />
                     <span className="truncate text-neutral-200">{s.entityName}</span>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-[10px] text-neutral-500">{s.timestamp}</span>
-                    <span
-                      className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
-                        s.accessGranted
-                          ? "text-emerald-400 bg-emerald-500/10"
-                          : "text-red-400 bg-red-500/10"
-                      }`}
-                    >
-                      {s.accessGranted ? "PASS" : "DENIED"}
-                    </span>
-                  </div>
+                  <span
+                    className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
+                      s.accessGranted
+                        ? "text-emerald-400 bg-emerald-500/10"
+                        : "text-red-400 bg-red-500/10"
+                    }`}
+                  >
+                    {s.accessGranted ? "PASS" : "DENIED"}
+                  </span>
                 </div>
               ))}
             </div>
@@ -925,33 +1300,30 @@ export default function PermanentC66ScannerPage() {
         )}
       </main>
 
-      {/* Device ID Rename Modal */}
+      {/* Device ID Modal */}
       {isEditingDevice && (
-        <div className="fixed inset-0 z-40 bg-black/80 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="w-full max-w-xs bg-neutral-900 border border-white/15 rounded-2xl p-5 space-y-3">
+        <div className="fixed inset-0 z-35 bg-black/80 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="w-full max-w-sm bg-neutral-900 border border-white/15 rounded-2xl p-5 space-y-4 shadow-2xl">
             <h3 className="text-sm font-bold text-white font-mono">Configure Scanner ID</h3>
-            <p className="text-xs text-neutral-400 font-mono">
-              Permanently identifies this Android terminal in the system.
-            </p>
             <input
               type="text"
               value={tempDeviceId}
               onChange={(e) => setTempDeviceId(e.target.value)}
               placeholder="e.g. Chainway-C66-01"
-              className="w-full h-9 rounded-lg bg-black/60 border border-white/20 px-3 text-xs text-white font-mono focus:border-[#007AFF] focus:outline-none"
+              className="w-full h-12 rounded-xl bg-black/60 border border-white/20 px-3.5 text-sm text-white font-mono focus:border-[#007AFF] focus:outline-none"
             />
-            <div className="grid grid-cols-2 gap-2 pt-1">
+            <div className="grid grid-cols-2 gap-3 pt-1">
               <button
                 type="button"
                 onClick={() => setIsEditingDevice(false)}
-                className="h-8 rounded-lg bg-white/5 text-xs text-neutral-300 font-mono hover:bg-white/10 cursor-pointer"
+                className="h-12 min-h-[48px] rounded-xl bg-white/5 text-xs text-neutral-300 font-mono hover:bg-white/10"
               >
                 Cancel
               </button>
               <button
                 type="button"
                 onClick={handleSaveDeviceId}
-                className="h-8 rounded-lg bg-[#007AFF] text-xs text-white font-mono font-semibold hover:bg-[#0A84FF] cursor-pointer"
+                className="h-12 min-h-[48px] rounded-xl bg-[#007AFF] text-xs text-white font-mono font-semibold hover:bg-[#0A84FF]"
               >
                 Save & Link
               </button>

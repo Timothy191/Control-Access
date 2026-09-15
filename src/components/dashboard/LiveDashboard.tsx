@@ -6,6 +6,7 @@ import { useSite } from "@/components/layout/SiteContext";
 import InteractiveStatCard from "./InteractiveStatCard";
 import LiveScansTable from "./LiveScansTable";
 import OperationalCommandStrip from "./OperationalCommandStrip";
+import ScannerFleetHub from "./ScannerFleetHub";
 
 interface ScanLog {
   id: number;
@@ -65,7 +66,8 @@ export default function LiveDashboard({
   }, [fetchStats]);
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
+    <div className="max-w-7xl 2xl:max-w-screen-2xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-2">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
       {/* Operational Command Strip */}
       <div className="lg:col-span-12">
         <OperationalCommandStrip
@@ -203,6 +205,9 @@ export default function LiveDashboard({
           </a>
         </div>
 
+        {/* C66 Scanner Fleet Telemetry Hub */}
+        <ScannerFleetHub />
+
         <LiveScansTable
           scans={stats.recentScans || []}
           onRefresh={fetchStats}
@@ -210,5 +215,6 @@ export default function LiveDashboard({
         />
       </div>
     </div>
-  );
+  </div>
+);
 }

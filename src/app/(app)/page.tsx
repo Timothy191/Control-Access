@@ -38,20 +38,7 @@ export default async function DashboardPage({
       }
     : { status: "online" };
 
-  const musterWhere = {
-    direction: "IN",
-    access_granted: true,
-    ...(isFiltered
-      ? {
-          OR: [
-            { gate_location: { contains: site } },
-            { employee: { area: { contains: site } } },
-          ],
-        }
-      : {}),
-  };
-
-  const [totalScans, activeDevices, pendingApprovals, rawRecentScans] =
+    const [totalScans, activeDevices, pendingApprovals, rawRecentScans, grantedLogs] =
     await Promise.all([
       prisma.gate_logs.count({ where: gateLogWhere }),
       prisma.devices.count({ where: deviceWhere }),
@@ -61,11 +48,28 @@ export default async function DashboardPage({
         take: 25,
         orderBy: { id: "desc" },
       }),
+      prisma.gate_logs.findMany({
+        where: {
+          access_granted: true,
+          ...(isFiltered ? gateLogWhere : {}),
+        },
+        orderBy: { id: "desc" },
+      }),
     ]);
 
-  const musterCount = await prisma.gate_logs.count({
-    where: musterWhere,
-  });
+  // Calculate mathematically real muster count:
+  // Determine unique individuals/entities whose latest granted scan was 'IN'
+  const seenEntities = new Set<string>();
+  let musterCount = 0;
+  for (const log of grantedLogs) {
+    const key = log.entity_name || log.qr_data || `log_${log.id}`;
+    if (!seenEntities.has(key)) {
+      seenEntities.add(key);
+      if (log.direction === "IN") {
+        musterCount++;
+      }
+    }
+  }
 
   const recentScans = rawRecentScans.map((scan) => ({
     id: scan.id,
@@ -84,9 +88,9 @@ export default async function DashboardPage({
 
   const initialStats = {
     totalScans,
-    activeDevices: activeDevices || 1,
+    activeDevices, // 100% Real DB count
     pendingApprovals,
-    musterCount,
+    musterCount, // 100% Real on-site headcount
     recentScans,
     updatedAt: new Date().toISOString(),
   };

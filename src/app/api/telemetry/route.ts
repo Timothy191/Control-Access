@@ -1,31 +1,54 @@
 import { NextResponse } from "next/server";
+import prisma from "@/lib/prisma";
+
+export const dynamic = "force-dynamic";
 
 export async function GET() {
   const stream = new ReadableStream({
-    start(controller) {
-      controller.enqueue("retry: 1000\n\n");
-      
+    async start(controller) {
+      controller.enqueue("retry: 2000\n\n");
+
       const sendEvent = (data: unknown) => {
-        controller.enqueue(`data: ${JSON.stringify(data)}\n\n`);
+        try {
+          controller.enqueue(`data: ${JSON.stringify(data)}\n\n`);
+        } catch {
+          // Stream might be closed
+        }
       };
 
-      // Mocking Redis pub/sub telemetry events for SSE
-      const interval = setInterval(() => {
+      const emitLiveTelemetry = async () => {
         try {
+          const [onlineDevices, totalScans] = await Promise.all([
+            prisma.devices.count({ where: { status: "online" } }),
+            prisma.gate_logs.count(),
+          ]);
+
           sendEvent({
-            type: "ping",
+            type: "hardware_pulse",
             timestamp: new Date().toISOString(),
-            activeTCP: Math.floor(Math.random() * 10),
+            activeTCP: onlineDevices,
+            totalScans,
+            status: "live",
           });
+        } catch (err) {
+          console.error("Telemetry query error:", err);
+        }
+      };
+
+      // Push immediate live metrics
+      await emitLiveTelemetry();
+
+      const interval = setInterval(async () => {
+        try {
+          await emitLiveTelemetry();
         } catch {
           clearInterval(interval);
         }
       }, 5000);
     },
     cancel() {
-      // Clean up when the client disconnects
       console.log("Telemetry stream disconnected");
-    }
+    },
   });
 
   return new NextResponse(stream, {
@@ -36,3 +59,4 @@ export async function GET() {
     },
   });
 }
+

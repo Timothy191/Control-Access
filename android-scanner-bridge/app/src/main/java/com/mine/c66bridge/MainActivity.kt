@@ -5,6 +5,7 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.content.SharedPreferences
 import android.media.AudioManager
 import android.media.ToneGenerator
 import android.os.Build
@@ -12,7 +13,6 @@ import android.os.Bundle
 import android.os.VibrationEffect
 import android.os.Vibrator
 import android.os.VibratorManager
-import android.view.KeyEvent
 import android.webkit.JavascriptInterface
 import android.webkit.WebChromeClient
 import android.webkit.WebSettings
@@ -22,25 +22,32 @@ import androidx.appcompat.app.AppCompatActivity
 
 class MainActivity : AppCompatActivity() {
 
-    private lateinit var webView: WebView
-    private val TARGET_URL = "http://192.168.1.79:8080/scanner?link=true" // Change to your IP/Tunnel
+    companion object {
+        var instance: MainActivity? = null
+    }
 
-    // Receiver to catch scans from InfoWedge
+    private lateinit var webView: WebView
+    private lateinit var prefs: SharedPreferences
+    private val DEFAULT_TARGET_URL = "https://vocational-damages-calculated-are.trycloudflare.com/scanner?link=true"
+
+    fun dispatchScanToWeb(barcode: String) {
+        runOnUiThread {
+            webView.evaluateJavascript("if(window.onNativeScanReceived){window.onNativeScanReceived('$barcode');}", null)
+        }
+    }
+
+    // Dynamic broadcast receiver for InfoWedge scans
     private val scanReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
             val action = intent?.action
             if (action != null) {
-                // InfoWedge / Chainway default extras for barcode data
                 val barcode = intent.getStringExtra("scannerdata") ?: 
                               intent.getStringExtra("barcode") ?: 
                               intent.getStringExtra("data") ?: 
                               intent.getStringExtra("barcode_string")
                               
                 if (!barcode.isNullOrEmpty()) {
-                    // Send directly to the web page via JavaScript
-                    runOnUiThread {
-                        webView.evaluateJavascript("window.onNativeScanReceived('$barcode');", null)
-                    }
+                    dispatchScanToWeb(barcode)
                 }
             }
         }
@@ -49,7 +56,11 @@ class MainActivity : AppCompatActivity() {
     @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        instance = this
         
+        prefs = getSharedPreferences("c66_scanner_prefs", Context.MODE_PRIVATE)
+        val targetUrl = prefs.getString("scanner_url", DEFAULT_TARGET_URL) ?: DEFAULT_TARGET_URL
+
         webView = WebView(this)
         setContentView(webView)
 
@@ -68,7 +79,7 @@ class MainActivity : AppCompatActivity() {
         webView.addJavascriptInterface(HardwareBridge(this), "ChainwayHardware")
 
         // Load the scanner PWA
-        webView.loadUrl(TARGET_URL)
+        webView.loadUrl(targetUrl)
 
         // Register the broadcast receiver for scanner intents
         val filter = IntentFilter().apply {
@@ -85,7 +96,12 @@ class MainActivity : AppCompatActivity() {
 
     override fun onDestroy() {
         super.onDestroy()
-        unregisterReceiver(scanReceiver)
+        instance = null
+        try {
+            unregisterReceiver(scanReceiver)
+        } catch (e: Exception) {
+            // ignore
+        }
     }
 
     // Hardware Bridge accessible from JS
@@ -119,15 +135,43 @@ class MainActivity : AppCompatActivity() {
         }
 
         @JavascriptInterface
+        fun successFeedback() {
+            try {
+                val toneGen = ToneGenerator(AudioManager.STREAM_MUSIC, 80)
+                toneGen.startTone(ToneGenerator.TONE_PROP_BEEP2, 200)
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+
+            val vibrator = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                val vibratorManager = context.getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as VibratorManager
+                vibratorManager.defaultVibrator
+            } else {
+                @Suppress("DEPRECATION")
+                context.getSystemService(Context.VIBRATOR_SERVICE) as Vibrator
+            }
+
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                vibrator.vibrate(VibrationEffect.createOneShot(80, VibrationEffect.DEFAULT_AMPLITUDE))
+            } else {
+                @Suppress("DEPRECATION")
+                vibrator.vibrate(80)
+            }
+        }
+
+        @JavascriptInterface
         fun triggerLaser() {
-            // Broadcast intent to tell InfoWedge to start scanning
-            // Note: Intent action varies by device. Common Chainway trigger intent:
             val intent = Intent("com.rsc.scan.action.START")
             context.sendBroadcast(intent)
-            
-            // Alternative fallback: inject keycode 139 (SCAN key)
-            // (Requires Accessibility Service or root to inject globally, 
-            // but intent is preferred for InfoWedge)
+        }
+
+        @JavascriptInterface
+        fun saveTunnelConfig(tunnelUrl: String, deviceId: String) {
+            val fullUrl = "$tunnelUrl/scanner?link=true&device=$deviceId"
+            prefs.edit().putString("scanner_url", fullUrl).apply()
+            runOnUiThread {
+                webView.loadUrl(fullUrl)
+            }
         }
     }
 }

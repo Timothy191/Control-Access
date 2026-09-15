@@ -71,7 +71,7 @@ export function decodeQrData(raw: string | null | undefined): DecodedQr {
   // 2. URL query string (?id=123&name=John or full URL)
   if (data.includes("?") && data.includes("=")) {
     try {
-      const queryStr = data.split("?", 1)[1] ?? data;
+      const queryStr = data.includes("?") ? data.split("?")[1] : data;
       const params = new URLSearchParams(queryStr);
       if (params.size > 0) {
         result.format = "url_query";

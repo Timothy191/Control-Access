@@ -23,11 +23,11 @@ export async function POST(req: Request) {
     }
 
     return NextResponse.json({ response: stdout || stderr || "No response generated." });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("AGY Execution Error:", error);
     return NextResponse.json({ 
       error: "Failed to communicate with Antigravity Agent", 
-      details: error.message 
+      details: error instanceof Error ? error.message : String(error) 
     }, { status: 500 });
   }
 }

@@ -9,7 +9,7 @@ datasource db {
 
 model users {
   id               Int             @id @default(autoincrement())
-  username         String          @unique
+  username         String          @unique(map: "ix_users_username")
   password         String
   role             String          @default("user")
   totp_secret      String?
@@ -20,61 +20,118 @@ model users {
 }
 
 model devices {
-  id          Int      @id @default(autoincrement())
+  id          Int       @id @default(autoincrement())
   device_name String
   device_type String?
   mac_address String?
   ip_address  String?
-  last_seen   DateTime @default(now())
-  status      String   @default("online")
-  total_scans Int      @default(0)
-  created_at  DateTime @default(now())
+  last_seen   DateTime  @default(now())
+  status      String    @default("online")
+  total_scans Int       @default(0)
+  created_at  DateTime  @default(now())
 }
 
 model employees {
-  id               Int         @id @default(autoincrement())
-  emp_code         String      @unique
-  initials         String?
-  first_name       String
-  second_name      String?
-  surname          String
-  id_number        String?     @unique
-  id_number_hash   String?     @unique
-  job_title        String?
-  area             String?
-  induction        String?
-  induction_expiry DateTime?
-  medical          String?
-  medical_expiry   DateTime?
-  qr_code          String?     @unique
-  rfid_tag         String?     @unique
-  photo            String?
-  status           String      @default("Active")
-  created_at       DateTime    @default(now())
-  visitors         visitors[]
-  gate_logs        gate_logs[]
+  id                 Int                @id @default(autoincrement())
+  emp_code           String             @unique(map: "ix_employees_emp_code")
+  initials           String?
+  first_name         String
+  second_name        String?
+  surname            String
+  id_number          String?            @unique(map: "sqlite_autoindex_employees_1")
+  id_number_hash     String?            @unique(map: "ix_employees_id_number_hash")
+  job_title          String?
+  area               String?
+  induction          String?
+  induction_expiry   DateTime?
+  medical            String?
+  medical_expiry     DateTime?
+  qr_code            String?            @unique(map: "sqlite_autoindex_employees_2")
+  rfid_tag           String?            @unique(map: "ix_employees_rfid_tag")
+  photo              String?
+  status             String             @default("Active")
+  is_contractor      Boolean            @default(false)
+  contractor_company String?
+  access_level       String?            @default("STANDARD")
+  certifications     String?
+  created_at         DateTime           @default(now())
+  visitors           visitors[]
+  gate_logs          gate_logs[]
+  personal_vehicles  vehicles[]         @relation("PersonalVehicleOwner")
+  assigned_equipment equipment[]        @relation("AssignedEquipmentOperator")
+  assigned_keys      keys[]             @relation("AssignedKeyOperator")
+  key_custody_logs   key_custody_logs[] @relation("KeyCustodyOperator")
 }
 
 model vehicles {
-  id                  Int         @id @default(autoincrement())
-  fleet_id            String      @unique
-  registration_expiry DateTime?
-  qr_code             String?     @unique
-  rfid_tag            String?     @unique
-  status              String      @default("Active")
-  created_at          DateTime    @default(now())
-  gate_logs           gate_logs[]
+  id                     Int         @id @default(autoincrement())
+  fleet_id               String      @unique(map: "ix_vehicles_fleet_id")
+  vehicle_type           String      @default("HEAVY_FLEET")
+  is_heavy_fleet         Boolean     @default(false)
+  machine_id             String?     @unique
+  make                   String?
+  model                  String?
+  license_plate          String?
+  license_disc_expiry    DateTime?
+  roadworthy_expiry      DateTime?
+  registration_expiry    DateTime?
+  operational_hours      Float?      @default(0.0)
+  required_certification String?
+  owner_id               Int?
+  owner                  employees?  @relation("PersonalVehicleOwner", fields: [owner_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  qr_code                String?     @unique(map: "sqlite_autoindex_vehicles_1")
+  rfid_tag               String?     @unique(map: "ix_vehicles_rfid_tag")
+  status                 String      @default("Active")
+  created_at             DateTime    @default(now())
+  gate_logs              gate_logs[]
+  keys                   keys[]
 }
 
 model equipment {
   id                  Int         @id @default(autoincrement())
-  radio_id            String      @unique
+  radio_id            String      @unique(map: "ix_equipment_radio_id")
+  equipment_type      String      @default("TWO_WAY_RADIO")
+  model_name          String?
+  serial_number       String?
+  barcode             String?     @unique
+  calibration_expiry  DateTime?
   registration_expiry DateTime?
-  qr_code             String?     @unique
-  rfid_tag            String?     @unique
+  assigned_to_id      Int?
+  assigned_to         employees?  @relation("AssignedEquipmentOperator", fields: [assigned_to_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  qr_code             String?     @unique(map: "sqlite_autoindex_equipment_1")
+  rfid_tag            String?     @unique(map: "ix_equipment_rfid_tag")
   status              String      @default("Active")
   created_at          DateTime    @default(now())
   gate_logs           gate_logs[]
+}
+
+model keys {
+  id                   Int                @id @default(autoincrement())
+  key_tag              String             @unique
+  machine_id           String
+  vehicle_id           Int?
+  vehicle              vehicles?          @relation(fields: [vehicle_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  status               String             @default("IN_KEY_BOX")
+  assigned_operator_id Int?
+  assigned_operator    employees?         @relation("AssignedKeyOperator", fields: [assigned_operator_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  created_at           DateTime           @default(now())
+  updated_at           DateTime           @default(now()) @updatedAt
+  custody_logs         key_custody_logs[]
+}
+
+model key_custody_logs {
+  id                   Int        @id @default(autoincrement())
+  key_id               Int
+  key                  keys       @relation(fields: [key_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  operator_id          Int
+  operator             employees  @relation("KeyCustodyOperator", fields: [operator_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  action               String
+  status               String
+  denial_reason        String?
+  operational_hours_at Float?
+  gate_location        String?
+  scanned_by           String?
+  timestamp            DateTime   @default(now())
 }
 
 model visitors {
@@ -83,10 +140,10 @@ model visitors {
   company        String?
   purpose        String?
   meeting_person String?
-  qr_code        String?     @unique
-  rfid_tag       String?     @unique
+  qr_code        String?     @unique(map: "sqlite_autoindex_visitors_1")
+  rfid_tag       String?     @unique(map: "ix_visitors_rfid_tag")
   host_id        Int?
-  host           employees?  @relation(fields: [host_id], references: [id])
+  host           employees?  @relation(fields: [host_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
   check_in_time  DateTime    @default(now())
   check_out_time DateTime?
   status         String      @default("Checked In")
@@ -95,29 +152,48 @@ model visitors {
 }
 
 model gate_logs {
-  id             Int        @id @default(autoincrement())
-  access_type    String?
-  entity_id      Int?
-  entity_name    String?
-  direction      String?
-  qr_data        String?
-  access_granted Boolean    @default(true)
-  denial_reason  String?
-  gate_location  String?
-  scanned_at     DateTime   @default(now())
-  scanned_by     String?
-  ip_address     String?
-  user_agent     String?
-  parsed_qr_data String?
-  alcohol_tested String?
-  employee_id    Int?
-  employee       employees? @relation(fields: [employee_id], references: [id])
-  vehicle_id     Int?
-  vehicle        vehicles?  @relation(fields: [vehicle_id], references: [id])
-  visitor_id     Int?
-  visitor        visitors?  @relation(fields: [visitor_id], references: [id])
-  equipment_id   Int?
-  equipment      equipment? @relation(fields: [equipment_id], references: [id])
+  id              Int        @id @default(autoincrement())
+  access_type     String?
+  entity_id       Int?
+  entity_name     String?
+  direction       String?
+  qr_data         String?
+  access_granted  Boolean    @default(true)
+  denial_reason   String?
+  gate_location   String?
+  scanned_at      DateTime   @default(now())
+  scanned_by      String?
+  ip_address      String?
+  user_agent      String?
+  parsed_qr_data  String?
+  alcohol_tested  String?
+  latitude        Float?
+  longitude       Float?
+  altitude        Float?
+  accuracy        Float?
+  speed           Float?
+  heading         Float?
+  rssi            Float?
+  antenna_id      String?
+  device_battery  Int?
+  read_count      Int?
+  geofence_status String?
+  operator_id     String?
+  telemetry_data  String?
+  employee_id     Int?
+  employee        employees? @relation(fields: [employee_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  vehicle_id      Int?
+  vehicle         vehicles?  @relation(fields: [vehicle_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  visitor_id      Int?
+  visitor         visitors?  @relation(fields: [visitor_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  equipment_id    Int?
+  equipment       equipment? @relation(fields: [equipment_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([direction], map: "ix_gate_logs_direction")
+  @@index([scanned_at], map: "ix_gate_logs_scanned_at")
+  @@index([access_type], map: "ix_gate_logs_access_type")
+  @@index([entity_id], map: "ix_gate_logs_entity_id")
+  @@index([access_granted], map: "ix_gate_logs_access_granted")
 }
 
 model approvals {
@@ -133,18 +209,31 @@ model approvals {
   target_table   String?
   scanned_data   String?
   created_at     DateTime  @default(now())
+
+  @@index([status], map: "ix_approvals_status")
+}
+
+model audit_logs {
+  id          Int       @id @default(autoincrement())
+  user        String?
+  action      String?
+  entity_type String?
+  entity_id   Int?
+  details     String?
+  ip_address  String?
+  created_at  DateTime? @default(now())
 }
 
 model site_settings {
   id    Int     @id @default(autoincrement())
-  key   String  @unique
+  key   String  @unique(map: "sqlite_autoindex_site_settings_1")
   value String?
 }
 
 model notifications {
   id         Int      @id @default(autoincrement())
   user_id    Int?
-  user       users?   @relation(fields: [user_id], references: [id])
+  user       users?   @relation(fields: [user_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
   type       String
   message    String
   read       Boolean  @default(false)
@@ -153,12 +242,12 @@ model notifications {
 }
 
 model gate_mappings {
-  id                   Int      @id @default(autoincrement())
-  ip_address           String   @unique
+  id                   Int       @id @default(autoincrement())
+  ip_address           String    @unique(map: "ix_gate_mappings_ip_address")
   scanner_id           String?
   gate_name            String
   location_description String?
-  is_active            Boolean  @default(true)
-  created_at           DateTime @default(now())
-  updated_at           DateTime @updatedAt
+  is_active            Boolean   @default(true)
+  created_at           DateTime  @default(now())
+  updated_at           DateTime? @updatedAt
 }

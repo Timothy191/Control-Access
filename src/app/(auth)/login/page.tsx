@@ -78,30 +78,19 @@ function LoginForm() {
   };
 
   return (
-    <div className="relative z-10 flex min-h-screen w-full items-center justify-center p-4 sm:p-6 lg:p-8 font-sans antialiased">
-      {/* High-tech Cyber Grid & Ambient Vignette Background */}
-      <div className="pointer-events-none absolute inset-0 bg-cyber-grid radial-vignette opacity-70" />
+    <div className="relative z-10 flex min-h-screen w-full items-center justify-center p-4 sm:p-6 lg:p-8 font-sans antialiased text-white">
+      {/* Background Layer: Enforce dark mode explicitly to prevent white blocks */}
+      <div className="fixed inset-0 pointer-events-none bg-black/50 z-[-1]" />
+      <div className="pointer-events-none absolute inset-0 bg-cyber-grid radial-vignette opacity-50" />
 
-      {/* Dual Dynamic Floating Aurora Orbs */}
-      <div className="pointer-events-none absolute -top-28 left-1/2 -translate-x-1/2 w-[600px] h-[600px] bg-gradient-to-b from-orange-500/20 via-red-primary/10 to-transparent blur-[140px] rounded-full animate-aurora-slow" />
-      <div className="pointer-events-none absolute -bottom-36 right-1/4 w-[500px] h-[500px] bg-gradient-to-tl from-emerald-500/10 via-cyan-500/5 to-transparent blur-[130px] rounded-full animate-aurora-alt" />
-      {/* AI Agent Dev Access Link */}
-      <Link 
-        href="/chat"
-        className="absolute bottom-4 left-4 z-50 flex items-center gap-2 px-3 py-1.5 rounded-full bg-black/40 border border-white/10 text-neutral-400 hover:text-white hover:border-emerald-500/50 hover:bg-emerald-500/10 transition-all font-mono text-[10px] uppercase tracking-wider group"
-      >
-        <span className="relative flex h-1.5 w-1.5">
-          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-          <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500"></span>
-        </span>
-        <IconTerminal2 size={14} className="group-hover:text-emerald-400 transition-colors" />
-        <span className="group-hover:text-emerald-400 transition-colors">AI Console</span>
-      </Link>
-
+      {/* Simplified Dual Dynamic Floating Aurora Orbs (reduced blur to avoid rendering artifacts) */}
+      <div className="pointer-events-none absolute -top-28 left-1/2 -translate-x-1/2 w-[400px] h-[400px] bg-[#007AFF]/10 blur-[100px] rounded-full animate-aurora-slow" />
+      <div className="pointer-events-none absolute -bottom-36 right-1/4 w-[350px] h-[350px] bg-emerald-500/10 blur-[100px] rounded-full animate-aurora-alt" />
+      
       <div className="relative w-full max-w-[430px]">
         {/* Status Bar Header */}
         <div className="mb-3 flex items-center justify-between px-1 text-[11px] font-mono tracking-tight text-neutral-400">
-          <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-neutral-900/80 px-2.5 py-0.5 backdrop-blur-md shadow-xs">
+          <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-neutral-900/90 px-2.5 py-0.5 backdrop-blur-md shadow-xs">
             <span className="relative flex h-2 w-2">
               <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
               <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.8)]" />
@@ -115,10 +104,10 @@ function LoginForm() {
           </div>
         </div>
 
-        {/* macOS Window Card with Acrylic Vibrancy & Traffic Lights */}
-        <div className="mac-window relative overflow-hidden rounded-2xl border border-white/[0.14] transition-all duration-300">
+        {/* macOS Window Card with Deep Dark Apple Industrial Theme */}
+        <div className="mac-window relative overflow-hidden rounded-2xl border border-white/10 bg-[#141416]/90 backdrop-blur-3xl shadow-2xl transition-all duration-300">
           {/* macOS Titlebar */}
-          <div className="mac-titlebar px-4 py-3 flex items-center justify-between border-b border-white/[0.08] bg-white/[0.02]">
+          <div className="mac-titlebar px-4 py-3 flex items-center justify-between border-b border-white/10 bg-black/40">
             {/* Window Controls (Traffic Lights) */}
             <div className="flex items-center gap-2">
               <div className="h-3 w-3 rounded-full bg-[#FF5F56] border border-[#E0443E]/80 shadow-[inset_0_1px_1px_rgba(255,255,255,0.4)] flex items-center justify-center group cursor-pointer" title="Close">
@@ -148,13 +137,11 @@ function LoginForm() {
           <div className="p-6 sm:p-7">
             {/* Biometric Identity & Arch Linux Site Logo */}
             <div className="mb-6 flex flex-col items-center text-center">
-              <div className="relative mb-3.5 flex h-14 w-14 items-center justify-center rounded-2xl border border-[#1793D1]/40 bg-gradient-to-b from-[#1793D1]/20 via-white/[0.04] to-black/70 shadow-[inset_0_1px_0_rgba(255,255,255,0.25),0_0_24px_rgba(23,147,209,0.35)] overflow-hidden">
+              <div className="relative mb-3.5 flex h-14 w-14 items-center justify-center rounded-2xl border border-[#1793D1]/40 bg-gradient-to-b from-[#1793D1]/20 via-black/40 to-black/70 shadow-[inset_0_1px_0_rgba(255,255,255,0.1),0_0_24px_rgba(23,147,209,0.2)] overflow-hidden">
                 {/* Outer pulsing glow ring */}
                 <div className="pointer-events-none absolute -inset-1 rounded-2xl border border-[#1793D1]/30 animate-pulse-ring" />
-
                 {/* Animated Laser Scanline Effect */}
-                <div className="pointer-events-none absolute inset-x-1 h-[2px] bg-gradient-to-r from-transparent via-[#1793D1] to-transparent shadow-[0_0_10px_rgba(23,147,209,1)] z-20 animate-scan-line" />
-
+                <div className="pointer-events-none absolute inset-x-1 h-[2px] bg-gradient-to-r from-transparent via-[#1793D1] to-transparent shadow-[0_0_10px_rgba(23,147,209,0.8)] z-20 animate-scan-line" />
                 {/* Arch Linux Official Site Logo */}
                 <ArchLinux className="h-8 w-8 text-[#1793D1] relative z-10 drop-shadow-[0_0_10px_rgba(23,147,209,0.8)]" />
               </div>
@@ -168,10 +155,10 @@ function LoginForm() {
             </div>
 
             {/* macOS Segmented Control (Tabs) */}
-            <div className="mb-5 grid grid-cols-2 gap-1 rounded-xl border border-white/[0.08] bg-black/40 p-1 shadow-[inset_0_1px_2px_rgba(0,0,0,0.4)]">
+            <div className="mb-5 grid grid-cols-2 gap-1 rounded-xl border border-white/10 bg-black/60 p-1 shadow-[inset_0_1px_2px_rgba(0,0,0,0.6)]">
               <button
                 type="button"
-                className="flex items-center justify-center gap-1.5 rounded-lg border border-white/10 bg-white/[0.14] py-1.5 text-xs font-medium text-white shadow-[0_1px_3px_rgba(0,0,0,0.4),inset_0_1px_0_rgba(255,255,255,0.2)] transition"
+                className="flex items-center justify-center gap-1.5 rounded-lg border border-white/5 bg-white/10 py-1.5 text-xs font-medium text-white shadow-[0_1px_3px_rgba(0,0,0,0.4),inset_0_1px_0_rgba(255,255,255,0.1)] transition"
               >
                 <IconUser size={14} className="text-neutral-200" />
                 <span>Operator Login</span>
@@ -185,214 +172,214 @@ function LoginForm() {
               </Link>
             </div>
 
-          {/* Credentials Form */}
-          <form onSubmit={handleSubmit} className="space-y-4">
-            {/* Operator ID Dropdown */}
-            <div className="space-y-1.5">
-              <div className="flex items-center justify-between">
-                <label htmlFor="operator-select" className="block text-xs font-medium text-neutral-300">
-                  Operator ID or Username
-                </label>
-                <span className="text-[10px] font-mono text-neutral-500">
-                  {siteOperators.length} Available
-                </span>
-              </div>
-              <div className="relative">
-                <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-neutral-400">
-                  <IconUser size={16} />
-                </div>
-                <select
-                  id="operator-select"
-                  required
-                  autoFocus
-                  value={effectiveUsername}
-                  onChange={(e) => setUsername(e.target.value)}
-                  className="h-10 block w-full appearance-none rounded-md border border-white/10 bg-black/60 py-2 pl-9 pr-9 text-sm font-medium text-neutral-100 transition duration-150 ease-out focus:border-white/40 focus:bg-black/80 focus:outline-none focus:ring-1 focus:ring-white/30 cursor-pointer"
-                >
-                  <option value="" disabled className="bg-neutral-900 text-neutral-500">
-                    -- Select Operator ID or Username --
-                  </option>
-                  {siteOperators.map((op) => (
-                    <option
-                      key={op.id}
-                      value={op.id}
-                      className="bg-neutral-900 text-neutral-200 py-1"
-                    >
-                      {op.id} — {op.name} ({op.role})
-                    </option>
-                  ))}
-                </select>
-                <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3 text-neutral-500">
-                  <IconChevronDown size={15} />
-                </div>
-              </div>
-            </div>
-
-            {/* Password Field */}
-            <div className="space-y-1.5">
-              <div className="flex items-center justify-between">
-                <label className="block text-xs font-medium text-neutral-300">
-                  Password
-                </label>
-                {capsLockActive && (
-                  <span className="flex items-center gap-1 text-[11px] font-mono text-amber-400">
-                    <IconAlertCircle size={12} /> Caps Lock is ON
+            {/* Credentials Form */}
+            <form onSubmit={handleSubmit} className="space-y-4">
+              {/* Operator ID Dropdown */}
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <label htmlFor="operator-select" className="block text-xs font-medium text-neutral-300">
+                    Operator ID or Username
+                  </label>
+                  <span className="text-[10px] font-mono text-neutral-500">
+                    {siteOperators.length} Available
                   </span>
+                </div>
+                <div className="relative">
+                  <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-neutral-400">
+                    <IconUser size={16} />
+                  </div>
+                  <select
+                    id="operator-select"
+                    required
+                    autoFocus
+                    value={effectiveUsername}
+                    onChange={(e) => setUsername(e.target.value)}
+                    className="h-10 block w-full appearance-none rounded-md border border-white/10 bg-black/60 py-2 pl-9 pr-9 text-sm font-medium text-neutral-100 transition duration-150 ease-out focus:border-[#007AFF] focus:bg-black focus:outline-none focus:ring-1 focus:ring-[#007AFF] cursor-pointer"
+                  >
+                    <option value="" disabled className="bg-[#141418] text-neutral-400">
+                      -- Select Operator ID or Username --
+                    </option>
+                    {siteOperators.map((op) => (
+                      <option
+                        key={op.id}
+                        value={op.id}
+                        className="bg-[#141418] text-neutral-100 py-1.5"
+                      >
+                        {op.id} — {op.name} ({op.role})
+                      </option>
+                    ))}
+                  </select>
+                  <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3 text-neutral-500">
+                    <IconChevronDown size={15} />
+                  </div>
+                </div>
+              </div>
+
+              {/* Password Field */}
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <label className="block text-xs font-medium text-neutral-300">
+                    Password
+                  </label>
+                  {capsLockActive && (
+                    <span className="flex items-center gap-1 text-[11px] font-mono text-amber-400">
+                      <IconAlertCircle size={12} /> Caps Lock is ON
+                    </span>
+                  )}
+                </div>
+                <div className="relative">
+                  <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-neutral-500">
+                    <IconLock size={16} />
+                  </div>
+                  <input
+                    type={showPassword ? "text" : "password"}
+                    required
+                    autoComplete="current-password"
+                    placeholder="••••••••••••"
+                    value={password}
+                    onKeyDown={handleKeyDown}
+                    onKeyUp={handleKeyDown}
+                    onChange={(e) => setPassword(e.target.value)}
+                    className="h-10 block w-full rounded-md border border-white/10 bg-black/60 py-2 pl-9 pr-10 text-sm text-neutral-100 placeholder:text-neutral-500 transition duration-150 ease-out focus:border-[#007AFF] focus:bg-black focus:outline-none focus:ring-1 focus:ring-[#007AFF]"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute inset-y-0 right-0 flex items-center pr-3 text-neutral-500 hover:text-neutral-300 transition"
+                    aria-label={showPassword ? "Hide password" : "Show password"}
+                  >
+                    {showPassword ? <IconEyeOff size={16} /> : <IconEye size={16} />}
+                  </button>
+                </div>
+              </div>
+
+              {/* Collapsible 2FA Accordion */}
+              <div className="pt-0.5">
+                {!showTotp ? (
+                  <button
+                    type="button"
+                    onClick={() => setShowTotp(true)}
+                    className="inline-flex items-center gap-1.5 text-xs text-neutral-400 hover:text-white transition duration-150"
+                  >
+                    <IconKey size={14} className="text-neutral-500" />
+                    <span>Use Two-Factor (TOTP) Key</span>
+                  </button>
+                ) : (
+                  <div className="space-y-1.5 rounded-lg border border-white/10 bg-black/50 p-3">
+                    <div className="flex items-center justify-between">
+                      <label className="block text-xs font-medium text-neutral-300">
+                        Two-Factor Security Code
+                      </label>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowTotp(false);
+                          setTotp("");
+                        }}
+                        className="text-[11px] text-neutral-500 hover:text-neutral-300"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                    <div className="relative">
+                      <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-neutral-500">
+                        <IconKey size={16} />
+                      </div>
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        placeholder="6-digit code"
+                        value={totp}
+                        onChange={(e) => setTotp(e.target.value)}
+                        className="h-9 block w-full rounded-md border border-white/10 bg-black/60 py-1.5 pl-9 pr-3 font-mono text-sm text-neutral-100 placeholder:text-neutral-500 focus:border-[#007AFF] focus:outline-none focus:ring-1 focus:ring-[#007AFF]"
+                      />
+                    </div>
+                  </div>
                 )}
               </div>
-              <div className="relative">
-                <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-neutral-500">
-                  <IconLock size={16} />
-                </div>
-                <input
-                  type={showPassword ? "text" : "password"}
-                  required
-                  autoComplete="current-password"
-                  placeholder="••••••••••••"
-                  value={password}
-                  onKeyDown={handleKeyDown}
-                  onKeyUp={handleKeyDown}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="h-10 block w-full rounded-md border border-white/10 bg-black/50 py-2 pl-9 pr-10 text-sm text-neutral-100 placeholder:text-neutral-600 transition duration-150 ease-out focus:border-white/40 focus:bg-black/70 focus:outline-none focus:ring-1 focus:ring-white/30"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute inset-y-0 right-0 flex items-center pr-3 text-neutral-500 hover:text-neutral-300 transition"
-                  aria-label={showPassword ? "Hide password" : "Show password"}
-                >
-                  {showPassword ? <IconEyeOff size={16} /> : <IconEye size={16} />}
-                </button>
-              </div>
-            </div>
 
-            {/* Collapsible 2FA Accordion */}
-            <div className="pt-0.5">
-              {!showTotp ? (
-                <button
-                  type="button"
-                  onClick={() => setShowTotp(true)}
-                  className="inline-flex items-center gap-1.5 text-xs text-neutral-400 hover:text-white transition duration-150"
-                >
-                  <IconKey size={14} className="text-neutral-500" />
-                  <span>Use Two-Factor (TOTP) Key</span>
-                </button>
-              ) : (
-                <div className="space-y-1.5 rounded-lg border border-white/10 bg-black/40 p-3">
-                  <div className="flex items-center justify-between">
-                    <label className="block text-xs font-medium text-neutral-300">
-                      Two-Factor Security Code
-                    </label>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setShowTotp(false);
-                        setTotp("");
-                      }}
-                      className="text-[11px] text-neutral-500 hover:text-neutral-300"
-                    >
-                      Cancel
-                    </button>
+              {/* Select Facility / Site Dropdown (at bottom of panel) */}
+              <div className="space-y-1.5 pt-1 border-t border-white/10">
+                <div className="flex items-center justify-between">
+                  <label className="block text-xs font-medium text-neutral-300">
+                    Select Facility / Site
+                  </label>
+                  <span className="text-[10px] font-mono text-neutral-500">
+                    Filters Database & ID
+                  </span>
+                </div>
+                <div className="relative">
+                  <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-[#007AFF]">
+                    <IconMapPin size={16} />
                   </div>
-                  <div className="relative">
-                    <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-neutral-500">
-                      <IconKey size={16} />
-                    </div>
-                    <input
-                      type="text"
-                      inputMode="numeric"
-                      placeholder="6-digit code"
-                      value={totp}
-                      onChange={(e) => setTotp(e.target.value)}
-                      className="h-9 block w-full rounded-md border border-white/10 bg-black/60 py-1.5 pl-9 pr-3 font-mono text-sm text-neutral-100 placeholder:text-neutral-600 focus:border-white/40 focus:outline-none focus:ring-1 focus:ring-white/30"
-                    />
+                  <select
+                    value={selectedSite}
+                    onChange={(e) => handleSiteChange(e.target.value)}
+                    className="h-10 block w-full appearance-none rounded-md border border-white/10 bg-black/60 py-2 pl-9 pr-9 text-sm font-medium text-neutral-100 transition duration-150 ease-out focus:border-[#007AFF] focus:bg-black focus:outline-none focus:ring-1 focus:ring-[#007AFF] cursor-pointer"
+                  >
+                    {availableSites.map((site) => (
+                      <option
+                        key={site.id}
+                        value={site.name}
+                        className="bg-[#141418] text-neutral-100 py-1.5"
+                      >
+                        {site.name} {site.shortCode !== "ALL" ? `(${site.shortCode})` : ""}
+                      </option>
+                    ))}
+                  </select>
+                  <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3 text-neutral-500">
+                    <IconChevronDown size={15} />
                   </div>
                 </div>
-              )}
-            </div>
-
-            {/* Select Facility / Site Dropdown (at bottom of panel) */}
-            <div className="space-y-1.5 pt-1 border-t border-white/5">
-              <div className="flex items-center justify-between">
-                <label className="block text-xs font-medium text-neutral-300">
-                  Select Facility / Site
-                </label>
-                <span className="text-[10px] font-mono text-neutral-500">
-                  Filters Database & ID
-                </span>
               </div>
-              <div className="relative">
-                <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-red-primary">
-                  <IconMapPin size={16} />
+
+              {/* Error Message Callout */}
+              {error && (
+                <div className="flex items-start gap-2.5 rounded-lg border border-red-500/20 bg-red-950/40 p-3 text-xs text-red-200 backdrop-blur-sm">
+                  <IconAlertCircle size={16} className="shrink-0 text-red-400 mt-0.5" />
+                  <div className="leading-tight">{error}</div>
                 </div>
-                <select
-                  value={selectedSite}
-                  onChange={(e) => handleSiteChange(e.target.value)}
-                  className="h-10 block w-full appearance-none rounded-md border border-white/10 bg-black/60 py-2 pl-9 pr-9 text-sm font-medium text-neutral-100 transition duration-150 ease-out focus:border-white/40 focus:bg-black/80 focus:outline-none focus:ring-1 focus:ring-white/30 cursor-pointer"
-                >
-                  {availableSites.map((site) => (
-                    <option
-                      key={site.id}
-                      value={site.name}
-                      className="bg-neutral-900 text-neutral-200 py-1"
-                    >
-                      {site.name} {site.shortCode !== "ALL" ? `(${site.shortCode})` : ""}
-                    </option>
-                  ))}
-                </select>
-                <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3 text-neutral-500">
-                  <IconChevronDown size={15} />
-                </div>
-              </div>
-            </div>
-
-            {/* Error Message Callout */}
-            {error && (
-              <div className="flex items-start gap-2.5 rounded-lg border border-red-500/20 bg-red-950/30 p-3 text-xs text-red-200 backdrop-blur-sm">
-                <IconAlertCircle size={16} className="shrink-0 text-red-400 mt-0.5" />
-                <div className="leading-tight">{error}</div>
-              </div>
-            )}
-
-            {/* Primary Action Button - macOS Blue Push Button */}
-            <button
-              type="submit"
-              disabled={loading}
-              className="mac-button-primary group relative overflow-hidden flex h-10 w-full items-center justify-center gap-2 rounded-lg text-white font-medium text-sm transition-all duration-150 active:scale-[0.99] disabled:pointer-events-none disabled:opacity-50 cursor-pointer"
-            >
-              {/* Shimmer Light Reflection */}
-              <div className="pointer-events-none absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/20 to-transparent animate-shimmer" />
-
-              {loading ? (
-                <>
-                  <IconLoader2 size={16} className="animate-spin text-white/90 relative z-10" />
-                  <span className="relative z-10">Authenticating...</span>
-                </>
-              ) : (
-                <>
-                  <span className="relative z-10 font-sans">Sign In to System</span>
-                  <kbd className="relative z-10 hidden sm:inline-flex items-center justify-center h-5 min-w-[20px] px-1.5 rounded border border-white/30 bg-white/20 font-mono text-[10px] text-white">
-                    ↵
-                  </kbd>
-                </>
               )}
-            </button>
-          </form>
 
-          {/* Quick Scanner Helper */}
-          <div className="mt-5 border-t border-white/5 pt-4 text-center">
-            <p className="text-xs text-neutral-400">
-              Need hardware scanner setup?{" "}
-              <Link
-                href="/onboard"
-                className="font-medium text-[#007AFF] hover:underline underline-offset-4 transition"
+              {/* Primary Action Button - macOS Blue Push Button */}
+              <button
+                type="submit"
+                disabled={loading}
+                className="mac-button-primary group relative overflow-hidden flex h-10 w-full items-center justify-center gap-2 rounded-lg text-white font-medium text-sm transition-all duration-150 active:scale-[0.99] disabled:pointer-events-none disabled:opacity-50 cursor-pointer"
               >
-                Provision Scanner
-              </Link>
-            </p>
+                {/* Shimmer Light Reflection */}
+                <div className="pointer-events-none absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/10 to-transparent animate-shimmer" />
+
+                {loading ? (
+                  <>
+                    <IconLoader2 size={16} className="animate-spin text-white/90 relative z-10" />
+                    <span className="relative z-10">Authenticating...</span>
+                  </>
+                ) : (
+                  <>
+                    <span className="relative z-10 font-sans">Sign In to System</span>
+                    <kbd className="relative z-10 hidden sm:inline-flex items-center justify-center h-5 min-w-[20px] px-1.5 rounded border border-white/20 bg-white/10 font-mono text-[10px] text-white">
+                      ↵
+                    </kbd>
+                  </>
+                )}
+              </button>
+            </form>
+
+            {/* Quick Scanner Helper */}
+            <div className="mt-5 border-t border-white/10 pt-4 text-center">
+              <p className="text-xs text-neutral-400">
+                Need hardware scanner setup?{" "}
+                <Link
+                  href="/onboard"
+                  className="font-medium text-[#007AFF] hover:underline underline-offset-4 transition"
+                >
+                  Provision Scanner
+                </Link>
+              </p>
+            </div>
           </div>
         </div>
-      </div>
 
         {/* Minimal System Watermark with Live Beacon */}
         <div className="mt-3 flex items-center justify-between px-1 text-[11px] font-mono text-neutral-500">
@@ -406,12 +393,12 @@ function LoginForm() {
         {/* Global Vercel & Arch Branding Ribbon */}
         <div className="mt-4 flex items-center justify-center gap-3 text-[11px] font-mono text-neutral-500">
           <div className="flex items-center gap-1.5 hover:text-neutral-300 transition-colors cursor-help" title="Vercel Platform">
-            <Vercel className="h-3.5 w-3.5 text-white" />
+            <Vercel className="h-3.5 w-3.5 text-neutral-400" />
             <span>Vercel</span>
           </div>
           <span className="text-neutral-700">•</span>
           <div className="flex items-center gap-1.5 hover:text-neutral-300 transition-colors cursor-help" title="Next.js 16 (Turbopack Engine)">
-            <Nextjs className="h-3.5 w-3.5 text-white" />
+            <Nextjs className="h-3.5 w-3.5 text-neutral-400" />
             <span>Next.js 16</span>
           </div>
           <span className="text-neutral-700">•</span>
@@ -432,14 +419,28 @@ function LoginForm() {
 
 export default function LoginPage() {
   return (
+    <>
+      <Link 
+        href="/chat"
+        className="fixed bottom-6 left-6 z-[9999] flex items-center gap-2 px-4 py-2 rounded-full bg-black/90 border border-emerald-500/30 shadow-[0_0_15px_rgba(16,185,129,0.2)] text-white hover:bg-emerald-500/20 transition-all font-mono text-[11px] uppercase tracking-wider group"
+      >
+        <span className="relative flex h-2 w-2">
+          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+          <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+        </span>
+        <IconTerminal2 size={16} className="text-emerald-400" />
+        <span>Chat with AI</span>
+      </Link>
+
     <Suspense
       fallback={
-        <div className="flex min-h-screen w-full items-center justify-center">
-          <IconLoader2 size={32} className="animate-spin text-red-primary" />
+        <div className="flex min-h-screen w-full items-center justify-center bg-[#0a0a0c]">
+          <IconLoader2 size={32} className="animate-spin text-[#007AFF]" />
         </div>
       }
     >
       <LoginForm />
     </Suspense>
+    </>
   );
 }

@@ -3,7 +3,7 @@ import prisma from "@/lib/prisma";
 export interface DeviceNotification {
   id: string;
   timestamp: string;
-  type: "ACCESS_DENIED" | "ACCESS_GRANTED" | "ALERT" | "INFO" | "LOCKDOWN";
+  type: "ACCESS_DENIED" | "ACCESS_GRANTED" | "ALERT" | "INFO" | "LOCKDOWN" | "KEY_CUSTODY_RESULT" | "PROVISIONED";
   title: string;
   message: string;
   targetDeviceId?: string; // "ALL" or specific device ID

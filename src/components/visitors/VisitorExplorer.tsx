@@ -106,11 +106,11 @@ export default function VisitorExplorer({ visitors }: { visitors: Visitor[] }) {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search visitor, company, host, tag..."
-            className="h-9 w-64 rounded-xl bg-black/50 border border-white/15 pl-8 pr-3 text-xs text-white placeholder:text-neutral-500 focus:border-[#007AFF] focus:outline-none"
+            className="min-h-[48px] w-64 sm:w-80 rounded-xl bg-black/50 border border-white/15 pl-10 pr-4 text-xs font-mono text-white placeholder:text-neutral-500 focus:border-[#007AFF] focus:outline-none"
           />
           <IconSearch
-            size={14}
-            className="absolute left-2.5 top-2.5 text-neutral-500"
+            size={16}
+            className="absolute left-3.5 top-4 text-neutral-500"
           />
         </div>
       </div>
@@ -178,9 +178,9 @@ export default function VisitorExplorer({ visitors }: { visitors: Visitor[] }) {
             <button
               type="button"
               onClick={() => handleOpenHistory(visitor)}
-              className="w-full py-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-xs font-mono text-white flex items-center justify-center gap-1.5 transition cursor-pointer"
+              className="w-full min-h-[48px] py-2.5 rounded-xl bg-white/5 hover:bg-white/10 active:scale-[0.98] border border-white/10 text-xs font-mono text-white flex items-center justify-center gap-2 transition cursor-pointer"
             >
-              <IconHistory size={14} className="text-amber-400" />
+              <IconHistory size={16} className="text-amber-400" />
               <span>View Gate Log History</span>
             </button>
           </div>
@@ -217,9 +217,9 @@ export default function VisitorExplorer({ visitors }: { visitors: Visitor[] }) {
               <button
                 type="button"
                 onClick={() => setSelectedVisitor(null)}
-                className="p-1 rounded-lg bg-white/5 hover:bg-white/10 text-neutral-400 hover:text-white cursor-pointer"
+                className="min-h-[48px] min-w-[48px] rounded-xl flex items-center justify-center bg-white/5 hover:bg-white/10 text-neutral-400 hover:text-white cursor-pointer"
               >
-                <IconX size={16} />
+                <IconX size={18} />
               </button>
             </div>
 
@@ -306,7 +306,7 @@ export default function VisitorExplorer({ visitors }: { visitors: Visitor[] }) {
               <button
                 type="button"
                 onClick={() => setSelectedVisitor(null)}
-                className="px-4 py-2 rounded-xl bg-white/10 hover:bg-white/15 text-xs text-white font-mono cursor-pointer"
+                className="min-h-[48px] px-5 py-2.5 rounded-xl bg-white/10 hover:bg-white/15 active:scale-[0.98] text-xs text-white font-mono transition cursor-pointer"
               >
                 Close History
               </button>

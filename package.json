@@ -6,19 +6,31 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "typecheck": "tsc --noEmit",
+    "prisma:generate": "prisma generate",
+    "prisma:validate": "prisma validate",
+    "test": "tsx tests/e2e/runner.ts",
+    "test:e2e": "tsx tests/e2e/runner.ts",
+    "test:spec": "tsx tests/e2e/runner.ts",
+    "test:stress": "tsx tests/stress-css-touch-m2.ts && tsx tests/stress-challenger-m1.ts && tsx tests/stress_api_harness.ts && tsx tests/stress_challenger_m2.ts && tsx tests/stress_challenger_gate_1.ts && tsx tests/stress_key_custody_challenger.ts",
+    "test:all": "tsx tests/e2e/runner.ts && tsx tests/stress-css-touch-m2.ts && tsx tests/stress-challenger-m1.ts && tsx tests/stress_api_harness.ts && tsx tests/stress_challenger_m2.ts && tsx tests/stress_challenger_gate_1.ts && tsx tests/stress_key_custody_challenger.ts"
   },
   "dependencies": {
     "@tabler/icons-react": "^3.46.0",
     "@thesvg/react": "^3.3.3",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
     "geist": "^1.7.2",
+    "lucide-react": "^1.45.0",
     "next": "16.4.0-canary.23",
     "next-auth": "5.0.0-beta.32",
     "otplib": "^13.5.0",
     "qrcode": "^1.5.4",
     "react": "19.2.8",
     "react-dom": "19.2.8",
-    "react-qrcode-logo": "^4.1.0"
+    "react-qrcode-logo": "^4.1.0",
+    "tailwind-merge": "^3.7.0"
   },
   "devDependencies": {
     "@prisma/client": "^6.19.3",
@@ -31,6 +43,7 @@
     "eslint-config-next": "16.4.0-canary.23",
     "prisma": "6.19.3",
     "tailwindcss": "^4.3.3",
+    "tsx": "^4.23.13",
     "typescript": "^6.0.3"
   },
   "packageManager": "pnpm@9.15.9"

@@ -41,13 +41,10 @@ export default function InteractiveStatCard({
     if (historyData && historyData[timeRange]) {
       return historyData[timeRange];
     }
-    // Generate organic points leading to current value
+    // Render honest baseline representing current verified value (zero synthetic oscillations)
     const count = timeRange === "1H" ? 8 : timeRange === "8H" ? 12 : 16;
     const pts: DataPoint[] = [];
-    const base = Math.max(1, value);
     for (let i = 0; i < count; i++) {
-      const factor = 0.75 + Math.sin(i * 0.8 + (id.length % 5)) * 0.2 + (i / count) * 0.25;
-      const val = i === count - 1 ? value : Math.max(0, Math.round(base * factor));
       const hoursAgo = count - 1 - i;
       const timeStr =
         timeRange === "1H"
@@ -57,12 +54,11 @@ export default function InteractiveStatCard({
           : `${hoursAgo}h ago`;
       pts.push({
         time: i === count - 1 ? "Now" : timeStr,
-        value: val,
-        delta: i > 0 ? (val >= pts[i - 1].value ? `+${val - pts[i - 1].value}` : `-${pts[i - 1].value - val}`) : undefined,
+        value,
       });
     }
     return pts;
-  }, [historyData, timeRange, value, id]);
+  }, [historyData, timeRange, value]);
 
   const activePoint = hoveredIndex !== null && points[hoveredIndex] ? points[hoveredIndex] : null;
   const displayValue = activePoint ? activePoint.value : value;

@@ -28,16 +28,7 @@ function getServerIp(): Promise<string> {
   });
 }
 
-async function getPublicUrl(): Promise<string> {
-  try {
-    const txtPath = path.join(process.cwd(), "public_url.txt");
-    const content = (await fs.readFile(txtPath, "utf-8")).trim();
-    if (content.startsWith("http")) return content;
-  } catch {
-    // fallback
-  }
-  return "https://francisco-wing-appointment-gap.trycloudflare.com";
-}
+import { getTunnelUrl } from "@/lib/tunnel";
 
 export default async function OnboardPage({
   searchParams,
@@ -56,7 +47,7 @@ export default async function OnboardPage({
     serverIp = "192.168.1.79";
   }
 
-  const publicUrl = await getPublicUrl();
+  const publicUrl = await getTunnelUrl();
 
   // 1. Generate Universal Permanent Link QR (links C66 permanently to Control-Access)
   const defaultDevice = "Chainway-C66-01";

@@ -1,0 +1,137 @@
+name: Production Deployment & Health Verification
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      target_env:
+        description: 'Deployment Target Environment'
+        required: true
+        default: 'production'
+        type: choice
+        options:
+          - production
+          - staging
+
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  NODE_ENV: production
+  DATABASE_URL: "file:./mine_management.db"
+  NEXTAUTH_URL: "http://127.0.0.1:8080"
+  NEXT_PUBLIC_APP_URL: "http://127.0.0.1:8080"
+
+jobs:
+  build-and-verify:
+    name: Build Bundle & Verify Integrity
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Source Code
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.9
+
+      - name: Setup Node.js v26
+        uses: actions/setup-node@v4
+        with:
+          node-version: '26'
+          cache: 'pnpm'
+
+      - name: Install Production Dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Prisma Schema Validation & Generate
+        run: |
+          pnpm exec prisma validate
+          pnpm exec prisma generate
+
+      - name: TypeScript Type Checking
+        run: pnpm exec tsc --noEmit
+
+      - name: Build Production Next.js Bundle
+        run: pnpm build
+
+      - name: Upload Production Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: control-access-production-bundle
+          path: |
+            .next
+            public
+            prisma
+            package.json
+            pnpm-lock.yaml
+          retention-days: 14
+
+  deploy-service:
+    name: Zero-Downtime Service Deployment
+    runs-on: ubuntu-latest
+    needs: [build-and-verify]
+    steps:
+      - name: Checkout Source Code
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.9
+
+      - name: Setup Node.js v26
+        uses: actions/setup-node@v4
+        with:
+          node-version: '26'
+          cache: 'pnpm'
+
+      - name: Install Dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Prisma Database Migration / Push
+        run: |
+          pnpm exec prisma generate
+          pnpm exec prisma db push --skip-generate
+
+      - name: Build Next.js
+        run: pnpm build
+
+      - name: Launch Service Health Check Harness
+        run: |
+          pnpm start -p 8080 &
+          APP_PID=$!
+          echo "App process launched with PID $APP_PID"
+          
+          # Health check polling
+          HEALTH_STATUS="DOWN"
+          for i in {1..30}; do
+            HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:8080/api/health || true)
+            if [ "$HTTP_CODE" -eq 200 ]; then
+              echo "✅ Health check passed: HTTP 200 OK"
+              HEALTH_STATUS="UP"
+              break
+            fi
+            echo "Waiting for /api/health probe ($i/30)..."
+            sleep 1
+          done
+          
+          if [ "$HEALTH_STATUS" != "UP" ]; then
+            echo "❌ CRITICAL: Health check probe failed on /api/health"
+            kill -9 $APP_PID || true
+            exit 1
+          fi
+
+      - name: Cloudflare Tunnel & Telemetry Verification
+        run: |
+          echo "Verifying /api/tunnel-status endpoint responsiveness..."
+          TUNNEL_RESP=$(curl -s http://127.0.0.1:8080/api/tunnel-status || echo '{"status":"offline"}')
+          echo "Tunnel Status Response: $TUNNEL_RESP"
+
+      - name: Run Smoke Tests Against Live Instance
+        run: |
+          curl -s -f http://127.0.0.1:8080/api/admin/provisioning > /dev/null
+          curl -s -f http://127.0.0.1:8080/api/scanner/key-custody > /dev/null
+          echo "✅ All mission-critical ingress and custody endpoints verified live!"

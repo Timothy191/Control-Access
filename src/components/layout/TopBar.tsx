@@ -11,7 +11,21 @@ import {
   IconMapPin,
   IconChevronDown,
   IconCheck,
+  IconMenu2,
+  IconX,
+  IconDashboard,
+  IconUsers,
+  IconUserCheck,
+  IconTruck,
+  IconRadio,
+  IconIdBadge2,
+  IconDeviceMobile,
+  IconDatabase,
+  IconSettings,
+  IconClipboardCheck,
+  IconQrcode,
 } from "@tabler/icons-react";
+import Link from "next/link";
 
 export default function TopBar() {
   const pathname = usePathname();
@@ -19,6 +33,7 @@ export default function TopBar() {
   const { data: session } = useSession();
   const { selectedSite, setSelectedSite, availableSites } = useSite();
   const [siteDropdownOpen, setSiteDropdownOpen] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
   const [pendingApprovals, setPendingApprovals] = useState<number | null>(null);
 
   useEffect(() => {
@@ -59,8 +74,12 @@ export default function TopBar() {
         return "Database";
       case "/admin":
         return "Admin Settings";
+      case "/access-cards":
+        return "Access Cards";
       case "/onboard":
         return "Device Onboarding";
+      case "/onboard/scanner":
+        return "Scanner Onboarding";
       default:
         return "Dashboard";
     }
@@ -79,8 +98,37 @@ export default function TopBar() {
   const userName = session?.user?.name || "Signed in";
   const userRole = session?.user?.role || "user";
 
+  const quickNavSections = [
+    {
+      category: "Operations",
+      items: [
+        { name: "Dashboard", href: "/", icon: IconDashboard },
+        { name: "Scanner Terminal", href: "/scanner", icon: IconQrcode },
+        { name: "Approvals & Key Control", href: "/approvals", icon: IconClipboardCheck },
+      ],
+    },
+    {
+      category: "Registers & Personnel",
+      items: [
+        { name: "Employees", href: "/employees", icon: IconUsers },
+        { name: "Visitors", href: "/visitors", icon: IconUserCheck },
+        { name: "Fleet & Earthmoving", href: "/fleet", icon: IconTruck },
+        { name: "Equipment & Safety", href: "/equipment", icon: IconRadio },
+        { name: "Access Cards & Badges", href: "/access-cards", icon: IconIdBadge2 },
+      ],
+    },
+    {
+      category: "System & Setup",
+      items: [
+        { name: "Device Onboarding", href: "/onboard", icon: IconDeviceMobile },
+        { name: "Database & Backups", href: "/database", icon: IconDatabase },
+        { name: "Admin Settings", href: "/admin", icon: IconSettings },
+      ],
+    },
+  ];
+
   return (
-    <header className="w-full h-14 px-6 flex items-center justify-between backdrop-blur-2xl bg-[#141418]/75 border-b border-white/10 shadow-[0_1px_0_rgba(255,255,255,0.05)] sticky top-0 z-30 mb-6 font-sans">
+    <header className="w-full h-14 px-6 flex items-center justify-between backdrop-blur-2xl bg-[#141418]/75 border-b border-white/10 shadow-[0_1px_0_rgba(255,255,255,0.05)] sticky top-0 z-15 mb-6 font-sans">
       <div className="flex items-center gap-4 ml-12 md:ml-0">
         <h2 className="font-sans font-semibold text-base text-white tracking-tight">
           {getPageTitle()}
@@ -91,21 +139,21 @@ export default function TopBar() {
           <button
             type="button"
             onClick={() => setSiteDropdownOpen(!siteDropdownOpen)}
-            className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-white/15 bg-white/[0.05] hover:bg-white/[0.1] hover:border-white/25 text-xs font-sans text-neutral-200 transition shadow-[inset_0_1px_0_rgba(255,255,255,0.1)] cursor-pointer"
+            className="flex items-center gap-2 min-h-[38px] px-3.5 py-2 rounded-xl border border-white/15 bg-white/[0.05] hover:bg-white/[0.1] hover:border-white/25 active:scale-[0.98] text-xs font-sans text-neutral-200 transition shadow-[inset_0_1px_0_rgba(255,255,255,0.1)] cursor-pointer"
             aria-label="Select Site"
           >
-            <IconMapPin size={14} className="text-[#007AFF]" />
+            <IconMapPin size={15} className="text-[#007AFF]" />
             <span className="font-medium max-w-[140px] truncate sm:max-w-none">{selectedSite}</span>
-            <IconChevronDown size={13} className="text-neutral-400" />
+            <IconChevronDown size={14} className="text-neutral-400" />
           </button>
 
           {siteDropdownOpen && (
             <>
               <div
-                className="fixed inset-0 z-40"
+                className="fixed inset-0 z-20"
                 onClick={() => setSiteDropdownOpen(false)}
               />
-              <div className="absolute left-0 mt-2 w-64 rounded-xl border border-white/15 bg-[#1c1c22]/95 p-1.5 shadow-[0_20px_50px_rgba(0,0,0,0.85),0_0_0_1px_rgba(255,255,255,0.1)] backdrop-blur-2xl z-50">
+              <div className="absolute left-0 mt-2 w-64 rounded-xl border border-white/15 bg-[#1c1c22]/95 p-1.5 shadow-[0_20px_50px_rgba(0,0,0,0.85),0_0_0_1px_rgba(255,255,255,0.1)] backdrop-blur-2xl z-25">
                 <div className="px-2.5 py-1.5 text-[10px] font-mono uppercase tracking-wider text-neutral-400">
                   Select Facility / Site
                 </div>
@@ -140,7 +188,7 @@ export default function TopBar() {
 
       <div className="flex items-center gap-3 text-neutral-300">
         <button
-          className="p-2 hover:bg-white/10 hover:text-white rounded-lg transition-colors relative cursor-pointer"
+          className="min-h-[38px] min-w-[38px] flex items-center justify-center p-2 hover:bg-white/10 hover:text-white rounded-xl transition-colors relative cursor-pointer active:scale-[0.98]"
           aria-label="Notifications"
           type="button"
           onClick={() => router.push("/approvals")}
@@ -157,7 +205,7 @@ export default function TopBar() {
 
         <button
           onClick={handleSignOut}
-          className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg hover:bg-white/10 hover:text-white transition-colors cursor-pointer"
+          className="min-h-[38px] flex items-center gap-2 px-3 py-1.5 rounded-xl hover:bg-white/10 hover:text-white transition-colors cursor-pointer active:scale-[0.98]"
           aria-label="Sign out"
           type="button"
         >
@@ -172,6 +220,73 @@ export default function TopBar() {
           </div>
           <IconLogout size={16} className="ml-1 text-neutral-400 hover:text-white" />
         </button>
+
+        <div className="h-4 w-px bg-white/15 hidden sm:block" />
+
+        {/* Top Right Corner Sandwich Menu Icon */}
+        <div className="relative z-30">
+          <button
+            type="button"
+            onClick={() => setMenuOpen(!menuOpen)}
+            className={`min-h-[44px] min-w-[44px] flex items-center justify-center p-2.5 rounded-xl border transition-all duration-200 cursor-pointer active:scale-[0.96] ${
+              menuOpen
+                ? "bg-[#007AFF] text-white border-[#007AFF] shadow-[0_0_15px_rgba(0,122,255,0.4)]"
+                : "bg-white/[0.08] text-white border-white/15 hover:bg-white/[0.15] hover:border-white/30"
+            }`}
+            aria-label="Toggle Quick Navigation Sandwich Menu"
+            title="Sandwich Navigation Menu"
+          >
+            {menuOpen ? <IconX size={20} /> : <IconMenu2 size={20} />}
+          </button>
+
+          {menuOpen && (
+            <>
+              <div
+                className="fixed inset-0 z-40 bg-black/40 backdrop-blur-xs"
+                onClick={() => setMenuOpen(false)}
+              />
+              <div className="absolute right-0 mt-3 w-72 rounded-2xl border border-white/20 bg-[#141418]/95 p-3 shadow-[0_25px_60px_rgba(0,0,0,0.9),0_0_0_1px_rgba(255,255,255,0.1)] backdrop-blur-3xl z-50 animate-in fade-in slide-in-from-top-2 duration-150">
+                <div className="flex items-center justify-between px-2 pb-2 mb-2 border-b border-white/10">
+                  <div className="flex items-center gap-2">
+                    <IconMenu2 size={16} className="text-[#007AFF]" />
+                    <span className="text-xs font-semibold text-white tracking-tight">Navigation Menu</span>
+                  </div>
+                  <span className="text-[10px] font-mono text-neutral-400 bg-white/10 px-1.5 py-0.5 rounded">All Tabs</span>
+                </div>
+
+                <div className="max-h-[75vh] overflow-y-auto space-y-3 pr-1 scrollbar-thin">
+                  {quickNavSections.map((sec) => (
+                    <div key={sec.category} className="space-y-1">
+                      <div className="px-2 text-[10px] font-mono uppercase tracking-wider text-neutral-400">
+                        {sec.category}
+                      </div>
+                      {sec.items.map((item) => {
+                        const Icon = item.icon;
+                        const active = pathname === item.href;
+                        return (
+                          <Link
+                            key={item.href}
+                            href={item.href}
+                            onClick={() => setMenuOpen(false)}
+                            className={`flex items-center gap-3 px-2.5 py-2 rounded-xl text-xs font-medium transition cursor-pointer active:scale-[0.98] ${
+                              active
+                                ? "bg-[#007AFF] text-white shadow-sm"
+                                : "text-neutral-200 hover:bg-white/10 hover:text-white"
+                            }`}
+                          >
+                            <Icon size={16} className={active ? "text-white" : "text-neutral-400"} />
+                            <span className="flex-1 truncate">{item.name}</span>
+                            {active && <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />}
+                          </Link>
+                        );
+                      })}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </>
+          )}
+        </div>
       </div>
     </header>
   );
