@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useMemo } from "react";
+import { useRouter } from "next/navigation";
 import {
   IconTruck,
   IconCar,
@@ -18,7 +19,11 @@ import {
   IconPlus,
   IconCheck,
   IconAlertTriangle,
+  IconDownload,
+  IconUpload,
+  IconFileCode,
 } from "@tabler/icons-react";
+import FleetDataExchangeModal from "./FleetDataExchangeModal";
 
 export interface Vehicle {
   id: number;
@@ -73,11 +78,39 @@ export function evaluateExpiry(dateVal?: string | Date | null) {
 }
 
 export default function FleetExplorer({ vehicles: initialVehicles }: { vehicles: Vehicle[] }) {
+  const router = useRouter();
   const [vehicles, setVehicles] = useState<Vehicle[]>(initialVehicles);
   const [vehicleTab, setVehicleTab] = useState<"all" | "heavy" | "personal">("all");
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [complianceFilter, setComplianceFilter] = useState("all");
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+
+  const handleExport = (format: "csv" | "json") => {
+    const params = new URLSearchParams();
+    params.set("format", format);
+    if (vehicleTab === "heavy") params.set("is_heavy_fleet", "true");
+    if (vehicleTab === "personal") params.set("is_heavy_fleet", "false");
+    if (statusFilter !== "all") params.set("status", statusFilter);
+    if (search.trim()) params.set("search", search.trim());
+    window.location.href = `/api/fleet/export?${params.toString()}`;
+  };
+
+  const handleRefreshFleet = async () => {
+    try {
+      const res = await fetch("/api/fleet?format=array");
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data)) {
+          setVehicles(data);
+          showToast(`Fleet data refreshed: ${data.length} vehicles registered`);
+        }
+      }
+      router.refresh();
+    } catch (err) {
+      console.error("Failed to refresh fleet:", err);
+    }
+  };
 
   // Operational Hours Increment Modal State
   const [incrementModalVehicle, setIncrementModalVehicle] = useState<Vehicle | null>(null);
@@ -231,18 +264,53 @@ export default function FleetExplorer({ vehicles: initialVehicles }: { vehicles:
           </p>
         </div>
 
-        <div className="relative">
-          <input
-            type="text"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search fleet ID, machine ID, plate, model..."
-            className="min-h-[48px] w-64 sm:w-80 rounded-xl bg-black/50 border border-white/15 pl-10 pr-4 text-xs text-white placeholder:text-neutral-500 focus:border-[#007AFF] focus:outline-none"
-          />
-          <IconSearch
-            size={16}
-            className="absolute left-3.5 top-4 text-neutral-500"
-          />
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="relative">
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search fleet ID, machine ID, plate, model..."
+              className="min-h-[48px] w-64 sm:w-80 rounded-xl bg-black/50 border border-white/15 pl-10 pr-4 text-xs text-white placeholder:text-neutral-500 focus:border-[#007AFF] focus:outline-none"
+            />
+            <IconSearch
+              size={16}
+              className="absolute left-3.5 top-4 text-neutral-500"
+            />
+          </div>
+
+          {/* Action Controls: Import & Export */}
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => handleExport("csv")}
+              className="min-h-[48px] px-4 py-2.5 rounded-xl border border-white/15 bg-white/[0.05] hover:bg-white/10 active:scale-[0.98] text-xs font-mono font-semibold text-neutral-200 transition flex items-center gap-2 cursor-pointer shadow-[inset_0_1px_0_rgba(255,255,255,0.1)]"
+              title="Export filtered fleet register as CSV"
+            >
+              <IconDownload size={16} className="text-[#007AFF]" />
+              <span>Export CSV</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => handleExport("json")}
+              className="min-h-[48px] px-4 py-2.5 rounded-xl border border-white/15 bg-white/[0.05] hover:bg-white/10 active:scale-[0.98] text-xs font-mono font-semibold text-neutral-200 transition flex items-center gap-2 cursor-pointer shadow-[inset_0_1px_0_rgba(255,255,255,0.1)]"
+              title="Export filtered fleet register as JSON"
+            >
+              <IconFileCode size={16} className="text-purple-400" />
+              <span>Export JSON</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setIsImportModalOpen(true)}
+              className="min-h-[48px] px-4 py-2.5 rounded-xl bg-[#007AFF] hover:bg-[#0A84FF] active:scale-[0.98] text-xs font-mono font-bold text-white transition flex items-center gap-2 cursor-pointer shadow-md shadow-[#007AFF]/25"
+              title="Bulk import or mass-generate fleet machinery"
+            >
+              <IconUpload size={16} />
+              <span>Import / Generate</span>
+            </button>
+          </div>
         </div>
       </div>
 
@@ -329,11 +397,11 @@ export default function FleetExplorer({ vehicles: initialVehicles }: { vehicles:
           </button>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2.5">
           <select
             value={complianceFilter}
             onChange={(e) => setComplianceFilter(e.target.value)}
-            className="min-h-[48px] px-3 rounded-xl bg-black/50 border border-white/15 text-xs text-white font-mono focus:border-[#007AFF] focus:outline-none"
+            className="min-h-[48px] px-3 rounded-xl bg-black/50 border border-white/15 text-xs text-white font-mono focus:border-[#007AFF] focus:outline-none cursor-pointer"
           >
             <option value="all">All Compliance</option>
             <option value="valid">100% Valid Only</option>
@@ -344,13 +412,33 @@ export default function FleetExplorer({ vehicles: initialVehicles }: { vehicles:
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
-            className="min-h-[48px] px-3 rounded-xl bg-black/50 border border-white/15 text-xs text-white font-mono focus:border-[#007AFF] focus:outline-none"
+            className="min-h-[48px] px-3 rounded-xl bg-black/50 border border-white/15 text-xs text-white font-mono focus:border-[#007AFF] focus:outline-none cursor-pointer"
           >
             <option value="all">All Statuses</option>
             <option value="Active">Active</option>
             <option value="Maintenance">Maintenance</option>
             <option value="Decommissioned">Decommissioned</option>
           </select>
+
+          <button
+            type="button"
+            onClick={() => handleExport("csv")}
+            className="min-h-[48px] px-4 py-2.5 rounded-xl border border-white/15 bg-white/[0.05] hover:bg-white/10 active:scale-[0.98] text-xs font-mono font-semibold text-neutral-200 transition flex items-center gap-2 cursor-pointer shadow-[inset_0_1px_0_rgba(255,255,255,0.1)]"
+            title="Export filtered fleet register as CSV"
+          >
+            <IconDownload size={16} className="text-[#007AFF]" />
+            <span>Export CSV</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setIsImportModalOpen(true)}
+            className="min-h-[48px] px-4 py-2.5 rounded-xl bg-[#007AFF] hover:bg-[#0A84FF] active:scale-[0.98] text-xs font-mono font-bold text-white transition flex items-center gap-2 cursor-pointer shadow-md shadow-[#007AFF]/25"
+            title="Bulk import or mass-generate fleet and machinery"
+          >
+            <IconUpload size={16} />
+            <span>Import / Generate</span>
+          </button>
         </div>
       </div>
 
@@ -759,6 +847,13 @@ export default function FleetExplorer({ vehicles: initialVehicles }: { vehicles:
           </div>
         </div>
       )}
+
+      {/* Fleet Mass Import & Generator Modal */}
+      <FleetDataExchangeModal
+        isOpen={isImportModalOpen}
+        onClose={() => setIsImportModalOpen(false)}
+        onSuccess={handleRefreshFleet}
+      />
     </div>
   );
 }

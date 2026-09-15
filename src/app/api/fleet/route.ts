@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { Prisma } from "@prisma/client";
+import { exportFleet, importFleet } from "@/lib/data-exchange/fleet-exchange";
 
 export const dynamic = "force-dynamic";
 
@@ -83,6 +84,36 @@ function formatVehicle(v: Record<string, unknown>) {
 export async function GET(req: Request) {
   try {
     const url = new URL(req.url);
+    const exportParam = url.searchParams.get("export");
+    const formatParam = url.searchParams.get("format");
+
+    // Check if Export requested
+    if (exportParam === "true" || formatParam === "csv") {
+      const typeParam = url.searchParams.get("type") || url.searchParams.get("vehicle_type");
+      const isHeavyFleetParam = url.searchParams.get("is_heavy_fleet");
+      const status = url.searchParams.get("status");
+      const cert = url.searchParams.get("required_certification");
+      const search = url.searchParams.get("search")?.trim();
+
+      const exportResult = await exportFleet({
+        format: formatParam === "json" ? "json" : "csv",
+        typeParam,
+        isHeavyFleetParam,
+        status,
+        cert,
+        search,
+      });
+
+      return new Response(exportResult.data, {
+        status: 200,
+        headers: {
+          "Content-Type": exportResult.contentType,
+          "Content-Disposition": `attachment; filename="${exportResult.filename}"`,
+          "Cache-Control": "no-cache, no-store",
+        },
+      });
+    }
+
     const idParam = url.searchParams.get("id");
     const fleetIdParam = url.searchParams.get("fleet_id") || url.searchParams.get("machine_id");
 
@@ -250,6 +281,21 @@ export async function GET(req: Request) {
 export async function POST(req: Request) {
   try {
     const body = await req.json();
+
+    // Check if Mass Generator or Import Payload was sent to /api/fleet
+    if (
+      body.generate_count !== undefined ||
+      body.csvText !== undefined ||
+      Array.isArray(body.vehicles) ||
+      body.action === "import" ||
+      body.action === "generate"
+    ) {
+      const importResult = await importFleet(body);
+      if (!importResult.success && importResult.summary.total_processed === 0) {
+        return NextResponse.json(importResult, { status: 400 });
+      }
+      return NextResponse.json(importResult, { status: 200 });
+    }
 
     const fleetId = (body.fleet_id || body.machine_id)?.trim();
     if (!fleetId || fleetId.length < 2) {

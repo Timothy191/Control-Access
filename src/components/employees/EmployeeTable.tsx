@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import {
   IconSearch,
   IconShieldCheck,
@@ -15,7 +16,12 @@ import {
   IconHeartbeat,
   IconBuilding,
   IconIdBadge2,
+  IconDownload,
+  IconUpload,
+  IconRefresh,
+  IconFileCode,
 } from "@tabler/icons-react";
+import EmployeeDataExchangeModal from "./EmployeeDataExchangeModal";
 
 export interface Employee {
   id: number;
@@ -249,12 +255,42 @@ export default function EmployeeTable({
   areas,
   accessLevels = [],
 }: EmployeeTableProps) {
+  const router = useRouter();
+  const [employeesData, setEmployeesData] = useState<Employee[]>(employees);
   const [personnelType, setPersonnelType] = useState<"all" | "employees" | "contractors">("all");
   const [area, setArea] = useState("all");
   const [status, setStatus] = useState("all");
   const [accessLevel, setAccessLevel] = useState("all");
   const [complianceFilter, setComplianceFilter] = useState<"all" | "valid" | "expiring" | "expired">("all");
   const [search, setSearch] = useState("");
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+
+  const handleExport = (format: "csv" | "json") => {
+    const params = new URLSearchParams();
+    params.set("format", format);
+    if (area !== "all") params.set("site", area);
+    if (status !== "all") params.set("status", status);
+    if (personnelType === "contractors") params.set("contractor", "true");
+    if (personnelType === "employees") params.set("contractor", "false");
+    if (accessLevel !== "all") params.set("access_level", accessLevel);
+    if (search.trim()) params.set("search", search.trim());
+    window.location.href = `/api/employees/export?${params.toString()}`;
+  };
+
+  const handleRefreshEmployees = async () => {
+    try {
+      const res = await fetch("/api/employees?format=array");
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data)) {
+          setEmployeesData(data);
+        }
+      }
+      router.refresh();
+    } catch (err) {
+      console.error("Failed to refresh employees:", err);
+    }
+  };
 
   // Individual Employee History Modal
   const [selectedEmp, setSelectedEmp] = useState<Employee | null>(null);
@@ -281,7 +317,7 @@ export default function EmployeeTable({
   };
 
   const filtered = useMemo(() => {
-    return employees.filter((emp) => {
+    return employeesData.filter((emp) => {
       const isContractor = Boolean(
         emp.is_contractor ||
         (emp.contractor_company && emp.contractor_company.trim().length > 0) ||
@@ -341,43 +377,79 @@ export default function EmployeeTable({
 
   return (
     <div className="space-y-4">
-      {/* Type Toggle Tabs (Segmented Control - min 48px touch targets) */}
-      <div className="flex items-center gap-2 p-1.5 bg-neutral-900/80 border border-white/10 rounded-2xl w-fit backdrop-blur-md">
-        <button
-          type="button"
-          onClick={() => setPersonnelType("all")}
-          className={`min-h-[48px] px-5 py-2.5 rounded-xl text-xs font-mono font-bold transition cursor-pointer active:scale-[0.98] ${
-            personnelType === "all"
-              ? "bg-[#007AFF] text-white shadow-md shadow-[#007AFF]/25"
-              : "text-neutral-400 hover:text-white hover:bg-white/5"
-          }`}
-        >
-          All Workforce ({employees.length})
-        </button>
-        <button
-          type="button"
-          onClick={() => setPersonnelType("employees")}
-          className={`min-h-[48px] px-5 py-2.5 rounded-xl text-xs font-mono font-bold transition cursor-pointer flex items-center gap-1.5 active:scale-[0.98] ${
-            personnelType === "employees"
-              ? "bg-[#007AFF] text-white shadow-md shadow-[#007AFF]/25"
-              : "text-neutral-400 hover:text-white hover:bg-white/5"
-          }`}
-        >
-          <IconIdBadge2 size={16} />
-          <span>Mine Staff</span>
-        </button>
-        <button
-          type="button"
-          onClick={() => setPersonnelType("contractors")}
-          className={`min-h-[48px] px-5 py-2.5 rounded-xl text-xs font-mono font-bold transition cursor-pointer flex items-center gap-1.5 active:scale-[0.98] ${
-            personnelType === "contractors"
-              ? "bg-[#007AFF] text-white shadow-md shadow-[#007AFF]/25"
-              : "text-neutral-400 hover:text-white hover:bg-white/5"
-          }`}
-        >
-          <IconBuilding size={16} />
-          <span>Contractors</span>
-        </button>
+      {/* Top Controls: Type Tabs & Pipeline Actions (Import / Export) */}
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        {/* Type Toggle Tabs (Segmented Control - min 48px touch targets) */}
+        <div className="flex items-center gap-2 p-1.5 bg-neutral-900/80 border border-white/10 rounded-2xl w-fit backdrop-blur-md">
+          <button
+            type="button"
+            onClick={() => setPersonnelType("all")}
+            className={`min-h-[48px] px-5 py-2.5 rounded-xl text-xs font-mono font-bold transition cursor-pointer active:scale-[0.98] ${
+              personnelType === "all"
+                ? "bg-[#007AFF] text-white shadow-md shadow-[#007AFF]/25"
+                : "text-neutral-400 hover:text-white hover:bg-white/5"
+            }`}
+          >
+            All Workforce ({employees.length})
+          </button>
+          <button
+            type="button"
+            onClick={() => setPersonnelType("employees")}
+            className={`min-h-[48px] px-5 py-2.5 rounded-xl text-xs font-mono font-bold transition cursor-pointer flex items-center gap-1.5 active:scale-[0.98] ${
+              personnelType === "employees"
+                ? "bg-[#007AFF] text-white shadow-md shadow-[#007AFF]/25"
+                : "text-neutral-400 hover:text-white hover:bg-white/5"
+            }`}
+          >
+            <IconIdBadge2 size={16} />
+            <span>Mine Staff</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setPersonnelType("contractors")}
+            className={`min-h-[48px] px-5 py-2.5 rounded-xl text-xs font-mono font-bold transition cursor-pointer flex items-center gap-1.5 active:scale-[0.98] ${
+              personnelType === "contractors"
+                ? "bg-[#007AFF] text-white shadow-md shadow-[#007AFF]/25"
+                : "text-neutral-400 hover:text-white hover:bg-white/5"
+            }`}
+          >
+            <IconBuilding size={16} />
+            <span>Contractors</span>
+          </button>
+        </div>
+
+        {/* Action Controls: Import & Export */}
+        <div className="flex items-center gap-2.5">
+          <button
+            type="button"
+            onClick={() => handleExport("csv")}
+            className="min-h-[48px] px-4 py-2.5 rounded-xl border border-white/15 bg-white/[0.05] hover:bg-white/10 active:scale-[0.98] text-xs font-mono font-semibold text-neutral-200 transition flex items-center gap-2 cursor-pointer shadow-[inset_0_1px_0_rgba(255,255,255,0.1)]"
+            title="Export filtered workforce register as CSV"
+          >
+            <IconDownload size={16} className="text-[#007AFF]" />
+            <span>Export CSV</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => handleExport("json")}
+            className="min-h-[48px] px-4 py-2.5 rounded-xl border border-white/15 bg-white/[0.05] hover:bg-white/10 active:scale-[0.98] text-xs font-mono font-semibold text-neutral-200 transition flex items-center gap-2 cursor-pointer shadow-[inset_0_1px_0_rgba(255,255,255,0.1)]"
+            title="Export filtered workforce register as JSON"
+          >
+            <IconFileCode size={16} className="text-purple-400" />
+            <span>Export JSON</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setIsImportModalOpen(true)}
+            className="min-h-[48px] px-4 py-2.5 rounded-xl bg-[#007AFF] hover:bg-[#0A84FF] active:scale-[0.98] text-xs font-mono font-bold text-white transition flex items-center gap-2 cursor-pointer shadow-md shadow-[#007AFF]/25"
+            title="Bulk import or mass-generate workforce personnel"
+          >
+            <IconUpload size={16} />
+            <span>Import / Generate</span>
+          </button>
+        </div>
       </div>
 
       {/* Filter Bar */}
@@ -859,6 +931,14 @@ export default function EmployeeTable({
           </div>
         </div>
       )}
+
+      {/* Workforce Mass Import & Generator Modal */}
+      <EmployeeDataExchangeModal
+        isOpen={isImportModalOpen}
+        onClose={() => setIsImportModalOpen(false)}
+        areas={areas}
+        onSuccess={handleRefreshEmployees}
+      />
     </div>
   );
 }
