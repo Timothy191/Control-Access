@@ -124,3 +124,14 @@ skills-lock.json
 # Cloudflare tunnel info
 public_url.txt
 tunnel_info.json
+
+# Android build cache & temporary builder outputs
+android-tools-cache/
+android-builder/bin/
+android-builder/dex/
+android-builder/gen/
+android-builder/compiled_res.zip
+android-builder/*.apk
+android-builder/*.keystore
+.gradle/
+*.idsig

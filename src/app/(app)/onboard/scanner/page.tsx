@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import AdminZeroTouchSection from "@/components/admin/AdminZeroTouchSection";
 import C66LiveVerificationCard from "@/components/onboard/C66LiveVerificationCard";
+import C66ApkDownloadCard from "@/components/onboard/C66ApkDownloadCard";
 import { getTunnelUrl } from "@/lib/tunnel";
 import {
   IconArrowLeft,
@@ -43,7 +44,7 @@ export default async function ScannerOnboardPage() {
             Chainway C66 RFID Scanner Onboarding &amp; PC Link
           </h1>
           <p className="text-xs text-neutral-400 font-mono mt-1">
-            Pair rugged Android C66 handheld terminals, configure physical pistol grip triggers, and monitor live scans on this screen.
+            Download pre-configured Android companion app, pair rugged C66 handheld terminals, and monitor live scans on this screen.
           </p>
         </div>
 
@@ -58,7 +59,10 @@ export default async function ScannerOnboardPage() {
         </Link>
       </div>
 
-      {/* 1. Live PC Screen Tap Verification Console */}
+      {/* 1. Android Companion APK Download & Direct Setup Card */}
+      <C66ApkDownloadCard tunnelUrl={tunnelUrl} />
+
+      {/* 2. Live PC Screen Tap Verification Console */}
       <C66LiveVerificationCard tunnelUrl={tunnelUrl} />
 
       {/* 2. Zero-Touch QR Setup Generator */}

@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import PremiumQRCode from "./PremiumQRCode";
+import C66ApkDownloadCard from "./C66ApkDownloadCard";
 import {
   IconDeviceMobile,
   IconQrcode,
@@ -22,6 +23,7 @@ import {
   IconBroadcast,
   IconWifi,
   IconCloud,
+  IconBrandAndroid,
 } from "@tabler/icons-react";
 import type { DeviceNotification } from "@/lib/device-notifications";
 
@@ -236,6 +238,13 @@ export default function DeviceOnboardingTabs({
       {/* TAB 1: C66 Infowedge & RFID Provisioning */}
       {activeTab === "c66" && (
         <div className="space-y-6">
+          {/* Downloadable Android APK Package */}
+          <C66ApkDownloadCard
+            tunnelUrl={publicUrl}
+            serverIp={serverIp}
+            serverPort={serverPort}
+          />
+
           {/* Top Instruction Banner */}
           <div className="p-5 rounded-2xl bg-gradient-to-r from-[#007AFF]/15 via-neutral-900/60 to-neutral-900/60 border border-[#007AFF]/30 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div className="space-y-1">
@@ -867,6 +876,18 @@ export default function DeviceOnboardingTabs({
               </div>
 
               <div className="space-y-2">
+                <a
+                  href="/downloads/c66-scanner-bridge.apk"
+                  download="c66-scanner-bridge.apk"
+                  className="w-full py-2.5 px-4 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-medium text-xs transition flex items-center justify-between shadow-sm"
+                >
+                  <div className="flex items-center gap-2">
+                    <IconBrandAndroid size={16} />
+                    <span>c66-scanner-bridge.apk (Android Companion)</span>
+                  </div>
+                  <IconDownload size={15} />
+                </a>
+
                 <a
                   href="/downloads/infowedge-c66-config.json"
                   download="infowedge-c66-config.json"
