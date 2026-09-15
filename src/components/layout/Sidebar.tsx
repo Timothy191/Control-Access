@@ -45,8 +45,21 @@ export default function Sidebar() {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") setIsOpen(false);
     };
+    const onToggle = () => setIsOpen((prev) => !prev);
+    const onOpen = () => setIsOpen(true);
+    const onClose = () => setIsOpen(false);
+
     window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
+    window.addEventListener("toggle-sidebar", onToggle);
+    window.addEventListener("open-sidebar", onOpen);
+    window.addEventListener("close-sidebar", onClose);
+
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      window.removeEventListener("toggle-sidebar", onToggle);
+      window.removeEventListener("open-sidebar", onOpen);
+      window.removeEventListener("close-sidebar", onClose);
+    };
   }, []);
 
   const navSections = [
@@ -80,17 +93,6 @@ export default function Sidebar() {
 
   return (
     <>
-      {/* Mobile / Screen Hamburger Button (min 48x48px glove touch target) */}
-      <button
-        className={`fixed top-4 left-4 z-20 min-h-[48px] min-w-[48px] flex items-center justify-center p-3 backdrop-blur-md bg-black/50 border border-white/10 rounded-xl text-neutral-300 transition-all duration-300 hover:text-white hover:bg-white/10 active:scale-[0.98] cursor-pointer ${
-          isOpen ? "opacity-0 pointer-events-none -translate-x-4" : "opacity-100 translate-x-0"
-        }`}
-        onClick={() => setIsOpen(true)}
-        aria-label="Open Menu"
-      >
-        <IconMenu2 size={22} />
-      </button>
-
       <aside
         className={`fixed top-0 left-0 h-screen w-[280px] bg-[#0A0A0A]/85 backdrop-blur-2xl flex flex-col transition-transform duration-400 z-35 shadow-2xl
           ${isOpen ? "translate-x-0" : "-translate-x-full"}

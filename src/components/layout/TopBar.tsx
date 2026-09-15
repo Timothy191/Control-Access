@@ -128,8 +128,8 @@ export default function TopBar() {
   ];
 
   return (
-    <header className="w-full h-14 px-6 flex items-center justify-between backdrop-blur-2xl bg-[#141418]/75 border-b border-white/10 shadow-[0_1px_0_rgba(255,255,255,0.05)] sticky top-0 z-15 mb-6 font-sans">
-      <div className="flex items-center gap-4 ml-12 md:ml-0">
+    <header className="w-full h-14 px-4 sm:px-6 flex items-center justify-between backdrop-blur-2xl bg-[#141418]/80 border-b border-white/10 shadow-[0_1px_0_rgba(255,255,255,0.05)] sticky top-0 z-20 mb-6 font-sans">
+      <div className="flex items-center gap-3 sm:gap-4">
         <h2 className="font-sans font-semibold text-base text-white tracking-tight">
           {getPageTitle()}
         </h2>
@@ -139,11 +139,11 @@ export default function TopBar() {
           <button
             type="button"
             onClick={() => setSiteDropdownOpen(!siteDropdownOpen)}
-            className="flex items-center gap-2 min-h-[38px] px-3.5 py-2 rounded-xl border border-white/15 bg-white/[0.05] hover:bg-white/[0.1] hover:border-white/25 active:scale-[0.98] text-xs font-sans text-neutral-200 transition shadow-[inset_0_1px_0_rgba(255,255,255,0.1)] cursor-pointer"
+            className="flex items-center gap-2 h-[38px] px-3.5 py-2 rounded-xl border border-white/15 bg-white/[0.05] hover:bg-white/[0.1] hover:border-white/25 active:scale-[0.98] text-xs font-sans text-neutral-200 transition shadow-[inset_0_1px_0_rgba(255,255,255,0.1)] cursor-pointer"
             aria-label="Select Site"
           >
             <IconMapPin size={15} className="text-[#007AFF]" />
-            <span className="font-medium max-w-[140px] truncate sm:max-w-none">{selectedSite}</span>
+            <span className="font-medium max-w-[120px] truncate sm:max-w-none">{selectedSite}</span>
             <IconChevronDown size={14} className="text-neutral-400" />
           </button>
 
@@ -153,7 +153,7 @@ export default function TopBar() {
                 className="fixed inset-0 z-20"
                 onClick={() => setSiteDropdownOpen(false)}
               />
-              <div className="absolute left-0 mt-2 w-64 rounded-xl border border-white/15 bg-[#1c1c22]/95 p-1.5 shadow-[0_20px_50px_rgba(0,0,0,0.85),0_0_0_1px_rgba(255,255,255,0.1)] backdrop-blur-2xl z-25">
+              <div className="absolute left-0 top-full mt-2 w-64 rounded-xl border border-white/15 bg-[#1c1c22]/95 p-1.5 shadow-[0_20px_50px_rgba(0,0,0,0.85),0_0_0_1px_rgba(255,255,255,0.1)] backdrop-blur-2xl z-25">
                 <div className="px-2.5 py-1.5 text-[10px] font-mono uppercase tracking-wider text-neutral-400">
                   Select Facility / Site
                 </div>
@@ -186,9 +186,9 @@ export default function TopBar() {
         </div>
       </div>
 
-      <div className="flex items-center gap-3 text-neutral-300">
+      <div className="flex items-center gap-2 sm:gap-3 text-neutral-300">
         <button
-          className="min-h-[38px] min-w-[38px] flex items-center justify-center p-2 hover:bg-white/10 hover:text-white rounded-xl transition-colors relative cursor-pointer active:scale-[0.98]"
+          className="h-[38px] w-[38px] flex items-center justify-center hover:bg-white/10 hover:text-white rounded-xl transition-colors relative cursor-pointer active:scale-[0.98] border border-transparent hover:border-white/10"
           aria-label="Notifications"
           type="button"
           onClick={() => router.push("/approvals")}
@@ -205,7 +205,7 @@ export default function TopBar() {
 
         <button
           onClick={handleSignOut}
-          className="min-h-[38px] flex items-center gap-2 px-3 py-1.5 rounded-xl hover:bg-white/10 hover:text-white transition-colors cursor-pointer active:scale-[0.98]"
+          className="h-[38px] flex items-center gap-2 px-3 py-1.5 rounded-xl hover:bg-white/10 hover:text-white transition-colors cursor-pointer active:scale-[0.98] border border-transparent hover:border-white/10"
           aria-label="Sign out"
           type="button"
         >
@@ -223,20 +223,20 @@ export default function TopBar() {
 
         <div className="h-4 w-px bg-white/15 hidden sm:block" />
 
-        {/* Top Right Corner Sandwich Menu Icon */}
+        {/* Top Right Corner Sandwich Menu Icon - Seamlessly Integrated into Top Banner */}
         <div className="relative z-30">
           <button
             type="button"
             onClick={() => setMenuOpen(!menuOpen)}
-            className={`min-h-[44px] min-w-[44px] flex items-center justify-center p-2.5 rounded-xl border transition-all duration-200 cursor-pointer active:scale-[0.96] ${
+            className={`h-[38px] w-[38px] flex items-center justify-center rounded-xl border transition-all duration-200 cursor-pointer active:scale-[0.96] ${
               menuOpen
-                ? "bg-[#007AFF] text-white border-[#007AFF] shadow-[0_0_15px_rgba(0,122,255,0.4)]"
-                : "bg-white/[0.08] text-white border-white/15 hover:bg-white/[0.15] hover:border-white/30"
+                ? "bg-[#007AFF] text-white border-[#007AFF] shadow-[0_0_12px_rgba(0,122,255,0.4)]"
+                : "bg-white/[0.05] text-neutral-200 border-white/15 hover:bg-white/[0.12] hover:text-white hover:border-white/25 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]"
             }`}
-            aria-label="Toggle Quick Navigation Sandwich Menu"
-            title="Sandwich Navigation Menu"
+            aria-label="Toggle Navigation Menu"
+            title="Navigation Menu"
           >
-            {menuOpen ? <IconX size={20} /> : <IconMenu2 size={20} />}
+            {menuOpen ? <IconX size={18} /> : <IconMenu2 size={18} />}
           </button>
 
           {menuOpen && (
@@ -245,13 +245,22 @@ export default function TopBar() {
                 className="fixed inset-0 z-40 bg-black/40 backdrop-blur-xs"
                 onClick={() => setMenuOpen(false)}
               />
-              <div className="absolute right-0 mt-3 w-72 rounded-2xl border border-white/20 bg-[#141418]/95 p-3 shadow-[0_25px_60px_rgba(0,0,0,0.9),0_0_0_1px_rgba(255,255,255,0.1)] backdrop-blur-3xl z-50 animate-in fade-in slide-in-from-top-2 duration-150">
+              <div className="absolute right-0 top-full mt-2 w-72 rounded-2xl border border-white/20 bg-[#141418]/95 p-3 shadow-[0_25px_60px_rgba(0,0,0,0.9),0_0_0_1px_rgba(255,255,255,0.1)] backdrop-blur-3xl z-50 animate-in fade-in slide-in-from-top-2 duration-150">
                 <div className="flex items-center justify-between px-2 pb-2 mb-2 border-b border-white/10">
                   <div className="flex items-center gap-2">
                     <IconMenu2 size={16} className="text-[#007AFF]" />
                     <span className="text-xs font-semibold text-white tracking-tight">Navigation Menu</span>
                   </div>
-                  <span className="text-[10px] font-mono text-neutral-400 bg-white/10 px-1.5 py-0.5 rounded">All Tabs</span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMenuOpen(false);
+                      window.dispatchEvent(new CustomEvent("open-sidebar"));
+                    }}
+                    className="text-[10px] font-mono text-[#007AFF] hover:text-blue-300 bg-[#007AFF]/10 hover:bg-[#007AFF]/20 px-2 py-0.5 rounded transition cursor-pointer"
+                  >
+                    Open Drawer →
+                  </button>
                 </div>
 
                 <div className="max-h-[75vh] overflow-y-auto space-y-3 pr-1 scrollbar-thin">
