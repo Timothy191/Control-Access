@@ -138,7 +138,7 @@ export default function InteractiveStatCard({
     <div 
       ref={cardRef}
       onMouseMove={handleCardMouseMove}
-      className="group relative h-[190px] w-full overflow-hidden rounded-xl bg-black border border-white/10 p-5 transition-colors hover:border-white/20 flex flex-col justify-between"
+      className="group relative h-[190px] w-full overflow-hidden rounded-2xl bg-[#141418]/80 backdrop-blur-2xl border border-white/10 p-5 shadow-[0_8px_32px_rgba(0,0,0,0.36)] transition-all duration-200 hover:border-white/20 flex flex-col justify-between"
     >
       {/* Vercel Spotlight Glow */}
       <div 
@@ -148,7 +148,7 @@ export default function InteractiveStatCard({
         }}
       />
       
-      {/* Top Hairline Sheen with Accent Glow */}
+      {/* Top Acrylic Sheen with Accent Glow */}
       <div
         className="pointer-events-none absolute inset-x-0 top-0 h-[1.5px] opacity-80"
         style={{

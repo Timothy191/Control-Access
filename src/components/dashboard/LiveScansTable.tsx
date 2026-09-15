@@ -241,7 +241,7 @@ export default function LiveScansTable({
   };
 
   return (
-    <div className="relative overflow-hidden rounded-2xl border border-white/10 bg-[#18181b]/80 backdrop-blur-2xl shadow-[0_8px_32px_rgba(0,0,0,0.36)] flex flex-col font-sans transition-all">
+    <div className="relative overflow-hidden rounded-2xl border border-white/10 hover:border-white/20 bg-[#141418]/80 backdrop-blur-2xl shadow-[0_8px_32px_rgba(0,0,0,0.36)] flex flex-col font-sans transition-all duration-200">
       {/* Top macOS Acrylic Accent */}
       <div className="pointer-events-none absolute inset-x-0 top-0 h-[1px] bg-gradient-to-r from-transparent via-white/20 to-transparent" />
 

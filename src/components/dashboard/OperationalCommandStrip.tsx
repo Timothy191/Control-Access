@@ -208,7 +208,7 @@ export default function OperationalCommandStrip({
         className={`relative overflow-hidden rounded-2xl border transition-all duration-300 shadow-[0_8px_32px_rgba(0,0,0,0.36)] backdrop-blur-2xl ${
           isLockdown
             ? "bg-red-950/40 border-red-500/40 shadow-[0_0_25px_rgba(239,68,68,0.2)]"
-            : "bg-[#18181b]/80 border-white/10"
+            : "bg-[#141418]/80 border-white/10 hover:border-white/20"
         }`}
       >
         {/* Subtle macOS Top Acrylic Highlight */}

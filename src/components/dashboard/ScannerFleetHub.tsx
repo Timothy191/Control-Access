@@ -61,7 +61,10 @@ export default function ScannerFleetHub() {
   const onlineDevices = devices.filter((d) => d.isOnline);
 
   return (
-    <div className="rounded-2xl bg-[#18181b]/80 border border-white/10 p-4 sm:p-6 backdrop-blur-2xl shadow-xl space-y-4">
+    <div className="relative overflow-hidden rounded-2xl bg-[#141418]/80 hover:border-white/20 border border-white/10 p-4 sm:p-6 backdrop-blur-2xl shadow-[0_8px_32px_rgba(0,0,0,0.36)] space-y-4 transition-all duration-200">
+      {/* Top Acrylic Highlight */}
+      <div className="pointer-events-none absolute inset-x-0 top-0 h-[1px] bg-gradient-to-r from-transparent via-white/20 to-transparent" />
+
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-white/10 pb-4">
         <div className="flex items-center gap-3">
@@ -121,8 +124,8 @@ export default function ScannerFleetHub() {
               key={device.id}
               className={`p-3.5 rounded-xl border transition-all ${
                 device.isOnline
-                  ? "bg-neutral-900/90 border-emerald-500/30 hover:border-emerald-500/50"
-                  : "bg-neutral-900/50 border-white/10 hover:border-white/20"
+                  ? "bg-black/50 border-emerald-500/30 hover:border-emerald-500/50"
+                  : "bg-black/40 border-white/10 hover:border-white/20"
               }`}
             >
               <div className="flex items-center justify-between gap-2 mb-2">
