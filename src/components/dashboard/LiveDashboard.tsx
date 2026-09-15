@@ -152,7 +152,7 @@ export default function LiveDashboard({
         </div>
 
         {/* 3D Digital Rotating Globe Telemetry - 4 Cols */}
-        <div className="lg:col-span-4 flex">
+        <div className="lg:col-span-4 w-full h-[400px]">
           <DigitalGlobeTelemetry
             recentScans={stats.recentScans}
             totalScans={stats.totalScans}
@@ -161,7 +161,7 @@ export default function LiveDashboard({
       </div>
 
       {/* Corporate Kiosk Quick Launch & Operational Links */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
         <Link
           href="/scanner"
           className="corporate-card p-4 flex items-center justify-between group hover:border-blue-500/40 transition-all min-h-[48px]"
