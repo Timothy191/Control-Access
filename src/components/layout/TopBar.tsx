@@ -130,6 +130,80 @@ export default function TopBar() {
   return (
     <header className="w-full h-14 px-4 sm:px-6 flex items-center justify-between backdrop-blur-2xl bg-[#141418]/80 border-b border-white/10 shadow-[0_1px_0_rgba(255,255,255,0.05)] sticky top-0 z-20 mb-6 font-sans">
       <div className="flex items-center gap-3 sm:gap-4">
+        {/* Menu Interaction Icon - Placed before the Wording 'Dashboard' */}
+        <div className="relative z-30">
+          <button
+            type="button"
+            onClick={() => setMenuOpen(!menuOpen)}
+            className={`h-[38px] w-[38px] flex items-center justify-center rounded-xl border transition-all duration-200 cursor-pointer active:scale-[0.96] ${
+              menuOpen
+                ? "bg-[#007AFF] text-white border-[#007AFF] shadow-[0_0_12px_rgba(0,122,255,0.4)]"
+                : "bg-white/[0.05] text-neutral-200 border-white/15 hover:bg-white/[0.12] hover:text-white hover:border-white/25 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]"
+            }`}
+            aria-label="Toggle Navigation Menu"
+            title="Navigation Menu"
+          >
+            {menuOpen ? <IconX size={18} /> : <IconMenu2 size={18} />}
+          </button>
+
+          {menuOpen && (
+            <>
+              <div
+                className="fixed inset-0 z-40 bg-black/40 backdrop-blur-xs"
+                onClick={() => setMenuOpen(false)}
+              />
+              <div className="absolute left-0 top-full mt-2 w-72 rounded-2xl border border-white/20 bg-[#141418]/95 p-3 shadow-[0_25px_60px_rgba(0,0,0,0.9),0_0_0_1px_rgba(255,255,255,0.1)] backdrop-blur-3xl z-50 animate-in fade-in slide-in-from-top-2 duration-150">
+                <div className="flex items-center justify-between px-2 pb-2 mb-2 border-b border-white/10">
+                  <div className="flex items-center gap-2">
+                    <IconMenu2 size={16} className="text-[#007AFF]" />
+                    <span className="text-xs font-semibold text-white tracking-tight">Navigation Menu</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMenuOpen(false);
+                      window.dispatchEvent(new CustomEvent("open-sidebar"));
+                    }}
+                    className="text-[10px] font-mono text-[#007AFF] hover:text-blue-300 bg-[#007AFF]/10 hover:bg-[#007AFF]/20 px-2 py-0.5 rounded transition cursor-pointer"
+                  >
+                    Open Drawer →
+                  </button>
+                </div>
+
+                <div className="max-h-[75vh] overflow-y-auto space-y-3 pr-1 scrollbar-thin">
+                  {quickNavSections.map((sec) => (
+                    <div key={sec.category} className="space-y-1">
+                      <div className="px-2 text-[10px] font-mono uppercase tracking-wider text-neutral-400">
+                        {sec.category}
+                      </div>
+                      {sec.items.map((item) => {
+                        const Icon = item.icon;
+                        const active = pathname === item.href;
+                        return (
+                          <Link
+                            key={item.href}
+                            href={item.href}
+                            onClick={() => setMenuOpen(false)}
+                            className={`flex items-center gap-3 px-2.5 py-2 rounded-xl text-xs font-medium transition cursor-pointer active:scale-[0.98] ${
+                              active
+                                ? "bg-[#007AFF] text-white shadow-sm"
+                                : "text-neutral-200 hover:bg-white/10 hover:text-white"
+                            }`}
+                          >
+                            <Icon size={16} className={active ? "text-white" : "text-neutral-400"} />
+                            <span className="flex-1 truncate">{item.name}</span>
+                            {active && <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />}
+                          </Link>
+                        );
+                      })}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </>
+          )}
+        </div>
+
         <h2 className="font-sans font-semibold text-base text-white tracking-tight">
           {getPageTitle()}
         </h2>
@@ -220,82 +294,6 @@ export default function TopBar() {
           </div>
           <IconLogout size={16} className="ml-1 text-neutral-400 hover:text-white" />
         </button>
-
-        <div className="h-4 w-px bg-white/15 hidden sm:block" />
-
-        {/* Top Right Corner Sandwich Menu Icon - Seamlessly Integrated into Top Banner */}
-        <div className="relative z-30">
-          <button
-            type="button"
-            onClick={() => setMenuOpen(!menuOpen)}
-            className={`h-[38px] w-[38px] flex items-center justify-center rounded-xl border transition-all duration-200 cursor-pointer active:scale-[0.96] ${
-              menuOpen
-                ? "bg-[#007AFF] text-white border-[#007AFF] shadow-[0_0_12px_rgba(0,122,255,0.4)]"
-                : "bg-white/[0.05] text-neutral-200 border-white/15 hover:bg-white/[0.12] hover:text-white hover:border-white/25 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]"
-            }`}
-            aria-label="Toggle Navigation Menu"
-            title="Navigation Menu"
-          >
-            {menuOpen ? <IconX size={18} /> : <IconMenu2 size={18} />}
-          </button>
-
-          {menuOpen && (
-            <>
-              <div
-                className="fixed inset-0 z-40 bg-black/40 backdrop-blur-xs"
-                onClick={() => setMenuOpen(false)}
-              />
-              <div className="absolute right-0 top-full mt-2 w-72 rounded-2xl border border-white/20 bg-[#141418]/95 p-3 shadow-[0_25px_60px_rgba(0,0,0,0.9),0_0_0_1px_rgba(255,255,255,0.1)] backdrop-blur-3xl z-50 animate-in fade-in slide-in-from-top-2 duration-150">
-                <div className="flex items-center justify-between px-2 pb-2 mb-2 border-b border-white/10">
-                  <div className="flex items-center gap-2">
-                    <IconMenu2 size={16} className="text-[#007AFF]" />
-                    <span className="text-xs font-semibold text-white tracking-tight">Navigation Menu</span>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setMenuOpen(false);
-                      window.dispatchEvent(new CustomEvent("open-sidebar"));
-                    }}
-                    className="text-[10px] font-mono text-[#007AFF] hover:text-blue-300 bg-[#007AFF]/10 hover:bg-[#007AFF]/20 px-2 py-0.5 rounded transition cursor-pointer"
-                  >
-                    Open Drawer →
-                  </button>
-                </div>
-
-                <div className="max-h-[75vh] overflow-y-auto space-y-3 pr-1 scrollbar-thin">
-                  {quickNavSections.map((sec) => (
-                    <div key={sec.category} className="space-y-1">
-                      <div className="px-2 text-[10px] font-mono uppercase tracking-wider text-neutral-400">
-                        {sec.category}
-                      </div>
-                      {sec.items.map((item) => {
-                        const Icon = item.icon;
-                        const active = pathname === item.href;
-                        return (
-                          <Link
-                            key={item.href}
-                            href={item.href}
-                            onClick={() => setMenuOpen(false)}
-                            className={`flex items-center gap-3 px-2.5 py-2 rounded-xl text-xs font-medium transition cursor-pointer active:scale-[0.98] ${
-                              active
-                                ? "bg-[#007AFF] text-white shadow-sm"
-                                : "text-neutral-200 hover:bg-white/10 hover:text-white"
-                            }`}
-                          >
-                            <Icon size={16} className={active ? "text-white" : "text-neutral-400"} />
-                            <span className="flex-1 truncate">{item.name}</span>
-                            {active && <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />}
-                          </Link>
-                        );
-                      })}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </>
-          )}
-        </div>
       </div>
     </header>
   );
