@@ -32,6 +32,22 @@
   --color-mac-border: rgba(255, 255, 255, 0.12);
   --color-mac-border-subtle: rgba(255, 255, 255, 0.06);
 
+  /* Enterprise Corporate Palette */
+  --color-corporate-navy: #090e17;
+  --color-corporate-slate: #0f172a;
+  --color-corporate-surface: rgba(15, 23, 42, 0.8);
+  --color-corporate-surface-hover: rgba(30, 41, 59, 0.9);
+  --color-corporate-surface-subtle: rgba(15, 23, 42, 0.5);
+  --color-corporate-border: rgba(148, 163, 184, 0.14);
+  --color-corporate-border-hover: rgba(59, 130, 246, 0.35);
+  --color-corporate-blue: #2563eb;
+  --color-corporate-blue-light: #3b82f6;
+  --color-corporate-blue-glow: rgba(37, 99, 235, 0.25);
+  --color-corporate-emerald: #10b981;
+  --color-corporate-amber: #f59e0b;
+  --color-corporate-ruby: #ef4444;
+  --color-corporate-gold: #d4af37;
+
   --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", var(--font-geist-sans), "Helvetica Neue", system-ui, sans-serif;
   --font-mono: "SF Mono", var(--font-geist-mono), SFMono-Regular, Menlo, Monaco, Consolas, monospace;
 }
@@ -83,7 +99,7 @@ select, option, optgroup {
   outline-offset: 2px;
 }
 
-/* Base card styling with macOS frosted vibrancy */
+/* Base card styling with macOS frosted vibrancy & Corporate elevation */
 @layer components {
   .mac-window {
     background: rgba(20, 20, 24, 0.82);
@@ -170,6 +186,44 @@ select, option, optgroup {
     transform: translateY(-2px);
   }
 
+  /* Corporate Enterprise Card Elevation */
+  .corporate-card {
+    background: rgba(15, 23, 42, 0.78);
+    backdrop-filter: blur(28px) saturate(190%);
+    -webkit-backdrop-filter: blur(28px) saturate(190%);
+    border: 1px solid rgba(148, 163, 184, 0.14);
+    box-shadow: 
+      0 10px 30px -5px rgba(0, 0, 0, 0.6),
+      0 0 0 1px rgba(255, 255, 255, 0.05),
+      inset 0 1px 0 0 rgba(255, 255, 255, 0.12);
+    border-radius: 16px;
+    transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  .corporate-card:hover {
+    border-color: rgba(59, 130, 246, 0.35);
+    box-shadow: 
+      0 18px 45px -8px rgba(0, 0, 0, 0.75),
+      0 0 0 1px rgba(59, 130, 246, 0.2),
+      inset 0 1px 0 0 rgba(255, 255, 255, 0.2);
+    transform: translateY(-2px);
+  }
+
+  .corporate-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    padding: 0.25rem 0.625rem;
+    border-radius: 9999px;
+    font-family: var(--font-mono);
+    font-size: 0.6875rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    background: rgba(255, 255, 255, 0.04);
+  }
+
   /* Consistent dark glass table surface */
   .glass-table {
     background-color: rgba(18, 18, 22, 0.7);
@@ -209,6 +263,60 @@ select, option, optgroup {
 
   .glass-table tbody tr:hover {
     background-color: rgba(255, 255, 255, 0.04);
+  }
+
+  /* Enterprise Corporate Elevated Card */
+  .corporate-card {
+    background: rgba(19, 21, 27, 0.85);
+    backdrop-filter: blur(28px) saturate(180%);
+    -webkit-backdrop-filter: blur(28px) saturate(180%);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    box-shadow: 
+      0 0 0 1px rgba(0, 0, 0, 0.5),
+      0 16px 40px -8px rgba(0, 0, 0, 0.7),
+      inset 0 1px 0 0 rgba(255, 255, 255, 0.16);
+    border-radius: 16px;
+  }
+
+  .corporate-panel {
+    background: #0D0E12;
+    border: 1px solid rgba(255, 255, 255, 0.10);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+    border-radius: 14px;
+  }
+
+  /* Enterprise Zebra Table Striping */
+  .table-zebra tbody tr:nth-child(even) {
+    background-color: rgba(255, 255, 255, 0.018);
+  }
+  .table-zebra tbody tr:nth-child(odd) {
+    background-color: transparent;
+  }
+  .table-zebra tbody tr:hover {
+    background-color: rgba(0, 102, 255, 0.07) !important;
+  }
+
+  /* Industrial Touch Target Restraint */
+  .touch-target-industrial {
+    min-height: 48px;
+    min-width: 48px;
+  }
+
+  /* SCADA Telemetry Radar Node Beacon */
+  .scada-beacon {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .scada-beacon::after {
+    content: "";
+    position: absolute;
+    inset: -3px;
+    border-radius: 9999px;
+    background: currentColor;
+    opacity: 0.35;
+    animation: ping 2s cubic-bezier(0, 0, 0.2, 1) infinite;
   }
 }
 
@@ -351,7 +459,6 @@ select, option, optgroup {
   mask-composite: exclude;
   pointer-events: none;
 }
-
 
 /* Enterprise Industrial & Layout Restraints */
 @layer utilities {

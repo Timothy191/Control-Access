@@ -313,14 +313,14 @@ async function main() {
   });
 
   await runTest("Suite 3", "N3.2", "Sidebar close button satisfies min 48x48px touch target", () => {
-    const closeBtn = sidebarElements.find((b) => b.tag === "button" && b.line >= 115 && b.line <= 125);
+    const closeBtn = sidebarElements.find((b) => b.tag === "button" && (b.textSnippet.includes("Close Sidebar") || (b.line >= 105 && b.line <= 135)));
     assert(Boolean(closeBtn), "Close button must exist");
     assert(closeBtn!.parsedHeightPx !== null && closeBtn!.parsedHeightPx >= 48, `Must be >= 48px height, got ${closeBtn!.parsedHeightPx}`);
     assert(closeBtn!.parsedWidthPx !== null && closeBtn!.parsedWidthPx >= 48, `Must be >= 48px width, got ${closeBtn!.parsedWidthPx}`);
   });
 
   await runTest("Suite 3", "N3.3", "Sidebar navigation links meet min 48px height", () => {
-    const navLink = sidebarElements.find((b) => b.tag === "Link" && b.line >= 135 && b.line <= 150);
+    const navLink = sidebarElements.find((b) => b.tag === "Link" && (b.textSnippet.includes("item.href") || (b.line >= 125 && b.line <= 160)));
     assert(Boolean(navLink), "Must find navigation Link in Sidebar");
     assert(navLink!.parsedHeightPx !== null && navLink!.parsedHeightPx >= 48, `Sidebar navigation links must have min 48px height, got ${navLink!.parsedHeightPx}px`);
   });
@@ -330,7 +330,7 @@ async function main() {
   });
 
   await runTest("Suite 3", "N3.5", "Sidebar live tunnel copy button satisfies min 48x48px touch target", () => {
-    const copyBtn = sidebarElements.find((b) => b.tag === "button" && b.line >= 175 && b.line <= 190);
+    const copyBtn = sidebarElements.find((b) => b.tag === "button" && (b.textSnippet.includes("Copy Tunnel URL") || b.textSnippet.includes("handleCopy") || (b.line >= 160 && b.line <= 195)));
     assert(Boolean(copyBtn), "Copy button must exist");
     assert(copyBtn!.parsedHeightPx !== null && copyBtn!.parsedHeightPx >= 48, `Must be >= 48px height, got ${copyBtn!.parsedHeightPx}`);
     assert(copyBtn!.parsedWidthPx !== null && copyBtn!.parsedWidthPx >= 48, `Must be >= 48px width, got ${copyBtn!.parsedWidthPx}`);
@@ -377,7 +377,7 @@ async function main() {
   const employeeElements = parseJsxElements(employeeTable);
 
   await runTest("Suite 5", "R5.1", "EmployeeTable: Type segmented control tabs have min-h-[48px]", () => {
-    const tabButtons = employeeElements.filter((b) => b.tag === "button" && b.line >= 345 && b.line <= 380);
+    const tabButtons = employeeElements.filter((b) => b.tag === "button" && b.textSnippet.includes("setPersonnelType"));
     assert(tabButtons.length === 3, `Expected 3 type buttons, found ${tabButtons.length}`);
     for (const btn of tabButtons) {
       assert(btn.parsedHeightPx !== null && btn.parsedHeightPx >= 48, `Tab button at line ${btn.line} must be >= 48px, got ${btn.parsedHeightPx}px`);
@@ -385,11 +385,11 @@ async function main() {
   });
 
   await runTest("Suite 5", "R5.2", "EmployeeTable: Search input and 4 filter selects meet 48px height (h-12)", () => {
-    const searchInput = employeeElements.find((e) => e.tag === "input" && e.line >= 390 && e.line <= 400);
+    const searchInput = employeeElements.find((e) => e.tag === "input" && (e.textSnippet.includes("Search by name") || e.textSnippet.includes("setSearch") || (e.line >= 380 && e.line <= 485)));
     assert(Boolean(searchInput), "Search input must exist");
     assert(searchInput!.parsedHeightPx !== null && searchInput!.parsedHeightPx >= 48, `Search input must be >= 48px, got ${searchInput!.parsedHeightPx}px`);
 
-    const selects = employeeElements.filter((e) => e.tag === "select" && e.line >= 415 && e.line <= 490);
+    const selects = employeeElements.filter((e) => e.tag === "select" && (e.line >= 415 && e.line <= 580 || e.textSnippet.includes("setArea") || e.textSnippet.includes("setStatus")));
     assert(selects.length === 4, `Expected 4 filter selects in EmployeeTable, found ${selects.length}`);
     for (const sel of selects) {
       assert(sel.parsedHeightPx !== null && sel.parsedHeightPx >= 48, `Select at line ${sel.line} must be >= 48px, got ${sel.parsedHeightPx}px`);
@@ -397,7 +397,7 @@ async function main() {
   });
 
   await runTest("Suite 5", "R5.3", "EmployeeTable: Table row action buttons meet min-h-[48px]", () => {
-    const rowBtn = employeeElements.find((b) => b.tag === "button" && b.line >= 670 && b.line <= 685);
+    const rowBtn = employeeElements.find((b) => b.tag === "button" && (b.textSnippet.includes("handleOpenHistory") || (b.line >= 670 && b.line <= 780)));
     assert(Boolean(rowBtn), "Row action button must exist");
     assert(rowBtn!.parsedHeightPx !== null && rowBtn!.parsedHeightPx >= 48, `Row action button must be >= 48px, got ${rowBtn!.parsedHeightPx}px`);
   });
@@ -405,17 +405,17 @@ async function main() {
   const fleetElements = parseJsxElements(fleetExplorer);
 
   await runTest("Suite 5", "R5.4", "FleetExplorer: Category tabs, search input, and selects meet min 48px", () => {
-    const searchInput = fleetElements.find((e) => e.tag === "input" && e.line >= 230 && e.line <= 245);
+    const searchInput = fleetElements.find((e) => e.tag === "input" && (e.textSnippet.includes("setSearch") || (e.line >= 230 && e.line <= 285)));
     assert(Boolean(searchInput), "Search input must exist");
     assert(searchInput!.parsedHeightPx !== null && searchInput!.parsedHeightPx >= 48, "Search input must be >= 48px");
 
-    const tabButtons = fleetElements.filter((b) => b.tag === "button" && b.line >= 290 && b.line <= 330);
+    const tabButtons = fleetElements.filter((b) => b.tag === "button" && b.textSnippet.includes("setVehicleTab"));
     assert(tabButtons.length === 3, `Expected 3 category tabs in FleetExplorer, found ${tabButtons.length}`);
     for (const btn of tabButtons) {
       assert(btn.parsedHeightPx !== null && btn.parsedHeightPx >= 48, `Tab at line ${btn.line} must be >= 48px, got ${btn.parsedHeightPx}px`);
     }
 
-    const selects = fleetElements.filter((e) => e.tag === "select" && e.line >= 330 && e.line <= 355);
+    const selects = fleetElements.filter((e) => e.tag === "select" && (e.line >= 330 && e.line <= 430));
     assert(selects.length === 2, `Expected 2 selects in FleetExplorer, found ${selects.length}`);
     for (const sel of selects) {
       assert(sel.parsedHeightPx !== null && sel.parsedHeightPx >= 48, `Select at line ${sel.line} must be >= 48px, got ${sel.parsedHeightPx}px`);
