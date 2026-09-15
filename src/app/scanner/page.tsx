@@ -744,6 +744,86 @@ export default function PermanentC66ScannerPage() {
     }
   });
 
+  // Hardware Scan Trigger (Fires native C66 laser / UHF RFID reader or focuses hardware input trap)
+  const handleTriggerHardwareScan = useCallback(() => {
+    armAudio();
+    if (typeof navigator !== "undefined" && navigator.vibrate) {
+      try {
+        navigator.vibrate(40);
+      } catch {}
+    }
+
+    const customWin = typeof window !== "undefined" ? (window as unknown as CustomWindow) : null;
+    if (customWin?.ChainwayHardware?.triggerLaser) {
+      customWin.ChainwayHardware.triggerLaser();
+    } else if (customWin?.chainway?.triggerLaser) {
+      customWin.chainway.triggerLaser();
+    } else if (customWin?.chainway?.scanBarcode) {
+      customWin.chainway.scanBarcode();
+    }
+
+    // Keep hardware scan catcher focused
+    inputRef.current?.focus();
+  }, [armAudio]);
+
+  // Global Hardware Wedge & Pistol Grip Trigger Keydown Listener
+  useEffect(() => {
+    let hwBuffer = "";
+    let lastKeyTime = 0;
+
+    const handleGlobalKeyDown = (e: KeyboardEvent) => {
+      if (isEditingDevice) return;
+
+      // 1. Chainway C66 physical hardware trigger keycodes:
+      // 139 = Pistol Grip Trigger, 280 = Yellow side triggers, 293/294 = Scan keys, F1-F4
+      const isTriggerKey =
+        e.keyCode === 139 ||
+        e.keyCode === 280 ||
+        e.keyCode === 293 ||
+        e.keyCode === 294 ||
+        e.key === "F1" ||
+        e.key === "F2";
+
+      if (isTriggerKey) {
+        e.preventDefault();
+        handleTriggerHardwareScan();
+        return;
+      }
+
+      // 2. Hardware Keystroke Wedge Accumulator
+      const now = Date.now();
+      const timeDiff = now - lastKeyTime;
+      lastKeyTime = now;
+
+      if (e.key === "Enter") {
+        if (hwBuffer.trim().length >= 2) {
+          e.preventDefault();
+          const tag = hwBuffer.trim();
+          hwBuffer = "";
+          setScanInput("");
+          handleProcessScan(tag);
+          return;
+        }
+        hwBuffer = "";
+        return;
+      }
+
+      // Accumulate printable ASCII characters
+      if (e.key.length === 1 && !e.ctrlKey && !e.altKey && !e.metaKey) {
+        if (timeDiff > 350) {
+          hwBuffer = e.key;
+        } else {
+          hwBuffer += e.key;
+        }
+      }
+    };
+
+    window.addEventListener("keydown", handleGlobalKeyDown, true);
+    return () => {
+      window.removeEventListener("keydown", handleGlobalKeyDown, true);
+    };
+  }, [handleProcessScan, handleTriggerHardwareScan, isEditingDevice]);
+
   // Camera Fallback Scanner Activation
   const startCamera = async () => {
     setCameraActive(true);
@@ -1331,6 +1411,39 @@ export default function PermanentC66ScannerPage() {
           </div>
         </div>
       )}
+      {/* Floating Industrial On-Screen Trigger Button (Overlay for C66 Scanners & Kiosks) */}
+      <div className="fixed bottom-6 right-6 z-50 flex items-center gap-3">
+        <button
+          type="button"
+          onClick={handleTriggerHardwareScan}
+          disabled={isProcessing}
+          className={`min-h-[60px] px-5 py-3 rounded-full flex items-center gap-3 transition-all duration-300 cursor-pointer select-none touch-manipulation backdrop-blur-2xl shadow-2xl border-2 active:scale-95 ${
+            isProcessing
+              ? "bg-amber-600/90 border-amber-400 text-white shadow-amber-600/50 animate-pulse"
+              : lastResult?.accessGranted
+              ? "bg-emerald-600/95 border-emerald-400 text-white shadow-emerald-600/50"
+              : lastResult?.accessGranted === false
+              ? "bg-red-600/95 border-red-400 text-white shadow-red-600/50 animate-bounce"
+              : "bg-gradient-to-tr from-[#007AFF] via-[#0A84FF] to-cyan-500 border-white/40 text-white shadow-[#007AFF]/60 hover:shadow-[#007AFF]/80"
+          }`}
+          title="Hardware Scan Trigger (Tap or pull physical C66 pistol grip)"
+        >
+          <div className="h-10 w-10 rounded-full bg-white/20 flex items-center justify-center shrink-0">
+            <IconScan size={24} className={isProcessing ? "animate-spin" : "animate-pulse"} />
+          </div>
+          <div className="flex flex-col text-left pr-1">
+            <div className="flex items-center gap-1.5">
+              <span className="text-[10px] font-mono uppercase tracking-wider font-bold text-white/90">
+                {isProcessing ? "TRANSMITTING" : "C66 TRIGGER"}
+              </span>
+              <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-ping" />
+            </div>
+            <span className="text-sm font-extrabold font-mono tracking-tight text-white drop-shadow-sm">
+              {isProcessing ? "SENDING TO PC..." : "SCAN RFID / BARCODE"}
+            </span>
+          </div>
+        </button>
+      </div>
     </div>
   );
 }

@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { useTelemetry } from "@/hooks/useTelemetry";
+import { useScanEvents } from "@/hooks/useScanEvents";
 import { useSite } from "@/components/layout/SiteContext";
 import InteractiveStatCard from "./InteractiveStatCard";
 import LiveScansTable from "./LiveScansTable";
@@ -64,6 +65,20 @@ export default function LiveDashboard({
       clearInterval(interval);
     };
   }, [fetchStats]);
+
+  // Zero-latency real-time push: whenever a C66 scanner or RFID gate reads a tag, refresh PC screen immediately
+  useScanEvents({
+    deviceId: "ALL",
+    onScanEvent: () => {
+      fetchStats();
+    },
+    onKeyCustodyEvent: () => {
+      fetchStats();
+    },
+    onAlert: () => {
+      fetchStats();
+    },
+  });
 
   return (
     <div className="max-w-7xl 2xl:max-w-screen-2xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-2">

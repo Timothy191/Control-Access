@@ -3,8 +3,10 @@
     package="com.mine.c66bridge">
 
     <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.VIBRATE" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
 
     <application
         android:allowBackup="true"
@@ -17,7 +19,7 @@
         <activity
             android:name=".MainActivity"
             android:exported="true"
-            android:configChanges="orientation|screenSize"
+            android:configChanges="orientation|screenSize|keyboardHidden"
             android:windowSoftInputMode="adjustResize">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
@@ -25,12 +27,18 @@
             </intent-filter>
         </activity>
         
-        <!-- Broadcast Receiver for Scanner Intents -->
+        <!-- Broadcast Receiver for Chainway C66 RFID & Barcode Scanner Intents -->
         <receiver android:name=".ScanReceiver" android:exported="true">
             <intent-filter>
                 <action android:name="com.scanner.broadcast" />
                 <action android:name="android.intent.ACTION_DECODE_DATA" />
                 <action android:name="com.rsc.scan.action" />
+                <action android:name="com.rsc.action.UHF_RECEIVE_DATA" />
+                <action android:name="com.android.server.scannerservice.broadcast" />
+                <action android:name="com.rfid.KEY_DOWN" />
+                <action android:name="android.rfid.FUN_KEY" />
+                <action android:name="nl.chainway.rfid.TAG_READ" />
+                <action android:name="com.ubx.datawedge.TAG_DATA" />
             </intent-filter>
         </receiver>
     </application>

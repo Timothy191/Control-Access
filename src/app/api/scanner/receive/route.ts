@@ -101,7 +101,7 @@ export async function POST(req: Request) {
       });
     }
 
-    // 3. Send Notification to Scanner (especially if Access Denied)
+    // 3. Send Notification to Scanner and PC dashboard
     let notification;
     if (!result.accessGranted) {
       notification = await broadcastDeviceNotification({
@@ -115,7 +115,7 @@ export async function POST(req: Request) {
         denialReason: result.denialReason || "Access Denied",
         gateLocation,
         rawTag: rawData,
-        targetDeviceId: deviceId,
+        targetDeviceId: "ALL",
       });
     } else {
       notification = await broadcastDeviceNotification({
@@ -126,7 +126,7 @@ export async function POST(req: Request) {
         entityName: result.entityName,
         gateLocation,
         rawTag: rawData,
-        targetDeviceId: deviceId,
+        targetDeviceId: "ALL",
       });
     }
 

@@ -1,4 +1,5 @@
 import prisma from "@/lib/prisma";
+import { broadcastDeviceNotification } from "./device-notifications";
 import {
   resolveEntityFromDatabase,
   decodePendingScan,
@@ -460,6 +461,25 @@ export async function processScan(scanData: ScanPayload): Promise<ScanResult> {
       telemetry_data: scanData.telemetryData ?? null,
     },
   });
+
+  // 7. System-Wide Real-Time Broadcast (Pushes to PC screens, Live Dashboard & C66 Scanners)
+  try {
+    await broadcastDeviceNotification({
+      type: accessGranted ? "ACCESS_GRANTED" : "ACCESS_DENIED",
+      title: accessGranted ? `✓ ACCESS GRANTED: ${entityName}` : `⛔ ACCESS DENIED: ${entityName}`,
+      message: accessGranted
+        ? `${direction} authorized at ${scanData.gateLocation || "Main Gate"} (${entityType.toUpperCase()})`
+        : `Refused at ${scanData.gateLocation || "Main Gate"}: ${denialReason}`,
+      severity: accessGranted ? "success" : "danger",
+      targetDeviceId: "ALL",
+      entityName,
+      denialReason: denialReason || undefined,
+      gateLocation: scanData.gateLocation,
+      rawTag: rawData,
+    });
+  } catch (err) {
+    console.error("Failed to broadcast device notification from processScan:", err);
+  }
 
   return {
     logId: createdLog.id,
